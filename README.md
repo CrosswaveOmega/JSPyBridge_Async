@@ -9,7 +9,10 @@ This is a fork of [JSPyBridge](https://github.com/extremeheat/JSPyBridge) by ext
 It was created in the hopes of providing better asyncio compatibility for the defined `javascript` package, and in the process turned into a refactor of `javascript` into a more object oriented approach to provide better organization amd to eliminate the need for global variables in specific locations.
 
 As the purpose of this fork was only to modify the `javascript` package, it's specifically for running Node.js from Python.  No changes are made to `pythonia`.
-
+### current installation
+```
+ pip install -U git+https://github.com/CrosswaveOmega/JSPyBridge_Async.git
+```
 
 ## KEY CHANGES:
 * `javascript` is now `javascriptasync`

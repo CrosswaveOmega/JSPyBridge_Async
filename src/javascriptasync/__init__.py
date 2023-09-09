@@ -77,7 +77,7 @@ async def eval_js_a(js,  timeout=10):
             #print('localv',local,frame.f_back.f_locals[local])
             if not local.startswith("__"):
                 local_vars[local] = frame.f_back.f_locals[local]
-        rv = await asyncio.to_thread(config.global_jsi.evaluateWithContext,js, local_vars, timeout=timeout,forceRefs=True)
+        rv = await asyncio.to_thread(config.Config('').global_jsi.evaluateWithContext,js, local_vars, timeout=timeout,forceRefs=True)
     finally:
         del frame
     return rv
