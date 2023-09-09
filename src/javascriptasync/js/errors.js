@@ -29,7 +29,7 @@ function printError (failedCall, jsErrorline, jsStacktrace, pyErrorline, pyStack
   log('\n... across the bridge ...\n')
 
   for (const [at, line] of pyStacktrace) {
-    if (at.includes('javascript')) continue
+    if (at.includes('javascriptasync')) continue
     if (!line) {
       log(' ', chalk.dim(at))
     } else {
