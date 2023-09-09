@@ -1,6 +1,6 @@
 import os
 import time
-from javascript import require, On, Once, off, once, eval_js, init, config
+from javascriptasync import require, On, Once, off, once, eval_js, init, config
 init()
 console = config.Config('').global_jsi.console  # TODO: Remove this in 1.0
 DemoClass = require("./test.js").DemoClass

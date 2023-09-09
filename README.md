@@ -12,6 +12,7 @@ As the purpose of this fork was only to modify the `javascript` package, it's sp
 
 
 ## KEY CHANGES:
+* `javascript` is now `javascriptasync`
 * `config.py` has been encapsulated into the `JSConfig` class, all objects that need to access variables within `JSConfig` have been passed an object reference to a single unique `JSConfig` instance.
  * `__init__.py` utilizes a singleton to ensure that only one instance of an JSConfig class is created at any one time.
 * debug output now uses the logging module.
