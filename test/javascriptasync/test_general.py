@@ -1,4 +1,4 @@
-from javascript import require,  On, Once, off, once, eval_js, init
+from javascriptasync import require,  On, Once, off, once, eval_js, init
 import pytest
 init()
 """
