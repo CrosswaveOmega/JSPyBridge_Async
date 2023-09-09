@@ -4,3 +4,8 @@ __*__
 src/**/package.json
 package-lock.json
 *.egg-info
+ignoreme
+asyncjs.log
+dist
+build
+HelloWorld.txt

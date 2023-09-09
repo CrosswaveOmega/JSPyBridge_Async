@@ -1,14 +1,30 @@
-import re, sys, traceback
-
+import re
+import sys
+import traceback
+from typing import List, Tuple
 
 class JavaScriptError(Exception):
-    def __init__(self, call, jsStackTrace, pyStacktrace=None):
+    """
+    Custom exception class for JavaScript errors.
+    """
+
+    def __init__(self, call: str, jsStackTrace: List[str], pyStacktrace: List[str] = None):
+        """
+        Initialize a JavaScriptError object.
+
+        :param call: The failed JavaScript call.
+        :param jsStackTrace: JavaScript stack trace.
+        :param pyStacktrace: Python stack trace (optional).
+        """
         self.call = call
         self.js = jsStackTrace
         self.py = pyStacktrace
 
 
 class Chalk:
+    """
+    Chalk class for text coloring.
+    """
     def red(self, text):
         return "\033[91m" + text + "\033[0m"
 
@@ -49,7 +65,13 @@ class Chalk:
 chalk = Chalk()
 
 
-def format_line(line):
+def format_line(line: str) -> str:
+    """
+    Format a line of code with appropriate colors.
+
+    :param line: The code line to be formatted.
+    :return: Formatted code line.
+    """
     if line.startswith("<") or line.startswith("\\"):
         return line
     statements = [
@@ -86,7 +108,26 @@ def format_line(line):
     return line
 
 
-def print_error(failedCall, jsErrorline, jsStackTrace, jsErrorMessage, pyErrorline, pyStacktrace):
+
+def print_error(
+    failedCall: str,
+    jsErrorline: str,
+    jsStackTrace: List[str],
+    jsErrorMessage: str,
+    pyErrorline: str,
+    pyStacktrace: List[Tuple[str, str]]
+) -> List[str]:
+    """
+    Print JavaScript error details with formatted stack traces.
+
+    :param failedCall: The failed JavaScript call.
+    :param jsErrorline: JavaScript error line.
+    :param jsStackTrace: JavaScript stack trace.
+    :param jsErrorMessage: JavaScript error message.
+    :param pyErrorline: Python error line.
+    :param pyStacktrace: Formatted Python stack trace.
+    :return: List of formatted lines to be printed.
+    """    
     lines = []
     log = lambda *s: lines.append(" ".join(s))
     log(
@@ -208,7 +249,7 @@ def getErrorMessage(failed_call, jsStackTrace, pyStacktrace):
 # Fix for IPython as it blocks the exception hook
 # https://stackoverflow.com/a/28758396/11173996
 try:
-    __IPYTHON__
+    #__IPYTHON__
     import IPython.core.interactiveshell
 
     oldLogger = IPython.core.interactiveshell.InteractiveShell.showtraceback

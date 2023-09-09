@@ -44,6 +44,6 @@ elif args.uninstall:
     if os.path.exists("package.json"):
         os.system(f"npm uninstall {args.uninstall}")
     else:
-        printf("No packages are currently installed")
+        print("No packages are currently installed")
 else:
     parser.print_help(sys.stderr)

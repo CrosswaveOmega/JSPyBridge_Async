@@ -162,7 +162,7 @@ class Bridge {
     }
   }
 
-  // called for debug in JS, print() in python via __str__
+  // called for debug in JS, log_print() in python via __str__
   async inspect (r, ffid, mode) {
     const colors = supportsColors && (mode === 'str')
     const s = util.inspect(await this.m[ffid], { colors })

@@ -1,23 +1,16 @@
 # This file contains all the exposed modules
-from . import config, proxy, events
+import asyncio
+from . import config
+from .config import myst
+from .logging import log_print,logs
 import threading, inspect, time, atexit, os, sys
 
 
 def init():
-    if config.event_loop:
-        return  # Do not start event loop again
-    config.event_loop = events.EventLoop()
-    config.event_thread = threading.Thread(target=config.event_loop.loop, args=(), daemon=True)
-    config.event_thread.start()
-    config.executor = proxy.Executor(config.event_loop)
-    config.global_jsi = proxy.Proxy(config.executor, 0)
-    atexit.register(config.event_loop.on_exit)
-
-    if config.global_jsi.needsNodePatches():
-        config.node_emitter_patches = True
+    log_print('Starting up js config.')
+    config.Config('')
 
 
-init()
 
 
 def require(name, version=None):
@@ -34,15 +27,33 @@ def require(name, version=None):
             # On Notebooks, the frame info above does not exist, so assume the CWD as caller
             calling_dir = os.getcwd()
 
-    return config.global_jsi.require(name, version, calling_dir, timeout=900)
+    return config.Config('').global_jsi.require(name, version, calling_dir, timeout=900)
+
+async def require_a(name, version=None):
+    calling_dir = None
+    if name.startswith("."):
+        # Some code to extract the caller's file path, needed for relative imports
+        try:
+            namespace = sys._getframe(1).f_globals
+            cwd = os.getcwd()
+            rel_path = namespace["__file__"]
+            abs_path = os.path.join(cwd, rel_path)
+            calling_dir = os.path.dirname(abs_path)
+        except Exception:
+            # On Notebooks, the frame info above does not exist, so assume the CWD as caller
+            calling_dir = os.getcwd()
+    log_print('here')
+    coro=asyncio.to_thread(config.Config('').global_jsi.require(name, version, calling_dir, timeout=900))
+    #req=config.Config('').global_jsi.require
+    return await coro
 
 
-console = config.global_jsi.console  # TODO: Remove this in 1.0
-globalThis = config.global_jsi.globalThis
-RegExp = config.global_jsi.RegExp
+# console = config.Config('').global_jsi.console  # TODO: Remove this in 1.0
+# globalThis = config.Config('').global_jsi.globalThis
+# RegExp = config.Config('').global_jsi.RegExp
 
 
-def eval_js(js):
+def eval_js(js,  timeout=10):
     frame = inspect.currentframe()
     rv = None
     try:
@@ -50,35 +61,50 @@ def eval_js(js):
         for local in frame.f_back.f_locals:
             if not local.startswith("__"):
                 local_vars[local] = frame.f_back.f_locals[local]
-        rv = config.global_jsi.evaluateWithContext(js, local_vars, forceRefs=True)
+        rv = config.Config('').global_jsi.evaluateWithContext(js, local_vars,  timeout=timeout,forceRefs=True)
     finally:
         del frame
     return rv
 
+async def eval_js_a(js,  timeout=10):
+    frame = inspect.currentframe()
+    rv = None
+    try:
+        local_vars = {}
+        locals=frame.f_back.f_locals
+        
+        for local in frame.f_back.f_locals:
+            #print('localv',local,frame.f_back.f_locals[local])
+            if not local.startswith("__"):
+                local_vars[local] = frame.f_back.f_locals[local]
+        rv = await asyncio.to_thread(config.global_jsi.evaluateWithContext,js, local_vars, timeout=timeout,forceRefs=True)
+    finally:
+        del frame
+    return rv
 
 def AsyncTask(start=False):
     def decor(fn):
         fn.is_async_task = True
-        t = config.event_loop.newTaskThread(fn)
+        t = config.Config('').event_loop.newTaskThread(fn)
         if start:
             t.start()
 
     return decor
 
 
-start = config.event_loop.startThread
-stop = config.event_loop.stopThread
-abort = config.event_loop.abortThread
+# start = config.Config('').event_loop.startThread
+# stop = config.Config('').event_loop.stopThread
+# abort = config.Config('').event_loop.abortThread
 
 # You must use this Once decorator for an EventEmitter in Node.js, otherwise
 # you will not be able to off an emitter.
 def On(emitter, event):
-    # print("On", emitter, event,onEvent)
+    # log_print("On", emitter, event,onEvent)
     def decor(_fn):
         # Once Colab updates to Node 16, we can remove this.
         # Here we need to manually add in the `this` argument for consistency in Node versions.
         # In JS we could normally just bind `this` but there is no bind in Python.
-        if config.node_emitter_patches:
+        if config.Config('').node_emitter_patches:
 
             def handler(*args, **kwargs):
                 _fn(emitter, *args, **kwargs)
@@ -97,7 +123,7 @@ def On(emitter, event):
         # side. Normally this would be an issue, however it's fine here.
         ffid = getattr(fn, "iffid")
         setattr(fn, "ffid", ffid)
-        config.event_loop.callbacks[ffid] = fn
+        config.Config('').event_loop.callbacks[ffid] = fn
         return fn
 
     return decor
@@ -110,23 +136,23 @@ def Once(emitter, event):
         i = hash(fn)
 
         def handler(*args, **kwargs):
-            if config.node_emitter_patches:
+            if config.Config('').node_emitter_patches:
                 fn(emitter, *args, **kwargs)
             else:
                 fn(*args, **kwargs)
-            del config.event_loop.callbacks[i]
+            del config.Config('').event_loop.callbacks[i]
 
         emitter.once(event, handler)
-        config.event_loop.callbacks[i] = handler
+        config.Config('').event_loop.callbacks[i] = handler
 
     return decor
 
 
 def off(emitter, event, handler):
     emitter.off(event, handler)
-    del config.event_loop.callbacks[getattr(handler, "ffid")]
+    del config.Config('').event_loop.callbacks[getattr(handler, "ffid")]
 
 
 def once(emitter, event):
-    val = config.global_jsi.once(emitter, event, timeout=1000)
+    val = config.Config('').global_jsi.once(emitter, event, timeout=1000)
     return val

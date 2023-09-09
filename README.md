@@ -1,11 +1,33 @@
-# JSPyBridge
+# JSPyBridge - javascript asyncio fork
 [![NPM version](https://img.shields.io/npm/v/pythonia.svg)](http://npmjs.com/package/pythonia)
 [![PyPI](https://img.shields.io/pypi/v/javascript)](https://pypi.org/project/javascript/)
 [![Build Status](https://github.com/extremeheat/JSPyBridge/workflows/Node.js%20CI/badge.svg)](https://github.com/extremeheat/JSPyBridge/actions/workflows/)
 [![Gitpod ready-to-code](https://img.shields.io/badge/Gitpod-ready--to--code-blue?logo=gitpod)](https://gitpod.io/#https://github.com/extremeheat/jspybridge)
 
+This is a fork of [JSPyBridge](https://github.com/extremeheat/JSPyBridge) by extremeheat
+
+It was created in the hopes of providing better asyncio compatibility for the defined `javascript` package, and in the process turned into a refactor of `javascript` into a more object oriented approach to provide better organization amd to eliminate the need for global variables in specific locations.
+
+As the purpose of this fork was only to modify the `javascript` package, it's specifically for running Node.js from Python.  No changes are made to `pythonia`.
 
 
+## KEY CHANGES:
+* `config.py` has been encapsulated into the `JSConfig` class, all objects that need to access variables within `JSConfig` have been passed an object reference to a single unique `JSConfig` instance.
+ * `__init__.py` utilizes a singleton to ensure that only one instance of an JSConfig class is created at any one time.
+* debug output now uses the logging module.
+* `connection.py` has been encapsulated into the `ConnectionClass`, accessable through the `events.EventLoop` class as `events.EventLoop` is the only place the connection is utilized.
+* It's possible to set a custom timeout value when using eval_js.
+* async variants of `require` and `eval_js` are included within __init__.py, as `require_a` and `eval_js_a` respectively.
+* this package is now built using a `pyproject.toml` file instead of a `setup.py` script.
+* `test_general.py` now works with pytest.
+
+## TO DO:
+ * Implement dedicated asyncio mode for AsyncTasks and pcall.
+ * Fix occasional daemon thread stderr read on exit error.
+ * Build new 
+
+
+# Old JSPyBridge description.
 Interoperate Node.js and Python. You can run Python from Node.js, *or* run Node.js from Python. **Work in progress.** 
 
 Requires Node.js 14 and Python 3.8 or newer.

@@ -3,10 +3,11 @@
 import inspect, importlib, traceback
 import os, sys, json, types
 import socket
-from .proxy import Proxy
+from . import proxy, events, config
 from .errors import JavaScriptError, getErrorMessage
 from weakref import WeakValueDictionary
-
+from .logging import logs,log_print
+DUMMYI=True
 
 def python(method):
     return importlib.import_module(method, package=None)
@@ -56,8 +57,10 @@ class PyInterface:
     # Things added to this dict are auto GC'ed
     weakmap = WeakValueDictionary()
     cur_ffid = 10000
+    
 
-    def __init__(self, ipc, exe):
+    def __init__(self,config_obj:config.JSConfig, ipc, exe):
+        self.config=config_obj
         self.ipc = ipc
         # This toggles if we want to send inspect data for console logging. It's auto
         # disabled when a for loop is active; use `repr` to request logging instead.
@@ -66,8 +69,18 @@ class PyInterface:
         self.q = lambda r, key, val, sig="": self.ipc.queue_payload(
             {"c": "pyi", "r": r, "key": key, "val": val, "sig": sig}
         )
-        self.executor = exe
-
+        #self.executor:proxy.Executor = exe
+    def __str__(self):
+        res=str(self.m)
+        return res
+            
+    @property
+    def executor(self):
+        return self.config.executor
+    @executor.setter
+    def executor(self, executor):
+        pass
+        #return config.Config().ms().executor
     def assign_ffid(self, what):
         self.cur_ffid += 1
         self.m[self.cur_ffid] = what
@@ -103,6 +116,7 @@ class PyInterface:
         # For example with the .append function we don't want ['append'] taking
         # precedence in a dict. However if we're only getting objects, we can
         # first try bracket for dicts, then attributes.
+        #print(r,ffid,keys,args,kwargs)
         if invoke:
             for key in keys:
                 t = getattr(v, str(key), None)
@@ -195,10 +209,14 @@ class PyInterface:
 
     # no ACK needed
     def free(self, r, ffid, key, args):
+        logs.debug('free: %s, %s, %s, %s', r, ffid, key, args)
+        logs.debug(str(self))
         for i in args:
             if i not in self.m:
                 continue
+            logs.debug(f"purged {i}")
             del self.m[i]
+        logs.debug(str(self))    
 
     def make_signature(self, what):
         if self.send_inspect:
@@ -219,14 +237,14 @@ class PyInterface:
                 for k, v in json_input.items():
                     if isinstance(v, dict) and (lookup_key in v):
                         ffid = v[lookup_key]
-                        json_input[k] = Proxy(self.executor, ffid)
+                        json_input[k] = proxy.Proxy(self.executor, ffid)
                     else:
                         process(v, lookup_key)
             elif isinstance(json_input, list):
                 for k, v in enumerate(json_input):
                     if isinstance(v, dict) and (lookup_key in v):
                         ffid = v[lookup_key]
-                        json_input[k] = Proxy(self.executor, ffid)
+                        json_input[k] = proxy.Proxy(self.executor, ffid)
                     else:
                         process(v, lookup_key)
 
@@ -268,4 +286,5 @@ class PyInterface:
             pass
 
     def inbound(self, j):
+        logs.debug("PYI, %s",j)
         return self.onMessage(j["r"], j["action"], j["ffid"], j["key"], j["val"])

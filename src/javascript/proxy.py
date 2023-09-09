@@ -1,13 +1,15 @@
 import time, threading, json, sys, os, traceback
 from . import config, json_patch
 from .errors import JavaScriptError
+from .events import EventLoop
+from .json_patch import DUMMY
 
-debug = config.debug
-
+from .logging import logs
 # This is the Executor, something that sits in the middle of the Bridge and is the interface for
 # Python to JavaScript. This is also used by the bridge to call Python from Node.js.
 class Executor:
-    def __init__(self, loop):
+    def __init__(self, config_obj:config.JSConfig,loop:EventLoop):
+        self.conf=config_obj
         self.loop = loop
         loop.pyi.executor = self
         self.queue = loop.queue_request
@@ -32,9 +34,9 @@ class Executor:
             l = self.queue(r, {"r": r, "action": "keys", "ffid": ffid})
 
         if not l.wait(10):
-            if not config.event_thread:
-                print(config.dead)
-            print("Timed out", action, ffid, attr, repr(config.event_thread))
+            if not self.conf.event_thread:
+                print(self.conf.dead)
+            print("Timed out", action, ffid, attr, repr(self.conf.event_thread))
             raise Exception(f"Timed out accessing '{attr}'")
         res, barrier = self.loop.responses[r]
         del self.loop.responses[r]
@@ -109,10 +111,12 @@ class Executor:
             if not l2.wait(timeout):
                 raise Exception("Execution timed out")
             pre, barrier = self.loop.responses[ffidRespId]
+            logs.debug("ProxyExec:callRespId:%s ffidRespId:%s",str(callRespId),str(ffidRespId))
+
             del self.loop.responses[ffidRespId]
 
             if "error" in pre:
-                raise JavaScriptError(attr, res["error"])
+                raise JavaScriptError(attr, pre["error"])
 
             for requestId in pre["val"]:
                 ffid = pre["val"][requestId]
@@ -125,13 +129,18 @@ class Executor:
                     pass
 
             barrier.wait()
+        now=time.time()
+        logs.debug("ProxyExec: lock:%s,callRespId:%s ffidRespId:%s, timeout:%s",str(l),str(callRespId),str(ffidRespId),timeout)
 
         if not l.wait(timeout):
-            if not config.event_thread:
-                print(config.dead)
+            if not self.conf.event_thread:
+                print(self.conf.dead)
             raise Exception(
                 f"Call to '{attr}' timed out. Increase the timeout by setting the `timeout` keyword argument."
             )
+        elapsed=(time.time()-now)
+        logs.debug("ProxyExec: lock:%s,callRespId:%s ffidRespId:%s, timeout:%s, took: %s",str(l),str(callRespId),str(ffidRespId),timeout,elapsed)
+
         res, barrier = self.loop.responses[callRespId]
         del self.loop.responses[callRespId]
 
@@ -171,12 +180,16 @@ class Executor:
         return self.bridge.m[ffid]
 
 
+
+
 INTERNAL_VARS = ["ffid", "_ix", "_exe", "_pffid", "_pname", "_es6", "_resolved", "_Keys"]
 
 # "Proxy" classes get individually instanciated for every thread and JS object
 # that exists. It interacts with an Executor to communicate.
 class Proxy(object):
     def __init__(self, exe, ffid, prop_ffid=None, prop_name="", es6=False):
+        
+        logs.debug("new Proxy: %s, %s,%s,%s,%s", exe,ffid,prop_ffid,prop_name,es6)
         self.ffid = ffid
         self._exe = exe
         self._ix = 0
@@ -186,11 +199,14 @@ class Proxy(object):
         self._es6 = es6
         self._resolved = {}
         self._Keys = None
+        
+        logs.debug("new Proxy init done: %s, %s,%s,%s,%s", exe,ffid,prop_ffid,prop_name,es6)
 
     def _call(self, method, methodType, val):
+        #log_print("calling call", method, methodType,val)
         this = self
 
-        debug("MT", method, methodType, val)
+        logs.debug("Proxy._call: %s, %s,%s,%s", "MT", method, methodType, val)
         if methodType == "fn":
             return Proxy(self._exe, val, self.ffid, method)
         if methodType == "class":
@@ -207,6 +223,7 @@ class Proxy(object):
             return val
 
     def __call__(self, *args, timeout=10, forceRefs=False):
+        logs.debug("calling __call__.  Timeout: %d, Args: %s", timeout, str(args))
         mT, v = (
             self._exe.initProp(self._pffid, self._pname, args)
             if self._es6
@@ -220,22 +237,29 @@ class Proxy(object):
 
     def __getattr__(self, attr):
         # Special handling for new keyword for ES5 classes
+        
+        logs.debug("proxy.get_attr start %s", attr)
         if attr == "new":
             return self._call(self._pname if self._pffid == self.ffid else "", "class", self._pffid)
         methodType, val = self._exe.getProp(self._pffid, attr)
+        logs.debug("proxy.get_attr %s, methodType: %s, val %s", attr,methodType,val)
         return self._call(attr, methodType, val)
 
     def __getitem__(self, attr):
+        logs.debug("proxy.get_item %s", attr)
         methodType, val = self._exe.getProp(self.ffid, attr)
         return self._call(attr, methodType, val)
 
     def __iter__(self):
         self._ix = 0
+        logs.debug("proxy. __iter__")
         if self.length == None:
             self._Keys = self._exe.keys(self.ffid)
         return self
 
     def __next__(self):
+        
+        logs.debug("proxy. __next__")
         if self._Keys:
             if self._ix < len(self._Keys):
                 result = self._Keys[self._ix]
@@ -251,29 +275,48 @@ class Proxy(object):
             raise StopIteration
 
     def __setattr__(self, name, value):
+        
+        logs.debug("proxy.setattr, name:%s, value:%s",name,value)
         if name in INTERNAL_VARS:
             object.__setattr__(self, name, value)
         else:
+            
+            logs.debug("proxy.setattr, call to setProp needed, name:%s, value:%s",name,value)
             return self._exe.setProp(self.ffid, name, value)
 
     def __setitem__(self, name, value):
+        
+        logs.debug("proxy.setitem, name:%s, value:%s",name,value)
         return self._exe.setProp(self.ffid, name, value)
 
     def __contains__(self, key):
+        
+        logs.debug("proxy.contains, key:%s",key)
         return True if self[key] is not None else False
 
     def valueOf(self):
         ser = self._exe.ipc("serialize", self.ffid, "")
+        
+        logs.debug("proxy.valueOf, %s",ser)
         return ser["val"]
 
     def __str__(self):
+        
+        logs.debug("proxy.str")
         return self._exe.inspect(self.ffid, "str")
 
     def __repr__(self):
+        
+        logs.debug("proxy.repr")
         return self._exe.inspect(self.ffid, "repr")
 
     def __json__(self):
+        
+        logs.debug("proxy.json")
         return {"ffid": self.ffid}
 
     def __del__(self):
+        
+        logs.debug("proxy.del")
         self._exe.free(self.ffid)
+
