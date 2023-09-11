@@ -23,8 +23,7 @@ class JSConfig(object):
     async_mode:bool=False
     def __init__(self):
         self.async_mode=False
-        from . import proxy, events
-        import threading, inspect, time, atexit, sys
+        from . import proxy
         #if self.event_loop:     return  # Do not start event loop again
         self.event_loop:None #events.EventLoop = events.EventLoop()
         self.event_thread:None #threading.Thread = threading.Thread(target=self.event_loop.loop, args=(), daemon=True)
@@ -50,24 +49,6 @@ class JSConfig(object):
         self.node_emitter_patches:bool=False
         atexit.register(self.event_loop.on_exit)
 
-
-
-    # async def astartup(self):
-        
-    #     log_print("Configuring Config.")
-    #     self.event_loop:events.EventLoop = events.EventLoop(True)
-    #     await self.event_loop.add_loop()
-    #     self.event_thread=asyncio.ensure_future(self.event_loop.aloop())
-    #     #self.event_thread:threading.Thread = threading.Thread(target=self.event_loop.loop, args=(), daemon=True)
-    #     #self.event_thread.start()
-    #     self.executor:proxy.AsyncExecutor = proxy.AsyncExecutor(self.event_loop)
-    #     # # The "root" interface to JavaScript with FFID 0
-    #     self.global_jsi:proxy.AProxy = proxy.AProxy(self.executor, 0)
-    #     self.fast_mode:bool=False
-    #     # Whether we need patches for legacy node versions
-    #     self.node_emitter_patches:bool=False
-    #     atexit.register(self.event_loop.on_exit)
-    #     log_print("Config complete") 
 
     def check_node_patches(self):
 
@@ -98,55 +79,62 @@ class classproperty:
     def __get__(self,instance,owner):
         return self.fget(owner)
 class Config:
-    
+    '''Singleton Container for JSConfig.'''
 
     _instance = None
     _initalizing=False
     _asyncmode=False
     def __init__(self, arg, asyncmode=False):
+        
+        frame=inspect.currentframe()
+        last_path=print_path(frame.f_back)
+        logs.debug(f'attempted init:[{last_path}]')
         if not Config._instance and not Config._initalizing:
             Config._initalizing=True
             Config._asyncmode=asyncmode
             instance = JSConfig()
-            
             Config._instance = instance
             if not Config._asyncmode:
                 log_print(Config._asyncmode)
                 Config._instance.startup()
                 Config._initalizing=False
-        if Config._initalizing:
+        elif Config._initalizing:
             frame=inspect.currentframe()
             lp=print_path(frame)
+            logs.warning(lp)
             log_print(f'attempted init during initalization:[{lp}]')
-    # async def initasync(self):
-    #     await Config._instance.astartup()
-    #     self.dummyv=JSConfig(False)
-    #     Config._initalizing=False
+
     @classmethod
     def inst(cls):
         return Config._instance
+    @classmethod
+    def get_inst(cls):
+        '''
+        Check if Config._instance was initalized and ready.
+        '''
+        if not Config._instance:
+            raise Exception("Never initalized JSConfig, please call javascriptasync.init() somewhere in your code first!")
+        elif Config._initalizing:
+            raise Exception("Still initalizing JSConfig, please wait!")
+        return Config._instance
+
     def ms(self):
         return Config._instance
-    # @classmethod
-    # def __getattr__(self, attr):
-    #     if hasattr(Config._instance,attr):
-    #         return getattr(Config._instance,attr)
-    #     raise Exception('Huh?')
+
     def __getattr__(self, attr):
         if hasattr(Config,attr):
             return getattr(Config,attr)
         else:
             if hasattr(Config._instance,attr):
                 return getattr(Config._instance,attr)
-            raise Exception('Huh?')
+            raise Exception('Tried to get attr on instance object that does not exist.')
     def __setattr__(self, attr,val):
         if hasattr(Config,attr):
             return setattr(Config,attr,val)
         else:
             if hasattr(Config._instance,attr):
                 return setattr(Config._instance,attr,val)
-            raise Exception('Huh?')
+            raise Exception('Tried to set attr on instance object that does not exist.')
 
 
 myst:JSConfig=None
-DUMMY=True

@@ -19,6 +19,24 @@ except Exception:
 
 
 class ConnectionClass():
+    """
+    Encapsulated connection class for interacting with JavaScript.
+
+    This class manages the communication between Python and JavaScript.
+
+    Attributes:
+        config (config.JSConfig): Config Object piped into here.
+        endself(bool): if the thread is ending, send nothing else.
+        stdout (object): The standard output.
+        notebook (bool): True if running in a Jupyter notebook, False otherwise.
+        NODE_BIN (str): The path to the Node.js binary.
+        dn (str): The directory containing this file.
+        proc (subprocess.Popen): The subprocess for running JavaScript.
+        com_thread (threading.Thread): The thread for handling communication with JavaScript.
+        stdout_thread (threading.Thread): The thread for reading standard output.
+        sendQ (list): Queue for outgoing messages to JavaScript.
+        stderr_lines (list): Lines piped from JavaScript Process
+    """
     #Encapsulated connection to make this file easier to work with.
     # Special handling for IPython jupyter notebooks
     stdout = sys.stdout
@@ -29,18 +47,30 @@ class ConnectionClass():
     com_thread = None
     stdout_thread = None
 
+    stderr_lines = []
 
     sendQ = []
 
     def is_notebook(self):
+        """
+        Check if running in a Jupyter notebook.
+
+        Returns:
+            bool: True if running in a notebook, False otherwise.
+        """
         return ISNOTEBOOK
 
         
 
     def __init__(self,config:config.JSConfig):
+        """
+        Initialize the ConnectionClass.
+
+        Args:
+            config (config.JSConfig): Configuration for JavaScript interaction.
+        """
         self.config=config
         # Modified stdout
-        self.killlock=threading.Lock()
         self.endself=False
         self.modified_stdout = (sys.stdout != sys.__stdout__) or (getattr(sys, 'ps1', sys.flags.interactive) == '>>> ')
 
@@ -79,6 +109,14 @@ class ConnectionClass():
     
 
     def read_stderr(self,stderrs):
+        """
+        Read and process stderr messages from the node.js process.
+        Args:
+            stderrs (list): List of error messages.
+
+        Returns:
+            list: Processed error messages.
+        """
         ret = []
         for stderr in stderrs:
             inp = stderr.decode("utf-8")
@@ -99,6 +137,12 @@ class ConnectionClass():
     # Write a message to a remote socket, in this case it's standard input
     # but it could be a websocket (slower) or other generic pipe.
     def writeAll(self,objs):
+        """
+        Write messages to the node.js process.
+
+        Args:
+            objs (list): List of messages to be sent.
+        """
         for obj in objs:
             if type(obj) == str:
                 j = obj + "\n"
@@ -120,18 +164,37 @@ class ConnectionClass():
                 break
 
 
-    stderr_lines = []
 
     # Reads from the socket, in this case it's standard error. Returns an array
     # of responses from the server.
     def readAll(self):
+        """
+        Read and process all messages from the node.js process.
+
+        Returns:
+            list: Processed messages.
+        """
         ret = self.read_stderr(self.stderr_lines)
         self.stderr_lines.clear()
         return ret
 
     
     def com_io(self):
-        
+        """
+        Handle communication with the node.js process.
+
+        This method runs as an endless daemon thread, initializing a Node.js
+        instance and managing the piping of input and output between Python and
+        JavaScript. It launches a new daemon thread using `com_io` as the
+        function.
+
+        The node.js process is spawned with the specified Node.js binary and
+        a bridge script, which facilitates communication.
+
+        Raises:
+            Exception: If there's an issue spawning the JS process or if any
+            exceptions occur during communication.
+        """
         try:
             if os.name == 'nt' and 'idlelib.run' in sys.modules:
                 logs.debug('subprossess mode s')
@@ -167,19 +230,20 @@ class ConnectionClass():
 
         while self.proc.poll() == None:
             
-            #self.killlock.acquire()
-            #log_print('killlock checking for input')
             readline=self.proc.stderr.readline()
             self.stderr_lines.append(readline)
             self.config.event_loop.queue.put("stdin")
             
-            #log_print('killlock release for input')
-            #self.killlock.release()
-
-        self.stop()
+        print(self.endself)
+        if not self.endself:
+            self.stop()
 
 
     def stdout_read(self):
+        """
+        Read and process standard output from the JavaScript process.
+        This is only for Jupyter notebooks.
+        """
         while self.proc.poll() is None:
 
             if not self.endself:
@@ -188,21 +252,28 @@ class ConnectionClass():
 
 
     def start(self):
+        """
+        Start the communication thread.
+        """
         logs.info("ConnectionClass.com_thread opened")
         self.com_thread = threading.Thread(target=self.com_io, args=(), daemon=True)
         self.com_thread.start()
 
 
     def stop(self):
-        
+        """
+        Terminate the node.js process.
+        """
         self.endself=True
-        
         time.sleep(4)
-        
-        print('terminating.')
+        log_print('terminating JS connection..')
         try:
-            #log_print('STOP.')
             self.proc.terminate()
+            print('Terminated JS Runtime.')
+            time.sleep(3)
+            print('Killing JS runtime.')
+            self.proc.kill()
+            
         except Exception as e:
             raise e
         self.config.reset_self()
@@ -210,7 +281,10 @@ class ConnectionClass():
 
 
     def is_alive(self):
+        """
+        Check if the node.js process is still running.
+
+        Returns:
+            bool: True if the process is running, False otherwise.
+        """
         return self.proc.poll() is None
-
-
-DUMMYc=True

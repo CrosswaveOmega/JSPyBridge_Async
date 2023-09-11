@@ -17,14 +17,15 @@ As the purpose of this fork was only to modify the `javascript` package, it's sp
 ## KEY CHANGES:
 * `javascript` is now `javascriptasync`
 * `config.py` has been encapsulated into the `JSConfig` class, all objects that need to access variables within `JSConfig` have been passed an object reference to a single unique `JSConfig` instance.
- * `__init__.py` utilizes a singleton to ensure that only one instance of an JSConfig class is created at any one time.
+ * `__init__.py` utilizes a singleton to ensure that only one instance of an JSConfig class is created at any one time.  You need to call `init()` to start up the bridge!
 * debug output now uses the logging module.
 * `connection.py` has been encapsulated into the `ConnectionClass`, accessable through the `events.EventLoop` class as `events.EventLoop` is the only place the connection is utilized.
 * It's possible to set a custom timeout value when using eval_js.
 * async variants of `require` and `eval_js` are included within __init__.py, as `require_a` and `eval_js_a` respectively.
 * this package is now built using a `pyproject.toml` file instead of a `setup.py` script.
 * `test_general.py` now works with pytest.
-
+* `console`, `globalThis`, and `RegExp` have to be retrieved with the `get_console()`, `get_globalThis()`, and `get_RegExp()` functions.
+* `start`, `stop`, and `abort` has to be retrieved with the `get_start_stop_abort` function.
 ## TO DO:
  * Implement dedicated asyncio mode for AsyncTasks and pcall.
  * Fix occasional daemon thread stderr read on exit error.

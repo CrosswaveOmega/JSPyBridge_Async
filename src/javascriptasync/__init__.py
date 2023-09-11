@@ -1,20 +1,23 @@
 # This file contains all the exposed modules
 import asyncio
 from . import config
-from .config import myst
+from .config import Config
 from .logging import log_print,logs
 import threading, inspect, time, atexit, os, sys
 
 
 def init():
     log_print('Starting up js config.')
-    config.Config('')
+    Config('')
 
 
 
 
 def require(name, version=None):
+    print('require')
     calling_dir = None
+    
+    conf=Config.get_inst()
     if name.startswith("."):
         # Some code to extract the caller's file path, needed for relative imports
         try:
@@ -27,10 +30,12 @@ def require(name, version=None):
             # On Notebooks, the frame info above does not exist, so assume the CWD as caller
             calling_dir = os.getcwd()
 
-    return config.Config('').global_jsi.require(name, version, calling_dir, timeout=900)
+    return conf.global_jsi.require(name, version, calling_dir, timeout=900)
 
 async def require_a(name, version=None):
     calling_dir = None
+    
+    conf=Config.get_inst()
     if name.startswith("."):
         # Some code to extract the caller's file path, needed for relative imports
         try:
@@ -43,31 +48,57 @@ async def require_a(name, version=None):
             # On Notebooks, the frame info above does not exist, so assume the CWD as caller
             calling_dir = os.getcwd()
     log_print('here')
-    coro=asyncio.to_thread(config.Config('').global_jsi.require(name, version, calling_dir, timeout=900))
-    #req=config.Config('').global_jsi.require
+    coro=asyncio.to_thread(conf.global_jsi.require(name, version, calling_dir, timeout=900))
+    #req=conf.global_jsi.require
     return await coro
 
 
-# console = config.Config('').global_jsi.console  # TODO: Remove this in 1.0
-# globalThis = config.Config('').global_jsi.globalThis
-# RegExp = config.Config('').global_jsi.RegExp
+def get_console():
+    '''
+    This function returns the console object from the JavaScript context which can be used to print 
+    direct messages in your Node.js console from the Python context. It does so by grabbing the console 
+    object from the global JavaScript Interface (JSI) stored in the Config singleton instance.
+
+    '''
+    return Config.get_inst().global_jsi.console  # TODO: Remove this in 1.0
+def get_globalThis():
+    '''
+     This function returns the globalThis object from the JavaScript context. The globalThis object is 
+    a standard built-in object in JavaScript, similar to window in a browser or global in Node.js. 
+    It's used as a universal way to access the global scope in any environment. This function provides 
+    a way to access this object from the Python context.
+
+    '''
+    globalThis = Config.get_inst().global_jsi.globalThis
+    return globalThis
+def get_RegExp():
+    '''
+    This function returns the RegExp (Regular Expression) object from the JavaScript context. Regular 
+    Expressions in JavaScript are used to perform pattern-matching and "search-and-replace" functions 
+    on text. This function returns this RegExp object to the Python environment.
+    '''
+    return Config.get_inst().global_jsi.RegExp
 
 
 def eval_js(js,  timeout=10):
     frame = inspect.currentframe()
+    
+    conf=Config.get_inst()
     rv = None
     try:
         local_vars = {}
         for local in frame.f_back.f_locals:
             if not local.startswith("__"):
                 local_vars[local] = frame.f_back.f_locals[local]
-        rv = config.Config('').global_jsi.evaluateWithContext(js, local_vars,  timeout=timeout,forceRefs=True)
+        rv = conf.global_jsi.evaluateWithContext(js, local_vars,  timeout=timeout,forceRefs=True)
     finally:
         del frame
     return rv
 
 async def eval_js_a(js,  timeout=10):
     frame = inspect.currentframe()
+    
+    conf=Config.get_inst()
     rv = None
     try:
         local_vars = {}
@@ -77,34 +108,51 @@ async def eval_js_a(js,  timeout=10):
             #print('localv',local,frame.f_back.f_locals[local])
             if not local.startswith("__"):
                 local_vars[local] = frame.f_back.f_locals[local]
-        rv = await asyncio.to_thread(config.Config('').global_jsi.evaluateWithContext,js, local_vars, timeout=timeout,forceRefs=True)
+        rv = await asyncio.to_thread(conf.global_jsi.evaluateWithContext,js, local_vars, timeout=timeout,forceRefs=True)
     finally:
         del frame
     return rv
 
 def AsyncTask(start=False):
     def decor(fn):
+        
+        conf=Config.get_inst() 
         fn.is_async_task = True
-        t = config.Config('').event_loop.newTaskThread(fn)
+        t = conf.event_loop.newTaskThread(fn)
         if start:
             t.start()
 
     return decor
 
+def get_start_stop_abort():
+    '''
+    Gets functions to start, stop, and abort thread from the event loop context.
 
-# start = config.Config('').event_loop.startThread
-# stop = config.Config('').event_loop.stopThread
-# abort = config.Config('').event_loop.abortThread
+    This function provides a bridge to the startThread, stopThread, and abortThread methods 
+    available in the event loop context of Node.js, enabling control over threads from within
+    Python context. It does so by grabbing these methods from the event loop which is stored in 
+    the Config singleton instance.
+
+    Returns:
+        tuple: The startThread, stopThread, and abortThread methods from the JavaScript event loop context.
+    '''
+    conf=Config.get_inst()
+    start = conf.event_loop.startThread
+    stop = conf.event_loop.stopThread
+    abort = conf.event_loop.abortThread
+    return start,stop,abort
 
 # You must use this Once decorator for an EventEmitter in Node.js, otherwise
 # you will not be able to off an emitter.
 def On(emitter, event):
     # log_print("On", emitter, event,onEvent)
     def decor(_fn):
+        
+        conf=Config.get_inst()
         # Once Colab updates to Node 16, we can remove this.
         # Here we need to manually add in the `this` argument for consistency in Node versions.
         # In JS we could normally just bind `this` but there is no bind in Python.
-        if config.Config('').node_emitter_patches:
+        if conf.node_emitter_patches:
 
             def handler(*args, **kwargs):
                 _fn(emitter, *args, **kwargs)
@@ -123,7 +171,8 @@ def On(emitter, event):
         # side. Normally this would be an issue, however it's fine here.
         ffid = getattr(fn, "iffid")
         setattr(fn, "ffid", ffid)
-        config.Config('').event_loop.callbacks[ffid] = fn
+        
+        conf.event_loop.callbacks[ffid] = fn
         return fn
 
     return decor
@@ -136,23 +185,29 @@ def Once(emitter, event):
         i = hash(fn)
 
         def handler(*args, **kwargs):
-            if config.Config('').node_emitter_patches:
+            if conf.node_emitter_patches:
                 fn(emitter, *args, **kwargs)
             else:
                 fn(*args, **kwargs)
-            del config.Config('').event_loop.callbacks[i]
+            del conf.event_loop.callbacks[i]
 
         emitter.once(event, handler)
-        config.Config('').event_loop.callbacks[i] = handler
+        
+        conf=Config.get_inst()
+        conf.event_loop.callbacks[i] = handler
 
     return decor
 
 
 def off(emitter, event, handler):
     emitter.off(event, handler)
-    del config.Config('').event_loop.callbacks[getattr(handler, "ffid")]
+    
+    conf=Config.get_inst()
+    del conf.event_loop.callbacks[getattr(handler, "ffid")]
 
 
 def once(emitter, event):
-    val = config.Config('').global_jsi.once(emitter, event, timeout=1000)
+    
+    conf=Config.get_inst()
+    val = conf.global_jsi.once(emitter, event, timeout=1000)
     return val

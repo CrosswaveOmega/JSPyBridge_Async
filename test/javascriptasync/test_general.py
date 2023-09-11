@@ -1,6 +1,6 @@
 from javascriptasync import require,  On, Once, off, once, eval_js, init
 import pytest
-init()
+
 """
 demo=None
 class Tester()
@@ -265,11 +265,13 @@ test_order = [
 @pytest.mark.only_test_this
 def test_run_order():
     # Create an instance of the test class
+    init()
     test_instance = TestJavaScriptLibrary()
     for test_name in test_order:
         print('testing ',test_name)
         getattr(test_instance, test_name)()
 
 if __name__ == "__main__":
+    test_run_order()
     # Run all test methods in the specified order
-    pytest.main()
+    #pytest.main()

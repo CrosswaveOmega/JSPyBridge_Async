@@ -7,7 +7,7 @@ from . import proxy, events, config
 from .errors import JavaScriptError, getErrorMessage
 from weakref import WeakValueDictionary
 from .logging import logs,log_print
-DUMMYI=True
+
 
 def python(method):
     return importlib.import_module(method, package=None)

@@ -5,16 +5,28 @@ from . import config, pyi
 from queue import Queue
 from weakref import WeakValueDictionary
 
-from .pyi import DUMMYI
 from .logging import logs, log_print
 
 from .connection import ConnectionClass
 class TaskState:
+    """
+    Represents the state of a task.
+
+    Attributes:
+        stopping (bool): Indicates whether the task should stop.
+        sleep (function): A function used to sleep for a specified duration.
+    """
     def __init__(self):
         self.stopping = False
         self.sleep = self.wait
 
     def wait(self, sec):
+        """
+        Wait for a specified duration.
+
+        Args:
+            sec (float): The duration to wait in seconds.
+        """
         stopTime = time.time() + sec
         while time.time() < stopTime and not self.stopping:
             time.sleep(0.2)
@@ -22,7 +34,14 @@ class TaskState:
             sys.exit(1)
 
 
-class EventExecutorThread(threading.Thread):
+class EventExecutorThread(threading.Thread): 
+    """Represents a thread for executing events locally
+
+    Attributes:
+        running (bool): Indicates whether the thread is running.
+        jobs (Queue): A queue for storing jobs to be executed.
+        doing (list): A list of jobs currently being executed.
+    """
     running = True
     jobs = Queue()
     doing = []
@@ -32,12 +51,24 @@ class EventExecutorThread(threading.Thread):
         #self.daemon=True
 
     def add_job(self, request_id, cb_id, job, args):
+        """
+        Add a job to the event executor thread.
+
+        Args:
+            request_id: The ID of the request.
+            cb_id: The ID of the callback.
+            job: The job function to execute.
+            args: Arguments for the job.
+        """
         if request_id in self.doing:
             return  # We already are doing this
         self.doing.append(request_id)
         self.jobs.put([request_id, cb_id, job, args])
 
     def run(self):
+        """
+        Run the event executor thread.
+        """
         while self.running:
             request_id, cb_id, job, args = self.jobs.get()
             logs.debug('EVT %s, %s,%s,%s',request_id,cb_id,job,args)
@@ -50,6 +81,22 @@ class EventExecutorThread(threading.Thread):
 # JS and Python happens through this event loop. Because of Python's "Global Interperter Lock"
 # only one thread can run Python at a time, so no race conditions to worry about.
 class EventLoop:
+    """
+    Represents an event loop for managing IO and threads.
+
+    Attributes:
+        active (bool): Indicates whether the event loop is active.
+        queue (Queue): A queue for storing events to be processed.
+        freeable (list): A list of freeable items.
+        callbackExecutor (EventExecutorThread): An event executor thread for handling callbacks.
+        callbacks (WeakValueDictionary): A dictionary of active callbacks.
+        threads (list): A list of threads managed by the event loop.
+        outbound (list): A list of outbound payloads.
+        requests (dict): A dictionary of request IDs and locks.
+        responses (dict): A dictionary of response data and barriers.
+        conn(ConnectionClass): Instance of the connection class.
+        conf(JSConfig): The JSConfig instance this class belongs to.
+    """
     active = True
     queue = Queue()
     freeable = []
@@ -75,6 +122,13 @@ class EventLoop:
     responses = {}  # Map of requestID -> response payload
 
     def __init__(self,config_container,amode=False):
+        """
+        Initialize the EventLoop.
+
+        Args:
+            config_container: Configuration container.
+            amode (bool): Indicates whether the loop is in "async" mode.
+        """
         self.conn= ConnectionClass(config_container)
         self.conf=config_container
         if not amode:
@@ -89,10 +143,23 @@ class EventLoop:
         
         #self.callbackExecutor.start()
     def stop(self):
+        """
+        Stop the event loop.
+        """
         self.conn.stop()
 
     # === THREADING ===
     def newTaskThread(self, handler, *args):
+        """
+        Create a new task thread.
+
+        Args:
+            handler: The handler function for the thread.
+            *args: Additional arguments for the handler function.
+
+        Returns:
+            threading.Thread: The created thread.
+        """
         state = TaskState()
         t = threading.Thread(target=handler, args=(state, *args), daemon=True)
         self.threads.append([state, handler, t])
@@ -105,6 +172,12 @@ class EventLoop:
         return t
 
     def startThread(self, method):
+        """
+        Start a thread.
+
+        Args:
+            method: The method associated with the thread.
+        """
         for state, handler, thread in self.threads:
             if method == handler:
                 thread.start()
@@ -114,6 +187,12 @@ class EventLoop:
 
     # Signal to the thread that it should stop. No forcing.
     def stopThread(self, method):
+        """
+        Stop a thread.
+
+        Args:
+            method: The method associated with the thread.
+        """
         for state, handler, thread in self.threads:
             if method == handler:
                 logs.debug(
@@ -123,6 +202,13 @@ class EventLoop:
 
     # Force the thread to stop -- if it doesn't kill after a set amount of time.
     def abortThread(self, method, killAfter=0.5):
+        """
+        Abort a thread.
+
+        Args:
+            method: The method associated with the thread.
+            killAfter (float): Time in seconds to wait before forcefully killing the thread.
+        """
         for state, handler, thread in self.threads:
             if handler == method:
                 state.stopping = True
@@ -139,6 +225,12 @@ class EventLoop:
 
     # Stop the thread immediately
     def terminateThread(self, method):
+        """
+        Terminate a thread.
+
+        Args:
+            method: The method associated with the thread.
+        """
         for state, handler, thread in self.threads:
             if handler == method:
                 logs.debug(
@@ -151,6 +243,17 @@ class EventLoop:
 
     # `queue_request` pushes this event onto the Payload
     def queue_request(self, request_id, payload, timeout=None)->threading.Event:
+        """
+        Queue a request to be sent with the payload
+
+        Args:
+            request_id: The ID of the request.
+            payload: The payload to be sent.
+            timeout (float): Timeout duration in seconds.
+
+        Returns:
+            threading.Event: An event for waiting on the response.
+        """
         self.outbound.append(payload)
         lock = threading.Event()
         self.requests[request_id] = [lock, timeout]
@@ -159,11 +262,27 @@ class EventLoop:
         return lock
 
     def queue_payload(self, payload):
+        """
+        Just send the payload to be sent.
+
+        Args:
+            payload: The payload to be sent.
+        """
         self.outbound.append(payload)
         logs.debug("EventLoop: added %s to payload",str(payload))
         self.queue.put("send")
 
     def await_response(self, request_id, timeout=None)->threading.Event:
+        """
+        Await a response for a request.
+
+        Args:
+            request_id: The ID of the request.
+            timeout (float): Timeout duration in seconds.
+
+        Returns:
+            threading.Event: An event for waiting on the response.
+        """
         lock = threading.Event()
         self.requests[request_id] = [lock, timeout]
         logs.debug("EventLoop: await_response. rid %s.  lock=%s, timeout:%s",str(request_id),str(lock),timeout)
@@ -171,6 +290,9 @@ class EventLoop:
         return lock
 
     def on_exit(self):
+        """
+        Handle the exit of the event loop.
+        """
         log_print('calling self.exit')
         log_print(str(self.responses))
         log_print(str(self.requests))
@@ -185,6 +307,9 @@ class EventLoop:
 
     # === LOOP ===
     def loop(self):
+        """
+        Main loop for processing events and managing IO.
+        """
         r=0
         while self.active:
             # Wait until we have jobs
