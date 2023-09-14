@@ -103,7 +103,13 @@ class Config:
             lp=print_path(frame)
             logs.warning(lp)
             log_print(f'attempted init during initalization:[{lp}]')
-
+    def kill(self):
+        if not Config._instance:
+            raise Exception("Never initalized JSConfig, please call javascriptasync.init_js() somewhere in your code first!")
+        elif Config._initalizing:
+            raise Exception("Still initalizing JSConfig, please wait!")
+        Config._instance.event_loop.on_exit()
+        Config._instance=None
     @classmethod
     def inst(cls):
         return Config._instance
@@ -113,7 +119,7 @@ class Config:
         Check if Config._instance was initalized and ready.
         '''
         if not Config._instance:
-            raise Exception("Never initalized JSConfig, please call javascriptasync.init() somewhere in your code first!")
+            raise Exception("Never initalized JSConfig, please call javascriptasync.init_js() somewhere in your code first!")
         elif Config._initalizing:
             raise Exception("Still initalizing JSConfig, please wait!")
         return Config._instance

@@ -9,7 +9,7 @@ description = "fork of JSPyBridge to provide limited asyncio compatibility and l
 readme = 'README.md'
 
 keywords = ['node', 'javascript', 'bridge', 'development','fork']
-version = '0.0.1.3'
+version = '0.0.1.4'
 
 [project.urls]
 "Homepage"= "https://github.com/CrosswaveOmega/JSPyBridge_Async"
@@ -115,7 +115,7 @@ asyncio_mode = "strict"
 pythonpath = [
   "src"
 ]
-testpaths = "tests"
+testpaths = "test/javascriptasync"
 junit_family = "xunit2"
 markers = [
     "integration: marks as integration test",

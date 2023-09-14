@@ -1,20 +1,23 @@
 # This file contains all the exposed modules
 import asyncio
+from typing import Coroutine
 from . import config
 from .config import Config
 from .logging import log_print,logs
 import threading, inspect, time, atexit, os, sys
 
 
-def init():
+def init_js():
     log_print('Starting up js config.')
     Config('')
 
-
+def kill_js():
+    Config('').kill()
+    print('killed js')
 
 
 def require(name, version=None):
-    print('require')
+    #print('require')
     calling_dir = None
     
     conf=Config.get_inst()
@@ -48,7 +51,7 @@ async def require_a(name, version=None):
             # On Notebooks, the frame info above does not exist, so assume the CWD as caller
             calling_dir = os.getcwd()
     log_print('here')
-    coro=asyncio.to_thread(conf.global_jsi.require(name, version, calling_dir, timeout=900))
+    coro=conf.global_jsi.require(name, version, calling_dir, timeout=900,coroutine=True)
     #req=conf.global_jsi.require
     return await coro
 
@@ -95,7 +98,7 @@ def eval_js(js,  timeout=10):
         del frame
     return rv
 
-async def eval_js_a(js,  timeout=10):
+async def eval_js_a(js,  timeout=10, as_thread=False)->Coroutine:
     frame = inspect.currentframe()
     
     conf=Config.get_inst()
@@ -108,10 +111,13 @@ async def eval_js_a(js,  timeout=10):
             #print('localv',local,frame.f_back.f_locals[local])
             if not local.startswith("__"):
                 local_vars[local] = frame.f_back.f_locals[local]
-        rv = await asyncio.to_thread(conf.global_jsi.evaluateWithContext,js, local_vars, timeout=timeout,forceRefs=True)
+        if not as_thread:
+            rv = conf.global_jsi.evaluateWithContext(js, local_vars, timeout=timeout,forceRefs=True,coroutine=True)
+        else:
+            rv = asyncio.to_thread(conf.global_jsi.evaluateWithContext,js, local_vars, timeout=timeout,forceRefs=True)
     finally:
         del frame
-    return rv
+    return await rv
 
 def AsyncTask(start=False):
     def decor(fn):

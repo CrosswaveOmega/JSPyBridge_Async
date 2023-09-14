@@ -234,7 +234,7 @@ class ConnectionClass():
             self.stderr_lines.append(readline)
             self.config.event_loop.queue.put("stdin")
             
-        print(self.endself)
+        print("Termination condition", self.endself)
         if not self.endself:
             self.stop()
 

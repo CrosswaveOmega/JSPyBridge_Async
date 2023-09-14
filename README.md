@@ -6,7 +6,7 @@
 
 This is a fork of [JSPyBridge](https://github.com/extremeheat/JSPyBridge) by extremeheat
 
-It was created in the hopes of providing better asyncio compatibility for the defined `javascript` package, and in the process turned into a refactor of `javascript` into a more object oriented approach to provide better organization amd to eliminate the need for global variables in specific locations.
+It was created in the hopes of providing better asyncio compatibility for the defined `javascript` package, and in the process turned into a refactor of `javascript` into a more object oriented approach to provide better organization and to eliminate the need for global variables in specific locations.
 
 As the purpose of this fork was only to modify the `javascript` package, it's specifically for running Node.js from Python.  No changes are made to `pythonia`.
 ### current installation
@@ -26,10 +26,26 @@ As the purpose of this fork was only to modify the `javascript` package, it's sp
 * `test_general.py` now works with pytest.
 * `console`, `globalThis`, and `RegExp` have to be retrieved with the `get_console()`, `get_globalThis()`, and `get_RegExp()` functions.
 * `start`, `stop`, and `abort` has to be retrieved with the `get_start_stop_abort` function.
+* any call or init operation can be made into a coroutine by passing in the `coroutine=True` keyword.
+
+### New Javascript from Python usage:
+```py
+import asyncio
+from javascriptasync import init_js, require_a, get_globalThis
+init_js()
+async def main():
+  chalk, fs = await require_a("chalk"), await require_a("fs")
+  globalThis=get_globalThis()
+  datestr=await (await globalThis.Date(coroutine=True)).toLocaleString(coroutine=True)
+  print("Hello", chalk.red("world!"), "it's", datestr)
+  fs.writeFileSync("HelloWorld.txt", "hi!")
+
+asyncio.run(main)
+```
 ## TO DO:
- * Implement dedicated asyncio mode for AsyncTasks and pcall.
  * Fix occasional daemon thread stderr read on exit error.
- * Build new 
+ * ensure events have an asyncio compatible equivalent
+ * proper async emitter support
 
 
 # Old JSPyBridge description.

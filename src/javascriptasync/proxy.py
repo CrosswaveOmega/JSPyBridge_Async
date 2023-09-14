@@ -1,3 +1,4 @@
+import asyncio
 import time, threading, json, sys, os, traceback
 from . import config, json_patch
 from .errors import JavaScriptError
@@ -131,7 +132,7 @@ class Executor:
 
     # forceRefs=True means that the non-primitives in the second parameter will not be recursively
     # parsed for references. It's specifcally for eval_js.
-    def pcallalt(self, ffid, action, attr, args, *, timeout=1000, forceRefs=False):
+    async def pcallalt(self, ffid, action, attr, args, *, timeout=1000, forceRefs=False):
         """
         This function does a two-part call to JavaScript. First, a preliminary request is made to JS
         with the function ID, attribute, and arguments that Python would like to call. For each of the
@@ -160,12 +161,15 @@ class Executor:
         
         callRespId= packet["r"]
         
-        l = self.loop.queue_request(callRespId, payload)
+        l = self.loop.queue_request(callRespId, payload, asyncmode=True, loop=asyncio.get_event_loop())
+        #print('asymc',payload,l)
         # We only have to wait for a FFID assignment response if
         # we actually sent any non-primitives, otherwise skip
         if self.expectReply:
-            l2 = self.loop.await_response(ffidRespId)
-            if not l2.wait(timeout):
+            l2 = self.loop.await_response(ffidRespId, asyncmode=True, loop=asyncio.get_event_loop())
+            try:
+                await asyncio.wait_for(l2.wait(), timeout)
+            except asyncio.TimeoutError:
                 raise Exception("Execution timed out")
             pre, barrier = self.loop.responses[ffidRespId]
             logs.debug("ProxyExec:callRespId:%s ffidRespId:%s",str(callRespId),str(ffidRespId))
@@ -188,13 +192,15 @@ class Executor:
             barrier.wait()
         now=time.time()
         logs.debug("ProxyExec: lock:%s,callRespId:%s ffidRespId:%s, timeout:%s",str(l),str(callRespId),str(ffidRespId),timeout)
-
-        if not l.wait(timeout):
+        try:
+            await asyncio.wait_for(l.wait(), timeout)
+        except asyncio.TimeoutError:
             if not self.conf.event_thread:
                 print(self.conf.dead)
             raise Exception(
                 f"Call to '{attr}' timed out. Increase the timeout by setting the `timeout` keyword argument."
             )
+           
         elapsed=(time.time()-now)
         logs.debug("ProxyExec: lock:%s,callRespId:%s ffidRespId:%s, timeout:%s, took: %s",str(l),str(callRespId),str(ffidRespId),timeout,elapsed)
 
@@ -395,7 +401,7 @@ class Executor:
         Returns:
             tuple: The response key and value.
         """
-        resp = self.pcall(ffid, "call", method, args, timeout=timeout, forceRefs=forceRefs)
+        resp = await self.pcallalt(ffid, "call", method, args, timeout=timeout, forceRefs=forceRefs)
         return resp
     
     async def initPropAsync(self, ffid, method, args):
@@ -410,7 +416,7 @@ class Executor:
         Returns:
             tuple: The response key and value.
         """
-        resp = self.pcall(ffid, "init", method, args)
+        resp = await self.pcallalt(ffid, "init", method, args)
         return resp
 
     def inspect(self, ffid, mode):
@@ -550,9 +556,9 @@ class Proxy(object):
         """
         logs.debug("calling coro_call.  Timeout: %d, Args: %s", timeout, str(args))
         if self._es6:
-            mT,v=self._exe.initProp(self._pffid, self._pname, args)
+            mT,v=await self._exe.initPropAsync(self._pffid, self._pname, args)
         else:
-            mT,v=self._exe.callProp(
+            mT,v=await self._exe.callPropAsync(
                 self._pffid, self._pname, args, timeout=timeout, forceRefs=forceRefs
             )
         if mT == "fn":
@@ -572,7 +578,7 @@ class Proxy(object):
             Any: The result of the call.
         """
         if coroutine:
-            return self.coro_call( *args, timeout=10, forceRefs=False)
+            return self.coro_call( *args, timeout=timeout, forceRefs=forceRefs)
         logs.debug("calling __call__.  Timeout: %d, Args: %s", timeout, str(args))
         if self._es6:
             mT,v=self._exe.initProp(self._pffid, self._pname, args)

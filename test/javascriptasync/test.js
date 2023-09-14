@@ -37,8 +37,9 @@ class DemoClass extends EventEmitter {
   }
 
   async callback (cb) {
-    const { python } = globalThis.JSPyBridge
-    const numpy = await python('math')
+    var { python } = globalThis.JSPyBridge
+    var numpy = await python('math')
+    console.log("mathok")
     console.log('callback from JS', cb, await numpy.sqrt(9))
     await cb('It works !')
   }

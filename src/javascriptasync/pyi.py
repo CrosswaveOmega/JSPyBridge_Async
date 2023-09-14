@@ -118,8 +118,12 @@ class PyInterface:
         # first try bracket for dicts, then attributes.
         #print(r,ffid,keys,args,kwargs)
         if invoke:
+            
+            logs.info("INVOKING MODE %s,%s,%s,%s",v,type(v),str(keys),str(args))
             for key in keys:
                 t = getattr(v, str(key), None)
+                
+                logs.info("GET MODE %s,%s,%s,%s",v,type(v),str(key),str(args))
                 if t:
                     v = t
                 elif hasattr(v, "__getitem__"):
@@ -149,6 +153,7 @@ class PyInterface:
         if invoke:
             if inspect.isclass(v):
                 was_class = True
+            logs.info("INVOKING %s,%s,%s",v,type(v),was_class)
             v = v(*args, **kwargs)
         typ = type(v)
         if typ is str:

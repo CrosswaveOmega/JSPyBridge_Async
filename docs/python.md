@@ -2,7 +2,9 @@
 
 (See README.md for some additional details)
 
-* All function calls to JavaScript are thread synchronous
+It's functionally equivalent to the original `javascript` library, with the major front end differences being the manual bridge initalization,asyncio compatible require and eval_js methods, and optionally asyncronous JavaScript init, and function calls. 
+* All function calls to JavaScript are thread synchronous by default.
+  * This can be changed by including a `coroutine=True` kwarg in the function call
 * ES6 classes can be constructed without new
 * ES5 classes can be constructed with the .new psuedo method
 * Use `@On` decorator when binding event listeners. Use `off` to disable it.
@@ -12,13 +14,13 @@
 
 ## Built-ins
 
-Dependencies are automatically maanged through the library through the `require` function. If
+Dependencies are automatically manged through the library through the `require` function. If
 you run into issues with dependencies, you can clear the internal `node_modules` folder cache
-by using `python3 -m javascript --clean` in a command line.
+by using `python3 -m javascriptasync --clean` in a command line.
 
-You can update the internal packages with `python3 -m javascript --update <npm package>`. 
+You can update the internal packages with `python3 -m javascriptasync --update <npm package>`. 
 
-You can install a package internally by using `python3 -m javascript --install <npm package>`. Internally, whatever you place after --update will be passed to `npm install <...>`. For example, use `python3 -m javascript --install PrismarineJS/vec3` to install the `vec3` package from git.
+You can install a package internally by using `python3 -m javascriptasync --install <npm package>`. Internally, whatever you place after --update will be passed to `npm install <...>`. For example, use `python3 -m javascriptasync --install PrismarineJS/vec3` to install the `vec3` package from git.
 
 ### imports
 
@@ -32,14 +34,28 @@ def require ( package_name: str, package_version: Optional[str] = None ) -> Void
   require from the local or global npm registry. If not found, install the specified package name
   and version. These two combine to create a unique ID, for example `chalk--1.0`. This ensures two
   different versiond don't collide. This parameter is ignored for relative imports.
+```py
+async def require_a ( package_name: str, package_version: Optional[str] = None ) -> Void
+```
+ Use this if you don't want to block an active asyncio event loop.
+* `package_name` : The name of the npm package you want to import. If you use a relative import
+  (starting with . or /) then it will load the file relative to where your calling script is.
+* `package_version` : The version of the npm package you want to install. If blank, first try to
+  require from the local or global npm registry. If not found, install the specified package name
+  and version. These two combine to create a unique ID, for example `chalk--1.0`. This ensures two
+  different versiond don't collide. This parameter is ignored for relative imports.
 
 ### threads
 
-This library provides some wrappers around threads. You aren't forced to use them, but they
+The base library provided some wrappers around threads. You aren't forced to use them, but they
 help you avoid boilerplate and are simple to use.
 
+**The only difference is you get the start, stop, and abort wrappers via the get_start_stop_abort function.**
+
 ```py
-from javascript import AsyncTask, start, stop, abort
+from javascriptasync import init_js, AsyncTask, get_start_stop_abort
+init_js()
+start,stop,abort=get_start_stop_abort()
 @AsyncTask(start=True)
 def routine(task: TaskState):
   ...
@@ -68,7 +84,9 @@ the process once the `stopping` flag is True.
 
 ```py
 import time
-from javascript import AsyncTask, start, stop, abort
+from javascriptasync import init_js, AsyncTask, get_start_stop_abort
+init_js()
+start,stop,abort=get_start_stop_abort()
 @AsyncTask(start=False)
 def routine(task: TaskState):
   while not task.stopping: # You can also just do `while True` as long as you use task.sleep and not time.sleep
@@ -96,7 +114,8 @@ Note that you are still able to use the `once` static function from Node.js's `e
 This library provides a default export for this, used as in the example below.
 
 ```py
-from javascript import require, On, Once, off, once
+from javascriptasync import init_js, require, On, Once, off, once
+init_js()
 MyEmitter = require('./emitter.js')
 # New class instance
 myEmitter = MyEmitter()
@@ -114,9 +133,11 @@ myEmitter.inc()
 
 You can use the exported `eval_js` function to evaluate JavaScript code within the current Python context. The parameter to this function is a JS string to evaluate, with access to all the Python variables in scope. Make sure to use `await` anywhere you do a function call or a property access on a Python object. You can set variables without await.
 
-```julia
-import javascript
+**Unique to this fork, you can set a timeout value on the python side.**
 
+```julia
+import javascriptasync
+javascriptasync.init_js()
 countUntil = 9
 myArray = [1]
 myObject = { 'hello': '' }
@@ -128,7 +149,28 @@ output = javascript.eval_js('''
         await myArray.append(2)
     }
     return 'it worked'
-''')
+''', timeout=20)
+
+# If we look at myArray and myObject, we should see it updated
+print(output, myArray, myObject)
+```
+There's also an asyncrounous variant in eval_js_a
+
+```julia
+import javascriptasync
+javascriptasync.init_js()
+countUntil = 9
+myArray = [1]
+myObject = { 'hello': '' }
+
+# Make sure you await everywhere you expect a JS call !
+output = await javascript.eval_js_a('''
+    myObject['world'] = 'hello'    
+    for (let x = 0; x < countUntil; x++) {
+        await myArray.append(2)
+    }
+    return 'it worked'
+''', timeout=20)
 
 # If we look at myArray and myObject, we should see it updated
 print(output, myArray, myObject)

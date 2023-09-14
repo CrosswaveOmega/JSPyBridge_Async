@@ -1,12 +1,14 @@
-
+import pytest
+import asyncio
 import pytest
 
-@pytest.mark
+
+@pytest.mark.usefixtures
 def testpy():
     import os
     import time
-    from javascriptasync import require, On, Once, off, once, eval_js, init, get_console
-    init()
+    from javascriptasync import require, On, Once, off, once, eval_js, init_js, get_console
+    init_js()
     console = get_console()  # TODO: Remove this in 1.0
     DemoClass = require("./test.js").DemoClass
 
@@ -90,3 +92,7 @@ def testpy():
     print("My var", pythonObject)
 
     print("OK, we can now exit")
+
+
+if __name__ == "__main__":
+    testpy()

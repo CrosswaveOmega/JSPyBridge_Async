@@ -8,6 +8,18 @@ from weakref import WeakValueDictionary
 from .logging import logs, log_print
 
 from .connection import ConnectionClass
+
+class Event_ts(asyncio.Event):
+    def __init__(self, _loop=None,*args, **kwargs):
+        super().__init__(*args, **kwargs)
+        if self._loop is None:
+            self._loop = _loop
+
+    def set(self):
+        self._loop.call_soon_threadsafe(super().set)
+
+    def clear(self):
+        self._loop.call_soon_threadsafe(super().clear)
 class TaskState:
     """
     Represents the state of a task.
@@ -242,7 +254,7 @@ class EventLoop:
     # == IO ==
 
     # `queue_request` pushes this event onto the Payload
-    def queue_request(self, request_id, payload, timeout=None)->threading.Event:
+    def queue_request(self, request_id, payload, timeout=None,asyncmode=False,loop=None)->threading.Event:
         """
         Queue a request to be sent with the payload
 
@@ -255,7 +267,10 @@ class EventLoop:
             threading.Event: An event for waiting on the response.
         """
         self.outbound.append(payload)
-        lock = threading.Event()
+        if asyncmode:
+            lock = Event_ts(_loop=loop)
+        else:
+            lock = threading.Event()
         self.requests[request_id] = [lock, timeout]
         logs.debug("EventLoop: queue_request. rid %s. payload=%s,  lock=%s, timeout:%s",str(request_id),str(payload),str(lock),timeout)
         self.queue.put("send")
@@ -272,7 +287,7 @@ class EventLoop:
         logs.debug("EventLoop: added %s to payload",str(payload))
         self.queue.put("send")
 
-    def await_response(self, request_id, timeout=None)->threading.Event:
+    def await_response(self, request_id, timeout=None,asyncmode=False,loop=None)->threading.Event:
         """
         Await a response for a request.
 
@@ -283,7 +298,10 @@ class EventLoop:
         Returns:
             threading.Event: An event for waiting on the response.
         """
-        lock = threading.Event()
+        if asyncmode:
+            lock = Event_ts(_loop=loop)
+        else:
+            lock = threading.Event()
         self.requests[request_id] = [lock, timeout]
         logs.debug("EventLoop: await_response. rid %s.  lock=%s, timeout:%s",str(request_id),str(lock),timeout)
         self.queue.put("send")
@@ -349,6 +367,7 @@ class EventLoop:
                 if "c" in inbound and inbound["c"] == "pyi":
                     
                     logs.debug("Loop, inbound C request was %s",str(inbound))
+                    #print(inbound)
                     j = inbound
                     self.callbackExecutor.add_job(r, cbid, self.pyi.inbound, inbound)
                 if r in self.requests:
@@ -356,5 +375,6 @@ class EventLoop:
                     barrier = threading.Barrier(2, timeout=5)
                     self.responses[r] = inbound, barrier
                     del self.requests[r]
+                    #print(inbound,lock)
                     lock.set()  # release, allow calling thread to resume
                     barrier.wait()
