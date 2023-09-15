@@ -1,10 +1,9 @@
 from javascriptasync import require, require_a, On, Once, off, once, eval_js, eval_js_a, init_js
+from javascriptasync import AsyncTaskA, AsyncTaskUtils
 from javascriptasync.logging import set_log_level
 import logging
 import pytest
 import asyncio
-
-
 
 # Define a class for testing
 class TestJavaScriptLibrary:
@@ -167,6 +166,7 @@ class TestJavaScriptLibraryASYNC:
         def handler(this, fn, num, obj):
             print("Handler caled", fn, num, obj)
             if num == 7:
+                print('off')
                 off(self.demo, "increment", handler)
 
         @Once(self.demo, "increment")
@@ -233,6 +233,35 @@ class TestJavaScriptLibraryASYNC:
 
     async def atest_nullFromJsReturnsNone(self):
         assert self.demo.returnNull() is None
+    async def asynctask_stop(self):
+        @AsyncTaskA()
+        async def routine(task):
+            
+            while not task.stopping: # You can also just do `while True` as long as you use task.sleep and not time.sleep
+                print(task)
+                #print('asynciotask')
+                await task.sleep(1) # Sleep for a bit to not block everything else
+
+        await AsyncTaskUtils.start(routine)
+        await asyncio.sleep(4)
+        print('stop!')
+        await AsyncTaskUtils.stop(routine)
+        await asyncio.sleep(4)
+
+    async def long_running_asynctask(self):
+        @AsyncTaskA()
+        async def my_function(task):
+            # Your function's logic here
+            for i in range(0,25):
+                print(str(task),'this is a run ',i)
+                await asyncio.sleep(1)  # Simulating some work
+            print('TASK OVER.')
+        print('corororo')
+        await AsyncTaskUtils.start(my_function)
+        for i in range(0,5):
+            print('MAIN LOOP')
+            await asyncio.sleep(5)
+        await asyncio.sleep(3)
 
 # Define the order of test methods
 test_order = [
@@ -263,17 +292,21 @@ atestorder=[
     "atest_assignment",
     "atest_eval",
     "atest_bigint",
-    "atest_nullFromJsReturnsNone"
+    "atest_nullFromJsReturnsNone",
+    'asynctask_stop',
+    "long_running_asynctask"
 ]
 
 @pytest.mark.asyncio
 async def test_my_coroutine():
     init_js()
+    
+    set_log_level(logging.WARNING)
+
     async_instance=TestJavaScriptLibraryASYNC()
     for test_name in test_order:
         print('testing sync',test_name)
         getattr(async_instance, test_name)()
-    del async_instance.demo
     for test_name in atestorder:
         print('testing async',test_name)
         await getattr(async_instance, test_name)()

@@ -13,7 +13,7 @@ try:
         shell = get_ipython().__class__.__name__
         if shell == "ZMQInteractiveShell":
             ISNOTEBOOK= True
-except Exception:
+except Exception as s:
     ISCLEAR= False
 # The "root" interface to JavaScript with FFID 0
 
@@ -62,14 +62,14 @@ class ConnectionClass():
 
         
 
-    def __init__(self,config:config.JSConfig):
+    def __init__(self,configval:config.JSConfig):
         """
         Initialize the ConnectionClass.
 
         Args:
             config (config.JSConfig): Configuration for JavaScript interaction.
         """
-        self.config=config
+        self.config=configval
         # Modified stdout
         self.endself=False
         self.modified_stdout = (sys.stdout != sys.__stdout__) or (getattr(sys, 'ps1', sys.flags.interactive) == '>>> ')
@@ -130,8 +130,8 @@ class ConnectionClass():
                     d = json.loads(line)
                     logs.debug("%s,%d,%s","connection: [js -> py]", int(time.time() * 1000), line)
                     ret.append(d)
-                except ValueError as e:
-                    print("[JSE]", line)
+                except ValueError as v_e:
+                    print(v_e,"[JSE]", line)
         return ret
 
     # Write a message to a remote socket, in this case it's standard input

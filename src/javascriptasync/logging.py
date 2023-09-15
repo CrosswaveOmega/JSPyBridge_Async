@@ -4,7 +4,7 @@ import os
 a simple logger.
 '''
 logs = logging.getLogger('asyncjs')
-logs.setLevel(logging.INFO)
+logs.setLevel(logging.DEBUG)
 
 # Create a console handler and set the level to Debug
 #console_handler=logging.StreamHandler()
@@ -24,6 +24,7 @@ def log_print(*msg):
 
 def set_log_level(level):
     logs.setLevel(level)
+    console_handler.setLevel(logs.level)
 
 def print_path(frame):
     output='now'

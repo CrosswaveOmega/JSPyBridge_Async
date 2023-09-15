@@ -121,7 +121,6 @@ async def eval_js_a(js,  timeout=10, as_thread=False)->Coroutine:
 
 def AsyncTask(start=False):
     def decor(fn):
-        
         conf=Config.get_inst() 
         fn.is_async_task = True
         t = conf.event_loop.newTaskThread(fn)
@@ -129,6 +128,46 @@ def AsyncTask(start=False):
             t.start()
 
     return decor
+def AsyncTaskA():
+    def decor(fn):
+        conf=Config.get_inst() 
+        fn.is_async_task = True
+
+
+        return fn
+        # t = conf.event_loop.newTask(fn)
+        # if start:
+        #     t.start()
+
+    return decor
+
+class AsyncTaskUtils:
+    @staticmethod
+    async def start(method):
+        conf=Config.get_inst()
+        await conf.event_loop.startTask(method)
+    @staticmethod
+    async def stop(method):
+        conf=Config.get_inst()
+        await conf.event_loop.stopTask(method)
+    @staticmethod
+    async def abort(method,killAfter:float=0.5):
+        conf=Config.get_inst()
+        await conf.event_loop.abortTask(method,killAfter)
+
+class ThreadUtils:
+    @staticmethod
+    def start(method):
+        conf=Config.get_inst()
+        conf.event_loop.startThread(method)
+    @staticmethod
+    def stop(method):
+        conf=Config.get_inst()
+        conf.event_loop.stopThread(method)
+    @staticmethod
+    def abort(method,killAfter:float=0.5):
+        conf=Config.get_inst()
+        conf.event_loop.abortThread(method,killAfter)
 
 def get_start_stop_abort():
     '''
@@ -143,9 +182,9 @@ def get_start_stop_abort():
         tuple: The startThread, stopThread, and abortThread methods from the JavaScript event loop context.
     '''
     conf=Config.get_inst()
-    start = conf.event_loop.startThread
-    stop = conf.event_loop.stopThread
-    abort = conf.event_loop.abortThread
+    start = conf.event_loop.
+    stop = conf.event_loop.
+    abort = conf.event_loop.
     return start,stop,abort
 
 # You must use this Once decorator for an EventEmitter in Node.js, otherwise
@@ -166,8 +205,10 @@ def On(emitter, event):
             fn = handler
         else:
             fn = _fn
-
+        
         emitter.on(event, fn)
+        s=str(repr(emitter)).replace("\n",'')
+        logs.info("On for: emitter %s, event %s, function %s, iffid %s",s,event,fn,getattr(fn, "iffid"))
         # We need to do some special things here. Because each Python object
         # on the JS side is unique, EventEmitter is unable to equality check
         # when using .off. So instead we need to avoid the creation of a new
@@ -190,6 +231,7 @@ def Once(emitter, event):
     def decor(fn):
         i = hash(fn)
 
+        conf=Config.get_inst()
         def handler(*args, **kwargs):
             if conf.node_emitter_patches:
                 fn(emitter, *args, **kwargs)
@@ -199,7 +241,6 @@ def Once(emitter, event):
 
         emitter.once(event, handler)
         
-        conf=Config.get_inst()
         conf.event_loop.callbacks[i] = handler
 
     return decor

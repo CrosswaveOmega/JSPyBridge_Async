@@ -10,6 +10,22 @@ It's functionally equivalent to the original `javascript` library, with the majo
 * Use `@On` decorator when binding event listeners. Use `off` to disable it.
 * All callbacks run on a dedicated callback thread. DO NOT BLOCK in a callback or all other events will be blocked. Instead:
 * Use the @AsyncTask decorator when you need to spawn a new thread for an async JS task.
+## Proxy Init And Call.
+ This fork allows you to utilice a reserved 'coroutine' argument whenever initalizing or calling a method on the JS side of the bridge.  This allows your asyncio event loop to continue with other task while waiting on the node.js side of the bridge.
+
+```py
+import asyncio
+from javascriptasync import init_js, require_a, get_globalThis
+init_js()
+async def main():
+  chalk, fs = await require_a("chalk"), await require_a("fs")
+  globalThis=get_globalThis()
+  datestr=await (await globalThis.Date(coroutine=True)).toLocaleString(coroutine=True)
+  print("Hello", chalk.red("world!"), "it's", datestr)
+  fs.writeFileSync("HelloWorld.txt", "hi!")
+
+asyncio.run(main)
+```
 
 
 ## Built-ins
@@ -33,27 +49,29 @@ def require ( package_name: str, package_version: Optional[str] = None ) -> Void
 * `package_version` : The version of the npm package you want to install. If blank, first try to
   require from the local or global npm registry. If not found, install the specified package name
   and version. These two combine to create a unique ID, for example `chalk--1.0`. This ensures two
-  different versiond don't collide. This parameter is ignored for relative imports.
+  different versions don't collide. This parameter is ignored for relative imports.
+
+There is also an asyncronous variant of require.
 ```py
 async def require_a ( package_name: str, package_version: Optional[str] = None ) -> Void
 ```
- Use this if you don't want to block an active asyncio event loop.
+ Use this if you don't want to block an active asyncio event loop.  Remember to utilize `await`!
 * `package_name` : The name of the npm package you want to import. If you use a relative import
   (starting with . or /) then it will load the file relative to where your calling script is.
 * `package_version` : The version of the npm package you want to install. If blank, first try to
   require from the local or global npm registry. If not found, install the specified package name
   and version. These two combine to create a unique ID, for example `chalk--1.0`. This ensures two
-  different versiond don't collide. This parameter is ignored for relative imports.
+  different versions don't collide. This parameter is ignored for relative imports.
 
 ### threads
 
 The base library provided some wrappers around threads. You aren't forced to use them, but they
 help you avoid boilerplate and are simple to use.
 
-**The only difference is you get the start, stop, and abort wrappers via the get_start_stop_abort function.**
+**The only difference is you access the start, stop, and abort methods through the ThreadUtils static class.**
 
 ```py
-from javascriptasync import init_js, AsyncTask, get_start_stop_abort
+from javascriptasync import init_js, AsyncTask, ThreadUtils
 init_js()
 start,stop,abort=get_start_stop_abort()
 @AsyncTask(start=True)
@@ -61,9 +79,9 @@ def routine(task: TaskState):
   ...
 
 # The signatures for the above functions :
-def start(fn: Function): ...
-def stop(fn: Function): ...
-def abort(fn: Function, killAfterSeconds: Optional[Int]): ...
+def ThreadUtils.start(fn: Function): ...
+def ThreadUtils.stop(fn: Function): ...
+def ThreadUtils.abort(fn: Function, killAfterSeconds: Optional[Int]): ...
 class TaskState:
   sleeping: bool
   def wait(seconds: Int): ...
@@ -74,9 +92,9 @@ The AsyncTask decorator is a wrapper for creating threads. Any function you wrap
 result in the creation of a thread, bound to the specified function. It will *not* automatically
 start the thread, unless `start` parameter is set to True. 
 
-The `start()`, `stop()` and `abort()` functions all relate to AsyncTask threads. If you didn't
-already start a AsyncTask, you can programmatically start it later with `start(routine)`. If you
-want a thread to stop, you can send a `stopping` signal to it. The first parameter to all AsyncTasks
+The `ThreadUtils.start()`, `ThreadUtils.stop()` and `ThreadUtils.abort()` functions all relate to AsyncTask threads. If you didn't
+already start a AsyncTask, you can programmatically start it later with `ThreadUtils.start(routine)`. If you
+want a thread to stop, you can send a `stopping` signal to it. The first parameter to all AsyncTaskUtils
 is a `TaskState` object. That object has a `stopping` variable, and a `wait` function. The stopping
 variable indicates that the thread should exit immediately, and it's your responsibility to make
 sure it does. The `wait` function that exists in TaskState will sleep, but also automatically exit 
@@ -84,24 +102,50 @@ the process once the `stopping` flag is True.
 
 ```py
 import time
-from javascriptasync import init_js, AsyncTask, get_start_stop_abort
+from javascriptasync import init_js, AsyncTask, ThreadUtils
 init_js()
-start,stop,abort=get_start_stop_abort()
 @AsyncTask(start=False)
 def routine(task: TaskState):
   while not task.stopping: # You can also just do `while True` as long as you use task.sleep and not time.sleep
     ... do some repeated task ...
     task.sleep(1) # Sleep for a bit to not block everything else
 
-start(routine)
+ThreadUtils.start(routine)
 time.sleep(1)
-stop(routine)
+ThreadUtils.stop(routine)
 ```
 
 If you need to be 100% sure the thread has stopped, you can use `abort(fn, seconds)` function instead. This
 will kill the thread if it doesn't kill in n seconds. It's not good pratice to kill Python threads, so
 avoid this when possible. To avoid trouble, `stop()` does not force the thread to exit, it just asks.
 
+### Asyncio Task support.
+
+You don't really need the provided wrappers when dealing with asyncio Tasks, but it may help avoid boilerplate code like with the thread wrappers above.  With asyncio, when a task is created it's **started immediately.**  The `AsyncTaskA` decorator is only to set the internal `is_async_task` attribute to the created coroutine.
+
+Operating asyncio tasks though this libary is done through the `AsyncTaskUtils` static class, in the same manner as the thread wrappers.
+
+* Transform async functions into Asyncio Tasks and start them using  `AsyncTaskUtils.start()`
+* Stop the operation of Asyncio Tasks passed into `AsyncTaskUtils.start()` using `AsyncTaskUtils.stop()`
+* Abort Asyncio Task operation using `AsyncTaskUtils.abort()`
+
+The internal `TaskStateAsync` object is identical to `TaskState`, but uses `asyncio.sleep()` instead of `time.sleep()`.
+```py
+import time
+from javascriptasync import init_js, AsyncTaskA,AsyncTaskUtils 
+init_js()
+async def main():
+  @AsyncTaskA()
+  async def routine(task: TaskStateAsync):
+    while not task.stopping: # You can also just do `while True` as long as you use task.sleep and not time.sleep
+      ... do some repeated task ...
+      await task.sleep(1) # This is a coroutine, remember to include await!  Sleep for a bit to not block everything else
+
+  await AsyncTaskUtils.start(routine)
+  await asyncio.sleep(5)
+  await AsyncTaskUtils.stop(routine)
+asyncio.run(main())
+```
 ### events
 
 This library provides some wrappers around EventEmitters. You must use them over the built-in
@@ -131,7 +175,7 @@ myEmitter.inc()
 
 ### expression evaluation
 
-You can use the exported `eval_js` function to evaluate JavaScript code within the current Python context. The parameter to this function is a JS string to evaluate, with access to all the Python variables in scope. Make sure to use `await` anywhere you do a function call or a property access on a Python object. You can set variables without await.
+You can use the exported `eval_js` function to evaluate JavaScript code within the current Python context. The parameter to this function is a JS string to evaluate, with access to all the Python variables in scope. Inside the JavaScript code block, Make sure to use `await` anywhere you do a function call or a property access on a Python object. You can set variables without await.
 
 **Unique to this fork, you can set a timeout value on the python side.**
 

@@ -9,7 +9,7 @@ description = "fork of JSPyBridge to provide limited asyncio compatibility and l
 readme = 'README.md'
 
 keywords = ['node', 'javascript', 'bridge', 'development','fork']
-version = '0.0.1.4'
+version = '0.0.1.5'
 
 [project.urls]
 "Homepage"= "https://github.com/CrosswaveOmega/JSPyBridge_Async"

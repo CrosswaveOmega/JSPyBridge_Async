@@ -8,8 +8,11 @@ from weakref import WeakValueDictionary
 from .logging import logs, log_print
 
 from .connection import ConnectionClass
-
-class Event_ts(asyncio.Event):
+from .asynciotasks import EventLoopMixin
+class CrossThreadEvent(asyncio.Event):
+    #Initalize Asyncio Event and pass in a specific
+    #Asyncio event loop, and ensure that the event can be
+    #Set outside an asyncio event loop.
     def __init__(self, _loop=None,*args, **kwargs):
         super().__init__(*args, **kwargs)
         if self._loop is None:
@@ -22,7 +25,7 @@ class Event_ts(asyncio.Event):
         self._loop.call_soon_threadsafe(super().clear)
 class TaskState:
     """
-    Represents the state of a task.
+    Represents the state of a thread task.
 
     Attributes:
         stopping (bool): Indicates whether the task should stop.
@@ -92,7 +95,7 @@ class EventExecutorThread(threading.Thread):
 # The event loop here is shared across all threads. All of the IO between the
 # JS and Python happens through this event loop. Because of Python's "Global Interperter Lock"
 # only one thread can run Python at a time, so no race conditions to worry about.
-class EventLoop:
+class EventLoop(EventLoopMixin):
     """
     Represents an event loop for managing IO and threads.
 
@@ -268,7 +271,7 @@ class EventLoop:
         """
         self.outbound.append(payload)
         if asyncmode:
-            lock = Event_ts(_loop=loop)
+            lock = CrossThreadEvent(_loop=loop)
         else:
             lock = threading.Event()
         self.requests[request_id] = [lock, timeout]
@@ -299,7 +302,7 @@ class EventLoop:
             threading.Event: An event for waiting on the response.
         """
         if asyncmode:
-            lock = Event_ts(_loop=loop)
+            lock = CrossThreadEvent(_loop=loop)
         else:
             lock = threading.Event()
         self.requests[request_id] = [lock, timeout]
@@ -352,6 +355,7 @@ class EventLoop:
             # remove them from self.threads
             #logs.debug("Loop: checking self.threads %s",",".join([str(s) for s in self.threads]))
             self.threads = [x for x in self.threads if x[2].is_alive()]
+            self.tasks = [x for x in self.tasks if x[2].done()==False]
             
             if len(self.freeable) > 40:
                 #
