@@ -169,24 +169,6 @@ class ThreadUtils:
         conf=Config.get_inst()
         conf.event_loop.abortThread(method,killAfter)
 
-def get_start_stop_abort():
-    '''
-    Gets functions to start, stop, and abort thread from the event loop context.
-
-    This function provides a bridge to the startThread, stopThread, and abortThread methods 
-    available in the event loop context of Node.js, enabling control over threads from within
-    Python context. It does so by grabbing these methods from the event loop which is stored in 
-    the Config singleton instance.
-
-    Returns:
-        tuple: The startThread, stopThread, and abortThread methods from the JavaScript event loop context.
-    '''
-    conf=Config.get_inst()
-    start = conf.event_loop.
-    stop = conf.event_loop.
-    abort = conf.event_loop.
-    return start,stop,abort
-
 # You must use this Once decorator for an EventEmitter in Node.js, otherwise
 # you will not be able to off an emitter.
 def On(emitter, event):
