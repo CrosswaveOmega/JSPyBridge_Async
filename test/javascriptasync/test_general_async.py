@@ -123,8 +123,6 @@ class TestJavaScriptLibraryASYNC:
 
     def test_nullFromJsReturnsNone(self):
         assert self.demo.returnNull() is None
-    def assertEquals(self, cond, val):
-        assert cond == val
 
     async def atest_require(self):
         chalk = await require_a("chalk")
@@ -162,18 +160,20 @@ class TestJavaScriptLibraryASYNC:
         await self.demo.callback(self.some_method,coroutine=True)
 
     async def atest_events(self):
-        @On(self.demo, "increment")
-        def handler(this, fn, num, obj):
-            print("Handler caled", fn, num, obj)
+        print('events start')
+        @On(self.demo, "increment",asyncio.get_event_loop())
+        async def handler(this, fn, num, obj):
+            print("Handler called", fn, num, obj)
             if num == 7:
                 print('off')
                 off(self.demo, "increment", handler)
 
-        @Once(self.demo, "increment")
-        def onceIncrement(this, *args):
+        @Once(self.demo, "increment",asyncio.get_event_loop())
+        async def onceIncrement(this, *args):
             print("Hey, I'm only called once !")
 
         self.demo.increment()
+        await asyncio.sleep(4)
 
     async def atest_arrays(self):
         self.demo.arr[1] = 5
@@ -252,15 +252,15 @@ class TestJavaScriptLibraryASYNC:
         @AsyncTaskA()
         async def my_function(task):
             # Your function's logic here
-            for i in range(0,25):
+            for i in range(0,10):
                 print(str(task),'this is a run ',i)
                 await asyncio.sleep(1)  # Simulating some work
             print('TASK OVER.')
         print('corororo')
         await AsyncTaskUtils.start(my_function)
-        for i in range(0,5):
+        for i in range(0,3):
             print('MAIN LOOP')
-            await asyncio.sleep(5)
+            await asyncio.sleep(4)
         await asyncio.sleep(3)
 
 # Define the order of test methods

@@ -20,7 +20,13 @@ class JavaScriptError(Exception):
         self.js = jsStackTrace
         self.py = pyStacktrace
 
+class NoAsyncLoop(Exception):
+    """
+    Raised when calling @On when the passed in handler is an async function
+    And no event loop was passed into the args
+    """
 
+        
 class Chalk:
     """
     Chalk class for text coloring.

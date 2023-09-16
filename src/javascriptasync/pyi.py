@@ -119,7 +119,7 @@ class PyInterface:
         #print(r,ffid,keys,args,kwargs)
         if invoke:
             
-            logs.info("INVOKING MODE %s,%s,%s,%s",v,type(v),str(keys),str(args))
+            logs.info("INVOKING MODE %s,%s,%s,%s",v,type(v),str(repr(keys)),str(repr(args)))
             for key in keys:
                 t = getattr(v, str(key), None)
                 

@@ -1,55 +1,20 @@
-# JSPyBridge - javascript asyncio fork
-[![NPM version](https://img.shields.io/npm/v/pythonia.svg)](http://npmjs.com/package/pythonia)
+# JSPyBridge_async - javascript asyncio fork
 [![PyPI](https://img.shields.io/pypi/v/javascript)](https://pypi.org/project/javascript/)
 [![Build Status](https://github.com/extremeheat/JSPyBridge/workflows/Node.js%20CI/badge.svg)](https://github.com/extremeheat/JSPyBridge/actions/workflows/)
 [![Gitpod ready-to-code](https://img.shields.io/badge/Gitpod-ready--to--code-blue?logo=gitpod)](https://gitpod.io/#https://github.com/extremeheat/jspybridge)
 
-This is a fork of [JSPyBridge](https://github.com/extremeheat/JSPyBridge) by extremeheat
 
-It was created in the hopes of providing better asyncio compatibility for the defined `javascript` package, and in the process turned into a refactor of `javascript` into a more object oriented approach to provide better organization and to eliminate the need for global variables in specific locations.
+Interoperate Node.js from Python, with asyncio compatibility. **Work in progress.** 
 
-As the purpose of this fork was only to modify the `javascript` package, it's specifically for running Node.js from Python.  No changes are made to `pythonia`.
+This is a fork of [JSPyBridge](https://github.com/extremeheat/JSPyBridge) by extremeheat, created to properly integrate `asyncio` events and coroutines into the python side of the bridge.
+
+
+As the purpose of this fork was only to modify the `javascript` package, it's specifically for running Node.js from Python.  No changes are made to `pythonia` or are planned to be made to `pythonia`.
 ### current installation
 ```
  pip install -U git+https://github.com/CrosswaveOmega/JSPyBridge_Async.git
 ```
 
-## KEY CHANGES:
-* `javascript` is now `javascriptasync`
-* `config.py` has been encapsulated into the `JSConfig` class, all objects that need to access variables within `JSConfig` have been passed an object reference to a single unique `JSConfig` instance.
- * `__init__.py` utilizes a singleton to ensure that only one instance of an JSConfig class is created at any one time.  You need to call `init()` to start up the bridge!
-* debug output now uses the logging module.
-* `connection.py` has been encapsulated into the `ConnectionClass`, accessable through the `events.EventLoop` class as `events.EventLoop` is the only place the connection is utilized.
-* It's possible to set a custom timeout value when using eval_js.
-* async variants of `require` and `eval_js` are included within __init__.py, as `require_a` and `eval_js_a` respectively.
-* this package is now built using a `pyproject.toml` file instead of a `setup.py` script.
-* `test_general.py` now works with pytest.
-* `console`, `globalThis`, and `RegExp` have to be retrieved with the `get_console()`, `get_globalThis()`, and `get_RegExp()` functions.
-* `start`, `stop`, and `abort` has to be retrieved with the `get_start_stop_abort` function.
-* any call or init operation can be made into a coroutine by passing in the `coroutine=True` keyword.
-
-### New Javascript from Python usage:
-```py
-import asyncio
-from javascriptasync import init_js, require_a, get_globalThis
-init_js()
-async def main():
-  chalk, fs = await require_a("chalk"), await require_a("fs")
-  globalThis=get_globalThis()
-  datestr=await (await globalThis.Date(coroutine=True)).toLocaleString(coroutine=True)
-  print("Hello", chalk.red("world!"), "it's", datestr)
-  fs.writeFileSync("HelloWorld.txt", "hi!")
-
-asyncio.run(main)
-```
-## TO DO:
- * Fix occasional daemon thread stderr read on exit error.
- * ensure events have an asyncio compatible equivalent
- * proper async emitter support
-
-
-# Old JSPyBridge description.
-Interoperate Node.js and Python. You can run Python from Node.js, *or* run Node.js from Python. **Work in progress.** 
 
 Requires Node.js 14 and Python 3.8 or newer.
 
@@ -60,100 +25,68 @@ Requires Node.js 14 and Python 3.8 or newer.
 * Bidirectional callbacks with arbitrary arguments
 * Iteration and exception handling support
 * Object inspection allows you to easily `console.log` or `print()` any foreign objects
-* (Bridge to call Python from JS) Python class extension and inheritance. [See pytorch and tensorflow examples](https://github.com/extremeheat/JSPyBridge/blob/master/examples/javascript/pytorch-train.js).
+
 * (Bridge to call JS from Python) Native decorator-based event emitter support
 * (Bridge to call JS from Python) **First-class Jupyter Notebook/Google Colab support.** See some Google Colab uses below.
+
+## KEY CHANGES:
+* `javascript` is now `javascriptasync`
+* `config.py` has been encapsulated into the `JSConfig` class, all objects that need to access variables within `JSConfig` have been passed an object reference to a single unique `JSConfig` instance.
+ * `__init__.py` utilizes a singleton to ensure that only one instance of an JSConfig class is created at any one time.  You need to call `init()` to start up the bridge!
+* debug output now uses the logging module.
+* `connection.py` has been encapsulated into the `ConnectionClass`, accessable through the `events.EventLoop` class, as `events.EventLoop` is the only place the connection was ever utilized.
+* It's possible to set a custom timeout value when using eval_js.
+* async variants of `require` and `eval_js` are included within __init__.py, as `require_a` and `eval_js_a` respectively.
+* this package is now built using a `pyproject.toml` file instead of a `setup.py` script.
+* `test_general.py` now works with pytest.
+* `console`, `globalThis`, and `RegExp` have to be retrieved with the `get_console()`, `get_globalThis()`, and `get_RegExp()` functions.
+* `start`, `stop`, and `abort` has to be retrieved with through the `ThreadUtils` static class.
+* any call or init operation can be made into a coroutine by passing in the `coroutine=True` keyword.
+* Separate set of wrappers for asyncio tasks through `AsyncTaskUtils` 
+* Event Emitters can utilize Coroutine handlers.
+### New Javascript from Python usage:
+```py
+import asyncio
+from javascriptasync import init_js, require_a, get_globalThis
+init_js()
+async def main():
+  chalk, fs = await require_a("chalk")
+  globalThis=get_globalThis()
+  datestr=await (await globalThis.Date(coroutine=True)).toLocaleString(coroutine=True)
+  print("Hello", chalk.red("world!"), "it's", datestr)
+  fs.writeFileSync("HelloWorld.txt", "hi!")
+
+asyncio.run(main)
+```
+## TO DO:
+ * better documentation and examples
+ * bug fixing/optimization.
+ * callback a coroutine from JavaScript
+
 
 
 ## Basic usage example
 
-See some examples [here](https://github.com/extremeheat/JSPyBridge/tree/master/examples). See [documentation](https://github.com/extremeheat/JSPyBridge#documentation) below and in [here](https://github.com/extremeheat/JSPyBridge/tree/master/docs).
-
-### Access JavaScript from Python
+See some examples [here](https://github.com/extremeheat/JSPyBridge/tree/master/examples). See [documentation](https://github.com/CrosswaveOmega/JSPyBridge_Async#documentation) below and in [here](https://github.com/CrosswaveOmega/JSPyBridge_Async/tree/master/docs).
 
 
-```sh
-pip3 install javascript
-```
-
-
-```py
-from javascript import require, globalThis
-
-chalk, fs = require("chalk"), require("fs")
-
-print("Hello", chalk.red("world!"), "it's", globalThis.Date().toLocaleString())
-fs.writeFileSync("HelloWorld.txt", "hi!")
-```
-
-### Access Python from JavaScript
-
-Make sure to have the dependencies installed before hand!
-
-```sh
-npm i pythonia
-```
-
-```js
-import { python } from 'pythonia'
-// Import tkinter
-const tk = await python('tkinter')
-// All Python API access must be prefixed with await
-const root = await tk.Tk()
-// A function call with a $ suffix will treat the last argument as a kwarg dict
-const a = await tk.Label$(root, { text: 'Hello World' })
-await a.pack()
-await root.mainloop()
-python.exit() // Make sure to exit Python in the end to allow node to exit. You can also use process.exit.
-```
 
 ### Examples
-[![Gitpod ready-to-code](https://img.shields.io/badge/Gitpod-ready--to--code-blue?logo=gitpod)](https://gitpod.io/#https://github.com/extremeheat/jspybridge)
-
-Check out some cool examples below! Try them on Gitpod! Click the Open in Gitpod link above, and then open the examples folder.
+ see https://github.com/CrosswaveOmega/JSPyBridge_Async/tree/master/examples
 
 
-[![PyTorch](https://www.vectorlogo.zone/logos/pytorch/pytorch-ar21.svg)](https://github.com/extremeheat/JSPyBridge/blob/master/examples/javascript/pytorch-train.js)
-[![numpy](https://www.vectorlogo.zone/logos/numpy/numpy-ar21.svg)](https://github.com/extremeheat/JSPyBridge/blob/master/examples/javascript/matplotlib.js)
-[![tensorflow](https://www.vectorlogo.zone/logos/tensorflow/tensorflow-ar21.svg)](https://github.com/extremeheat/JSPyBridge/blob/master/examples/javascript/tensorflow.js)
-[![mineflayer](https://www.vectorlogo.zone/logos/minecraft/minecraft-ar21.svg)](https://github.com/extremeheat/JSPyBridge/blob/master/examples/python/mineflayer.py)
-<!-- <img src="https://matplotlib.org/stable/_static/logo2_compressed.svg" alt="matplotlib" width="120" height="70">
- -->
-
-
-### Bridge feature comparison
-
-Unlike other bridges, you may notice you're not just writing Python code in JavaScript, or vice-versa. You can operate on objects
-on the other side of the bridge as if the objects existed on your side. This is achieved through real interop support: you can call
-callbacks, and do loss-less function calls with any arguments you like (with the exception of floating points percision of course).
-
-|  | python(ia) bridge | javascript bridge | [npm:python-bridge](https://www.npmjs.com/package/python-bridge) |
-|---|---|---|---|
-| Garbage collection | ✔ | ✔ | ❌ |
-| Class extension support | ✔ | Not built-in (rare use case), can be manually done with custom proxy | ❌ |
-| Passthrough stdin | ❌ (Standard input is not piped to bridge processes. Instead, listen to standard input then expose an API on the other side of the bridge recieve the data.) | ❌ | ✔ |
-| Passthrough stdout, stderr | ✔ | ✔ | ✔ |
-| Long-running sync calls | ✔ | ✔ | ✔ |
-| Long-running async calls | ❌ (need to manually create new thread) | ✔ (AsyncTask) | ❌ (need to manually create new thread) |
-| Callbacks | ✔ | ✔ | ❌ |
-| Call classes | ✔ | ✔ |  |
-| Iterators | ✔ | ✔ | ❌ |
-| Inline eval | ✔ | ✔ |  |
-| Dependency Management | ❌ | ✔ | ❌ |
-| Local File Imports | ✔ | ✔ | ❌ |
-| Error Management | ✔ | ✔ | ✔ |
-| Object inspection | ✔ | ✔ | ❌ |
-
-## Who's using it
-* [PrismarineJS/mineflayer](https://github.com/PrismarineJS/mineflayer) -- [![Open In Colab](https://colab.research.google.com/assets/colab-badge.svg)](https://colab.research.google.com/github/PrismarineJS/mineflayer/blob/master/docs/mineflayer.ipynb)
 
 # Documentation
 
 ## From Python
-
+The bridge has to be initalized before use, this can be done via the `init_js()` function
+```py
+from javascriptasync import init_js
+init_js()
+```
 You can import the bridge module with 
 ```py
-from javascript import require
+from javascriptasync import require
 ```
 
 This will import the require function which you can use just like in Node.js. This is a slightly
@@ -171,16 +104,33 @@ if you were using `npm install`. It's reccomended to only use the major version 
 will be internally treated as a unique package, for example 'chalk--^3'. If you leave this empty, 
 we will install `latest` version instead, or use the version that may already be installed globally.
 
+If require is being used within an asyncio coroutine, you should be using `require_a()` instead to prevent blocking your asyncio event loop.
+```py
+import asyncio
+from javascriptasync import init_js, require_a
+init_js()
+async def main():
+  chalk= await require_a("chalk")
+  red=await chalk.red("world!",coroutine=True)
+  print("Hello", red)
+
+asyncio.run(main)
+```
+
 ### Usage
 
-* All function calls to JavaScript are thread synchronous
+* All function calls to JavaScript are thread synchronous **by default.**
+  * This can be changed by including a `coroutine=True` kwarg in a function call on a Proxy.
+  * Currently, only function `calls` and `inits` can be coroutines for the sake of simplicity.
 * ES6 classes can be constructed without new
 * ES5 classes can be constructed with the .new psuedo method
-* Use `@On` decorator when binding event listeners. Use `off()` to disable it.
+* Use `@On` decorator when binding event listeners. Use `off` to disable it.
+  * You can bind a coroutine as an event listener, provided you pass in a reference to your running asyncio event loop.
 * All callbacks run on a dedicated callback thread. DO NOT BLOCK in a callback or all other events will be blocked. Instead:
-* Use the @AsyncTask decorator when you need to spawn a new thread for an async JS task.
+* ~~Use the @AsyncTask decorator when you need to spawn a new thread for an async JS task.~~
+* The @AsyncTask decorator is only for syncronous functions that you wish to run in a psuedo asyncronous(i.e, not with asyncio) way.  For Coroutines, wrappers are provided to quickly create Tasks which run on your event loop.
 
-For more, see [docs/python.md](https://github.com/extremeheat/JSPyBridge/blob/master/docs/python.md).
+For more, see [docs/python.md](https://github.com/CrosswaveOmega/JSPyBridge_Async/tree/master/docs/python.md).
 
 ### Usage
 

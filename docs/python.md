@@ -8,6 +8,7 @@ It's functionally equivalent to the original `javascript` library, with the majo
 * ES6 classes can be constructed without new
 * ES5 classes can be constructed with the .new psuedo method
 * Use `@On` decorator when binding event listeners. Use `off` to disable it.
+* You can bind a coroutine as an event listener, provided you pass in a reference to your running asyncio event loop.
 * All callbacks run on a dedicated callback thread. DO NOT BLOCK in a callback or all other events will be blocked. Instead:
 * Use the @AsyncTask decorator when you need to spawn a new thread for an async JS task.
 ## Proxy Init And Call.
@@ -15,14 +16,12 @@ It's functionally equivalent to the original `javascript` library, with the majo
 
 ```py
 import asyncio
-from javascriptasync import init_js, require_a, get_globalThis
+from javascriptasync import init_js, require_a
 init_js()
 async def main():
-  chalk, fs = await require_a("chalk"), await require_a("fs")
-  globalThis=get_globalThis()
-  datestr=await (await globalThis.Date(coroutine=True)).toLocaleString(coroutine=True)
-  print("Hello", chalk.red("world!"), "it's", datestr)
-  fs.writeFileSync("HelloWorld.txt", "hi!")
+  chalk= await require_a("chalk")
+  red=await chalk.red("world!",coroutine=True)
+  print("Hello", red)
 
 asyncio.run(main)
 ```
@@ -171,6 +170,36 @@ def handleIncrement(this, counter):
     off(myEmitter, 'increment', handleIncrement)
 # Trigger the event handler
 myEmitter.inc()
+```
+
+### async event handlers.
+
+It is possible to use `@On` and `@Once` on coroutine handler functions.  
+
+**However, you will have to pass in an active asyncio event loop into the decorator as an argument!**
+
+
+```py
+from javascriptasync import init_js, require, On, Once, off, once
+init_js()
+import asyncio
+
+async def main():
+  MyEmitter = require('./emitter.js')
+  # New class instance
+  myEmitter = MyEmitter()
+  # Decorator usage
+  asyncloop=asyncio.get_event_loop()
+  
+  @On(myEmitter, 'increment',asyncloop)#ASYNCLOOP MUST BE SET TO THE CURRENT EVENT LOOP, OR ELSE IT WILL CRASH.
+  async def handleIncrement(this, counter):
+      print("Incremented", counter)
+      # Stop listening. `this` is the this variable in JS.
+      off(myEmitter, 'increment', handleIncrement)
+  # Trigger the event handler
+  myEmitter.inc()
+
+asyncio.run(main())
 ```
 
 ### expression evaluation
