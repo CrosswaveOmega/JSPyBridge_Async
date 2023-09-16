@@ -279,7 +279,7 @@ class PyInterface:
 
         # TODO: do we realy want to worry about functions/classes here?
         # we're only supposed to send primitives, probably best to ignore
-        # everything else.
+        # everything else. 
         # payload = json.dumps(v, default=lambda arg: None)
         self.q(r, "ser", v)
 
