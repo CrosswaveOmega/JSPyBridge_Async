@@ -173,7 +173,7 @@ class TestJavaScriptLibraryASYNC:
             print("Hey, I'm only called once !")
 
         self.demo.increment()
-        await asyncio.sleep(4)
+        await asyncio.sleep(2)
 
     async def atest_arrays(self):
         self.demo.arr[1] = 5
@@ -243,25 +243,25 @@ class TestJavaScriptLibraryASYNC:
                 await task.sleep(1) # Sleep for a bit to not block everything else
 
         await AsyncTaskUtils.start(routine)
-        await asyncio.sleep(4)
+        await asyncio.sleep(1)
         print('stop!')
         await AsyncTaskUtils.stop(routine)
-        await asyncio.sleep(4)
+        await asyncio.sleep(1)
 
     async def long_running_asynctask(self):
         @AsyncTaskA()
         async def my_function(task):
             # Your function's logic here
-            for i in range(0,10):
+            for i in range(0,5):
                 print(str(task),'this is a run ',i)
-                await asyncio.sleep(1)  # Simulating some work
+                await asyncio.sleep(0.4)  # Simulating some work
             print('TASK OVER.')
         print('corororo')
         await AsyncTaskUtils.start(my_function)
         for i in range(0,3):
             print('MAIN LOOP')
-            await asyncio.sleep(4)
-        await asyncio.sleep(3)
+            await asyncio.sleep(1)
+        await asyncio.sleep(1)
 
 # Define the order of test methods
 test_order = [
