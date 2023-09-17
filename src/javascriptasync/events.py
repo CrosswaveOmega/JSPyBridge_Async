@@ -1,7 +1,8 @@
+from __future__ import annotations
 import asyncio
 import time, threading, json, sys
 from typing import Any, Callable, Dict, List, Tuple
-from . import config, pyi
+from . import pyi, config
 from queue import Queue
 from weakref import WeakValueDictionary
 
@@ -54,14 +55,15 @@ class EventExecutorThread(threading.Thread):
 
     Attributes:
         running (bool): Indicates whether the thread is running.
-        jobs (Queue): A queue for storing jobs to be executed.
+        jobs (Queue[Tuple(str,str,Callable,Tuple[Any, ...])]): A queue for storing jobs to be executed.
         doing (list): A list of jobs currently being executed.
     """
-    running = True
-    jobs = Queue()
-    doing = []
+    
 
     def __init__(self):
+        self.doing:List[Any] = []
+        self.running:bool = True
+        self.jobs:Queue[Tuple(str,str,Callable,Tuple[Any, ...])] = Queue()
         super().__init__(daemon=True)
         #self.daemon=True
 
@@ -97,14 +99,14 @@ class EventExecutorThread(threading.Thread):
 # only one thread can run Python at a time, so no race conditions to worry about.
 class EventLoop(EventLoopMixin):
     """
-    Represents an event loop for managing IO and threads.
+    A shared syncronous event loop which manages all IO between Python and Node.JS.
 
     Attributes:
         active (bool): Indicates whether the event loop is active.
-        queue (Queue): A queue for storing events to be processed.
+        queue (Queue): A queue for storing events to be processed.  When a job is added to the queue, the loop continues.
         freeable (list): A list of freeable items.
         callbackExecutor (EventExecutorThread): An event executor thread for handling callbacks.
-        callbacks (WeakValueDictionary): A dictionary of active callbacks.
+        callbacks (WeakValueDictionary): A dictionary of active callbacks that are being tracked.
         threads (list): A list of threads managed by the event loop.
         outbound (list): A list of outbound payloads.
         requests (dict): A dictionary of request IDs and locks.
@@ -112,43 +114,43 @@ class EventLoop(EventLoopMixin):
         conn(ConnectionClass): Instance of the connection class.
         conf(JSConfig): The JSConfig instance this class belongs to.
     """
-    active = True
-    queue = Queue()
-    freeable = []
 
-    callbackExecutor = EventExecutorThread()
 
-    # This contains a map of active callbacks that we're tracking.
-    # As it's a WeakRef dict, we can add stuff here without blocking GC.
-    # Once this list is empty (and a CB has been GC'ed) we can exit.
-    # Looks like someone else had the same idea :)
-    # https://stackoverflow.com/questions/21826700/using-python-weakset-to-enable-a-callback-functionality
-    callbacks = WeakValueDictionary()
-
-    # The threads created managed by this event loop.
-    threads = []
-
-    outbound = []
-
-    # After a socket request is made, it's ID is pushed to self.requests. Then, after a response
-    # is recieved it's removed from requests and put into responses, where it should be deleted
-    # by the consumer.
-    requests = {}  # Map of requestID -> threading.Lock
-    responses = {}  # Map of requestID -> response payload
-
-    def __init__(self,config_container,amode=False):
+    def __init__(self,config_container:config.JSConfig):
         """
         Initialize the EventLoop.
 
         Args:
-            config_container: Configuration container.
-            amode (bool): Indicates whether the loop is in "async" mode.
+            config_container (config.JSConfig): Reference to the active JSConfig object
         """
+        self.active:bool = True
+        self.queue = Queue()
+        self.freeable = []
+
+        self.callbackExecutor = EventExecutorThread()
+
+        # This contains a map of active callbacks that we're tracking.
+        # As it's a WeakRef dict, we can add stuff here without blocking GC.
+        # Once this list is empty (and a CB has been GC'ed) we can exit.
+        # Looks like someone else had the same idea :)
+        # https://stackoverflow.com/questions/21826700/using-python-weakset-to-enable-a-callback-functionality
+        self.callbacks = WeakValueDictionary()
+
+        # The threads created managed by this event loop.
+        self.threads = []
+        self.tasks=[]
+        self.outbound = []
+
+        # After a socket request is made, it's ID is pushed to self.requests. Then, after a response
+        # is recieved it's removed from requests and put into responses, where it should be deleted
+        # by the consumer.
+        self.requests = {}  # Map of requestID -> threading.Lock
+        self.responses = {}  # Map of requestID -> response payload
         self.conn= ConnectionClass(config_container)
         self.conf=config_container
-        if not amode:
-            self.conn.start()
-            self.callbackExecutor.start()
+        #if not amode:
+        self.conn.start()
+        self.callbackExecutor.start()
         self.pyi:pyi.PyInterface = pyi.PyInterface(config_container,self, None)
 
 

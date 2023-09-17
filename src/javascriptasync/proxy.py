@@ -1,6 +1,9 @@
+from __future__ import annotations
 import asyncio
 import time, threading, json, sys, os, traceback
+from typing import Any, Tuple
 from . import config, json_patch
+
 from .errors import JavaScriptError
 from .events import EventLoop
 
@@ -9,10 +12,11 @@ from .logging import logs
 
 class Executor:
     """
-   This is the Executor, something that sits in the middle of the Bridge and is the interface for
+    This is the Executor, something that sits in the middle of the Bridge and is the interface for
     Python to JavaScript. This is also used by the bridge to call Python from Node.js
+
     Attributes:
-        conf (config.JSConfig): The JavaScript configuration object.
+        conf (config.JSConfig): Reference to the active JSConfig object.
         loop (EventLoop): The event loop for handling JavaScript events.
         queue (callable): shortcut to EventLoop.queue_request
         i (int): A unique id for generating request ids.
@@ -129,7 +133,7 @@ class Executor:
 
     # forceRefs=True means that the non-primitives in the second parameter will not be recursively
     # parsed for references. It's specifcally for eval_js.
-    async def pcallalt(self, ffid, action, attr, args, *, timeout=1000, forceRefs=False):
+    async def pcallalt(self, ffid:int, action:str, attr:Any, args:Tuple[Any], *, timeout:int=1000, forceRefs:bool=False):
         """
         This function does a two-part call to JavaScript. First, a preliminary request is made to JS
         with the function ID, attribute, and arguments that Python would like to call. For each of the
@@ -144,8 +148,7 @@ class Executor:
         
         Args:
             ffid (int): Unknown purpose, needs more context.
-            action (str): The action to be executed. (can be "get", "init", "inspect", "serialize", "set", "keys", or "call")
-                        (NOTE: ONLY set, init, and call have been seen elsewhere in code!)
+            action (str): The action to be executed. (can be "init", "set", or "call") 
             attr (Any): Attribute to be passed into the 'key' field
             args (Tuple[Any]): Arguments for the action to be executed.
             timeout (int, optional): Timeout duration. Defaults to 1000.
@@ -209,7 +212,7 @@ class Executor:
         if "error" in res:
             raise JavaScriptError(attr, res["error"])
         return res["key"], res["val"]
-    def pcall(self, ffid, action, attr, args, *, timeout=1000, forceRefs=False):
+    def pcall(self, ffid:int, action:str, attr:Any, args:Tuple[Any], *, timeout:int=1000, forceRefs:bool=False):
         """
         This function does a two-part call to JavaScript. First, a preliminary request is made to JS
         with the function ID, attribute and arguments that Python would like to call. For each of the
@@ -222,9 +225,8 @@ class Executor:
         normal GC by Python. Finally, on the JS side it executes the function call without waiting for
         Python. A init/set operation on a JS object also uses pcall as the semantics are the same.
         Args:
-            ffid (int): Unknown purpose, needs more context.
-            action (str): The action to be executed.  (can be "get", "init", "inspect", "serialize", "set", "keys", or "call")
-                         (NOTE: ONLY set, init, and call have been seen elsewhere in code!)
+            ffid (int): unique function id.
+            action (str): The action to be executed.   (can be "init", "set", or "call") 
             attr (Any): attribute to be passed into the 'key' field
             args (Tuple[Any]): Arguments for the action to be executed.
             timeout (int, optional): Timeout duration. Defaults to 1000.

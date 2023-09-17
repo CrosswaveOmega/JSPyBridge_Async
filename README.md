@@ -1,7 +1,7 @@
 # JSPyBridge_async - javascript asyncio fork
-[![PyPI](https://img.shields.io/pypi/v/javascript)](https://pypi.org/project/javascript/)
-[![Build Status](https://github.com/extremeheat/JSPyBridge/workflows/Node.js%20CI/badge.svg)](https://github.com/extremeheat/JSPyBridge/actions/workflows/)
-[![Gitpod ready-to-code](https://img.shields.io/badge/Gitpod-ready--to--code-blue?logo=gitpod)](https://gitpod.io/#https://github.com/extremeheat/jspybridge)
+[![PyPI](https://img.shields.io/pypi/v/javascriptasync)](https://pypi.org/project/javascriptasync/)
+[![Build Status](https://github.com/CrosswaveOmega/JSPyBridge_Async/workflows/Node.js%20CI/badge.svg)](https://github.com/extremeheat/JSPyBridge/actions/workflows/)
+
 
 
 Interoperate Node.js from Python, with asyncio compatibility. **Work in progress.** 
@@ -9,8 +9,12 @@ Interoperate Node.js from Python, with asyncio compatibility. **Work in progress
 This is a fork of [JSPyBridge](https://github.com/extremeheat/JSPyBridge) by extremeheat, created to properly integrate `asyncio` events and coroutines into the python side of the bridge.
 
 
-As the purpose of this fork was only to modify the `javascript` package, it's specifically for running Node.js from Python.  No changes are made to `pythonia` or are planned to be made to `pythonia`.
-### current installation
+As the purpose of this fork was only to alter the `javascript` package, it's specifically for running Node.js from Python.  No changes are made to `pythonia` or are planned to be made to `pythonia`.
+### current stable install
+```
+ pip install -U javascriptasync
+```
+### current latest installation
 ```
  pip install -U git+https://github.com/CrosswaveOmega/JSPyBridge_Async.git
 ```
@@ -61,13 +65,13 @@ asyncio.run(main)
 ## TO DO:
  * better documentation and examples
  * bug fixing/optimization.
- * callback a coroutine from JavaScript
-
+ * callback an asyncio coroutine from JavaScript
+ * Code cleanup.
 
 
 ## Basic usage example
 
-See some examples [here](https://github.com/extremeheat/JSPyBridge/tree/master/examples). See [documentation](https://github.com/CrosswaveOmega/JSPyBridge_Async#documentation) below and in [here](https://github.com/CrosswaveOmega/JSPyBridge_Async/tree/master/docs).
+See some examples [here](https://github.com/CrosswaveOmega/JSPyBridge_Async/tree/master/examples). See [documentation](https://github.com/CrosswaveOmega/JSPyBridge_Async#documentation) below and in [here](https://github.com/CrosswaveOmega/JSPyBridge_Async/tree/master/docs).
 
 
 

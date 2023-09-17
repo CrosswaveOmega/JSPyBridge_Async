@@ -28,6 +28,9 @@ class TaskStateAsync:
             #sys.exit(1)
 
 class EventLoopMixin:
+    '''
+    A mixin for EventLoop which defines additional functions for managing asyncio tasks.
+    '''
     tasks=[]
     def __init__(self):
         self.tasks = []

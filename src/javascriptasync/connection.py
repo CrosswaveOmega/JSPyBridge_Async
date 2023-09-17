@@ -1,18 +1,26 @@
+
+from __future__ import annotations
 import asyncio
 import threading, subprocess, json, time, signal
 import atexit, os, sys
+from typing import Any, Dict, List, TextIO, Union
 from . import config
 from .logging import logs, log_print
+from .util import haspackage
 ISCLEAR=False
 ISNOTEBOOK=False
+
 try:
-    from IPython import get_ipython
-    if "COLAB_GPU" in os.environ:
-        isclear= True
+    if haspackage("IPython"):
+        from IPython import get_ipython
+        if "COLAB_GPU" in os.environ:
+            ISCLEAR= True
+        else:
+            shell = get_ipython().__class__.__name__
+            if shell == "ZMQInteractiveShell":
+                ISNOTEBOOK= True
     else:
-        shell = get_ipython().__class__.__name__
-        if shell == "ZMQInteractiveShell":
-            ISNOTEBOOK= True
+        ISCLEAR=False
 except Exception as s:
     ISCLEAR= False
 # The "root" interface to JavaScript with FFID 0
@@ -25,9 +33,10 @@ class ConnectionClass():
     This class manages the communication between Python and JavaScript.
 
     Attributes:
-        config (config.JSConfig): Config Object piped into here.
+        config (config.JSConfig): Reference to the active JSConfig object.
         endself(bool): if the thread is ending, send nothing else.
-        stdout (object): The standard output.
+        stdout (TextIO): The standard output.
+        modified_stdout (bool): True if stdout has been altered in some way, False otherwise.
         notebook (bool): True if running in a Jupyter notebook, False otherwise.
         NODE_BIN (str): The path to the Node.js binary.
         dn (str): The directory containing this file.
@@ -39,17 +48,7 @@ class ConnectionClass():
     """
     #Encapsulated connection to make this file easier to work with.
     # Special handling for IPython jupyter notebooks
-    stdout = sys.stdout
-    notebook = False
-    NODE_BIN = getattr(os.environ, "NODE_BIN") if hasattr(os.environ, "NODE_BIN") else "node"
-    dn = os.path.dirname(__file__)
-    proc = None
-    com_thread = None
-    stdout_thread = None
 
-    stderr_lines = []
-
-    sendQ = []
 
     def is_notebook(self):
         """
@@ -67,9 +66,18 @@ class ConnectionClass():
         Initialize the ConnectionClass.
 
         Args:
-            config (config.JSConfig): Configuration for JavaScript interaction.
+            config (config.JSConfig): Reference to the active JSConfig object.
         """
-        self.config=configval
+        self.stdout:TextIO = sys.stdout
+        self.notebook = False
+        self.NODE_BIN = getattr(os.environ, "NODE_BIN") if hasattr(os.environ, "NODE_BIN") else "node"
+        self.dn = os.path.dirname(__file__)
+        self.proc:subprocess.Popen = None
+        self.com_thread:threading.Thread = None
+        self.stdout_thread:threading.Thread = None
+        self.stderr_lines:List = []
+        self.sendQ:list = []
+        self.config:config.JSConfig=configval
         # Modified stdout
         self.endself=False
         self.modified_stdout = (sys.stdout != sys.__stdout__) or (getattr(sys, 'ps1', sys.flags.interactive) == '>>> ')
@@ -77,10 +85,11 @@ class ConnectionClass():
         if self.is_notebook() or self.modified_stdout:
             self.notebook = True
             self.stdout = subprocess.PIPE
-        if self.supports_color():
-            os.environ["FORCE_COLOR"] = "1"
-        else:
-            os.environ["FORCE_COLOR"] = "0"
+        #I don't want to forcefully change os env settings.
+        # if self.supports_color():
+        #     os.environ["FORCE_COLOR"] = "1"
+        # else:
+        #     os.environ["FORCE_COLOR"] = "0"
         # Make sure our child process is killed if the parent one is exiting
         atexit.register(self.stop)
 
@@ -108,14 +117,16 @@ class ConnectionClass():
 
     
 
-    def read_stderr(self,stderrs):
+    def read_stderr(self,stderrs:List[str])->List[Dict]:
         """
-        Read and process stderr messages from the node.js process.
+        Read and process stderr messages from the node.js process, transforming them
+        into Dictionaries via json.loads
+
         Args:
-            stderrs (list): List of error messages.
+            stderrs (List[str]): List of error messages.
 
         Returns:
-            list: Processed error messages.
+            List[Dict]: Processed error messages.
         """
         ret = []
         for stderr in stderrs:
@@ -136,12 +147,12 @@ class ConnectionClass():
 
     # Write a message to a remote socket, in this case it's standard input
     # but it could be a websocket (slower) or other generic pipe.
-    def writeAll(self,objs):
+    def writeAll(self,objs:List[Union[str,Any]]):
         """
         Write messages to the node.js process.
 
         Args:
-            objs (list): List of messages to be sent.
+            objs (List[Union[str,Any]]): List of messages to be sent.
         """
         for obj in objs:
             if type(obj) == str:
@@ -266,7 +277,7 @@ class ConnectionClass():
         Terminate the node.js process.
         """
         self.endself=True
-        time.sleep(4)
+        time.sleep(2)
         log_print('terminating JS connection..')
         try:
             self.proc.terminate()

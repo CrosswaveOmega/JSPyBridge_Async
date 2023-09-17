@@ -2,20 +2,21 @@ import re
 import sys
 import traceback
 from .logging import logs
-from typing import List, Tuple
-
+from typing import List, Optional, Tuple
+from .util import haspackage
 class JavaScriptError(Exception):
     """
     Custom exception class for JavaScript errors.
     """
 
-    def __init__(self, call: str, jsStackTrace: List[str], pyStacktrace: List[str] = None):
+    def __init__(self, call: str, jsStackTrace: List[str], pyStacktrace: Optional[List[str]] = None):
         """
         Initialize a JavaScriptError object.
-
-        :param call: The failed JavaScript call.
-        :param jsStackTrace: JavaScript stack trace.
-        :param pyStacktrace: Python stack trace (optional).
+        
+        Args:
+            call (str): The failed JavaScript call.
+            jsStackTrace (List[str]): JavaScript stack trace.
+            pyStacktrace (Optional[List[str]]): Python stack trace (optional).
         """
         self.call = call
         self.js = jsStackTrace
@@ -25,6 +26,10 @@ class NoAsyncLoop(Exception):
     """
     Raised when calling @On when the passed in handler is an async function
     And no event loop was passed into the args
+    """
+class NoConfigInitalized(Exception):
+    """
+    Raised if there was no JSConfig initalized.
     """
 
         
@@ -257,20 +262,21 @@ def getErrorMessage(failed_call, jsStackTrace, pyStacktrace):
 # https://stackoverflow.com/a/28758396/11173996
 try:
     #__IPYTHON__
-    import IPython
+    if haspackage("IPython"):
+        import IPython
 
-    oldLogger = IPython.core.interactiveshell.InteractiveShell.showtraceback
+        oldLogger = IPython.core.interactiveshell.InteractiveShell.showtraceback
 
-    def newLogger(*a, **kw):
-        ex_type, ex_inst, tb = sys.exc_info()
-        if ex_type is JavaScriptError:
-            pyStacktrace = traceback.format_tb(tb)
-            # The Python part of the stack trace is already printed by IPython
-            print(getErrorMessage(ex_inst.call, ex_inst.js, pyStacktrace))
-        else:
-            oldLogger(*a, **kw)
+        def newLogger(*a, **kw):
+            ex_type, ex_inst, tb = sys.exc_info()
+            if ex_type is JavaScriptError:
+                pyStacktrace = traceback.format_tb(tb)
+                # The Python part of the stack trace is already printed by IPython
+                print(getErrorMessage(ex_inst.call, ex_inst.js, pyStacktrace))
+            else:
+                oldLogger(*a, **kw)
 
-    IPython.core.interactiveshell.InteractiveShell.showtraceback = newLogger
+        IPython.core.interactiveshell.InteractiveShell.showtraceback = newLogger
 except ImportError:
     pass
 

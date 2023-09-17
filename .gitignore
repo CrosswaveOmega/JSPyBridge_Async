@@ -9,3 +9,4 @@ asyncjs.log
 dist
 build
 HelloWorld.txt
+docs/_build

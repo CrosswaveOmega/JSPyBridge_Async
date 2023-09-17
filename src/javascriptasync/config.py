@@ -1,7 +1,13 @@
+'''
+The core config class.
+'''
+from __future__ import annotations
 import asyncio
 import os
+from .proxy import Proxy,Executor
+from .events import EventLoop
 from .logging import log_print,logs, print_path
-
+from .errors import NoConfigInitalized
 import threading, inspect, time, atexit, sys
 class Null:
     def __getattr__(self, *args, **kwargs):
@@ -11,67 +17,81 @@ class Null:
 
 
 class JSConfig(object):
-    event_loop = None
-    event_thread = None
-    executor = None
-    # # The "root" interface to JavaScript with FFID 0
-    global_jsi = None
-    # # Currently this breaks GC
-    fast_mode:bool = False
-    # # Whether we need patches for legacy node versions
-    node_emitter_patches:bool = False
-    async_mode:bool=False
+    '''A configuration class for managing JavaScript runtime settings.
+
+    This class is used to configure and manage the JavaScript runtime environment.
+
+    Attributes:
+        event_loop (EventLoop): The event loop for JavaScript execution.
+        event_thread (Thread): The thread running the `event_loop.loop` method.
+        executor (Executor): The executor for JavaScript code execution.
+        global_jsi (Proxy): The root interface to JavaScript with FFID 0.
+        fast_mode (bool): Whether to enable fast mode for JavaScript execution.
+        node_emitter_patches (bool): Whether patches are needed for legacy node versions.
+        dead (str): message for when the node.js process crashes.
+    '''
+
+
     def __init__(self):
-        self.async_mode=False
-        from . import proxy
-        #if self.event_loop:     return  # Do not start event loop again
-        self.event_loop:None #events.EventLoop = events.EventLoop()
-        self.event_thread:None #threading.Thread = threading.Thread(target=self.event_loop.loop, args=(), daemon=True)
-        #self.event_thread.start()
-        self.executor:proxy.Executor = None# proxy.Executor(self.event_loop)
-        # # The "root" interface to JavaScript with FFID 0
-        self.global_jsi:proxy.Proxy =None# proxy.Proxy(self.executor, 0)
-        self.fast_mode:bool=False
-        # Whether we need patches for legacy node versions
-        self.node_emitter_patches:bool=False
+        """
+        Initializes a new instance of JSConfig.
+
+        It sets default values for the JavaScript runtime configuration.
+        """
+        self.dead="\n** The Node process has crashed. Please restart the runtime to use JS APIs. **\n"
+        self.event_loop: EventLoop = None
+        self.event_thread: threading.Thread = None
+        self.executor: Executor = None
+        self.global_jsi: Proxy = None
+        self.fast_mode: bool = False
+        self.node_emitter_patches: bool = False
 
     def startup(self):
-        from . import proxy, events
-        import threading, inspect, time, atexit, sys
-        self.event_loop:events.EventLoop = events.EventLoop(self)
-        self.event_thread:threading.Thread = threading.Thread(target=self.event_loop.loop, args=(), daemon=True)
+        """
+        Starts the JavaScript runtime environment.
+
+        This method initializes the event loop, executor, and global_jsi for JavaScript execution.
+        """
+        self.event_loop: EventLoop = EventLoop(self)
+        self.event_thread: threading.Thread = threading.Thread(target=self.event_loop.loop, args=(), daemon=True)
         self.event_thread.start()
-        self.executor:proxy.Executor = proxy.Executor(self,self.event_loop)
+
+        self.executor: Executor = Executor(self, self.event_loop)
         # # The "root" interface to JavaScript with FFID 0
-        self.global_jsi:proxy.Proxy = proxy.Proxy(self.executor, 0)
-        self.fast_mode:bool=False
-        # Whether we need patches for legacy node versions
-        self.node_emitter_patches:bool=False
+        self.global_jsi: Proxy = Proxy(self.executor, 0)
+        self.fast_mode: bool = False
+        self.node_emitter_patches: bool = False
         atexit.register(self.event_loop.on_exit)
 
 
     def check_node_patches(self):
-
+        """
+        Checks if node patches are needed and updates node_emitter_patches accordingly.
+        """
         if self.global_jsi.needsNodePatches():
             self.node_emitter_patches = True
+
     def reset_self(self):
-        '''set everything to None'''
+        """
+        Resets all attributes to None, except for global_jsi which will throw an error.
+        """
         self.event_loop = None
         self.event_thread = None
         self.executor = None
-
-
         self.global_jsi = Null()
-        # Currently this breaks GC
         self.fast_mode = False
 
     def is_main_loop_active(self):
+        """
+        Checks if the main event loop is active.
+
+        Returns:
+            bool: True if the main event loop is active, False otherwise.
+        """
         if not self.event_thread or self.event_loop:
             return False
         return self.event_thread.is_alive() and self.event_loop.active
 
-
-    dead = "\n** The Node process has crashed. Please restart the runtime to use JS APIs. **\n"
 
 class classproperty:
     def __init__(self,func):
@@ -79,53 +99,85 @@ class classproperty:
     def __get__(self,instance,owner):
         return self.fget(owner)
 class Config:
-    '''Singleton Container for JSConfig.'''
+    """
+
+    This class is a singleton container for managing a JSConfig instance. It ensures that only one instance
+    of JSConfig is created and provides methods for accessing and controlling it.
+
+    Attributes:
+        _instance (JSConfig): The instance of the JSConfig class.
+        _initalizing (bool): Flag indicating whether initialization is in progress.
+
+    
+    """
 
     _instance = None
     _initalizing=False
-    _asyncmode=False
-    def __init__(self, arg, asyncmode=False):
-        
+    def __init__(self, arg='none'):
+        """
+        Initializes the Config class and JSConfig instance.
+
+        Args:
+            arg: Description of the argument (replace with a meaningful description).
+            asyncmode (bool, optional): Whether to enable asynchronous mode. Defaults to False.
+
+        Raises:
+            Exception: If JSConfig is not initialized or initialization is in progress.
+        """
         frame=inspect.currentframe()
         last_path=print_path(frame.f_back)
         logs.debug(f'attempted init:[{last_path}]')
         if not Config._instance and not Config._initalizing:
             Config._initalizing=True
-            Config._asyncmode=asyncmode
             instance = JSConfig()
             Config._instance = instance
-            if not Config._asyncmode:
-                log_print(Config._asyncmode)
-                Config._instance.startup()
-                Config._initalizing=False
+            Config._instance.startup()
+            Config._initalizing=False
         elif Config._initalizing:
             frame=inspect.currentframe()
             lp=print_path(frame)
             logs.warning(lp)
             log_print(f'attempted init during initalization:[{lp}]')
     def kill(self):
+        """
+        Stops the JSConfig event loop and resets the instance.
+
+        Raises:
+            Exception: If JSConfig is not initialized or initialization is in progress.
+        """
         if not Config._instance:
-            raise Exception("Never initalized JSConfig, please call javascriptasync.init_js() somewhere in your code first!")
+            raise NoConfigInitalized("Never initalized JSConfig, please call javascriptasync.init_js() somewhere in your code first!")
         elif Config._initalizing:
-            raise Exception("Still initalizing JSConfig, please wait!")
+            raise NoConfigInitalized("Still initalizing JSConfig, please wait!")
         Config._instance.event_loop.on_exit()
         Config._instance=None
     @classmethod
     def inst(cls):
+        """
+        Returns the JSConfig instance.
+
+        Returns:
+            JSConfig: The JSConfig instance.
+
+        """
         return Config._instance
     @classmethod
     def get_inst(cls):
-        '''
-        Check if Config._instance was initalized and ready.
-        '''
+        """
+        Checks if JSConfig is initialized and returns the instance.
+
+        Returns:
+            JSConfig: The JSConfig instance.
+
+        Raises:
+            Exception: If JSConfig is not initialized or initialization is in progress.
+        """
         if not Config._instance:
-            raise Exception("Never initalized JSConfig, please call javascriptasync.init_js() somewhere in your code first!")
+            raise NoConfigInitalized("Never initalized JSConfig, please call javascriptasync.init_js() somewhere in your code first!")
         elif Config._initalizing:
-            raise Exception("Still initalizing JSConfig, please wait!")
+            raise NoConfigInitalized("Still initalizing JSConfig, please wait!")
         return Config._instance
 
-    def ms(self):
-        return Config._instance
 
     def __getattr__(self, attr):
         if hasattr(Config,attr):
@@ -133,14 +185,12 @@ class Config:
         else:
             if hasattr(Config._instance,attr):
                 return getattr(Config._instance,attr)
-            raise Exception('Tried to get attr on instance object that does not exist.')
+            raise NoConfigInitalized('Tried to get attr on instance object that does not exist.')
     def __setattr__(self, attr,val):
         if hasattr(Config,attr):
             return setattr(Config,attr,val)
         else:
             if hasattr(Config._instance,attr):
                 return setattr(Config._instance,attr,val)
-            raise Exception('Tried to set attr on instance object that does not exist.')
+            raise NoConfigInitalized('Tried to set attr on instance object that does not exist.')
 
-
-myst:JSConfig=None

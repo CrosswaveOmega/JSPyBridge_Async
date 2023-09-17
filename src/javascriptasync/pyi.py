@@ -1,3 +1,5 @@
+
+from __future__ import annotations
 # THe Python Interface for JavaScript
 
 import inspect, importlib, traceback
@@ -80,7 +82,6 @@ class PyInterface:
     @executor.setter
     def executor(self, executor):
         pass
-        #return config.Config().ms().executor
     def assign_ffid(self, what):
         self.cur_ffid += 1
         self.m[self.cur_ffid] = what

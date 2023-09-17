@@ -80,32 +80,44 @@ async def require_a(name:str, version:Optional[str]=None)->Proxy:
     #req=conf.global_jsi.require
     return await coro
 
+def get_console() -> Proxy:
+    """
+    Returns the console object from the JavaScript context.
 
-def get_console():
-    '''
-    This function returns the console object from the JavaScript context which can be used to print 
-    direct messages in your Node.js console from the Python context. It does so by grabbing the console 
-    object from the global JavaScript Interface (JSI) stored in the Config singleton instance.
+    The console object can be used to print direct messages in your Node.js console from the Python context.
+    It retrieves the console object from the global JavaScript Interface (JSI) stored in the Config singleton instance.
 
-    '''
-    return Config.get_inst().global_jsi.console  
-def get_globalThis():
-    '''
-     This function returns the globalThis object from the JavaScript context. The globalThis object is 
-    a standard built-in object in JavaScript, similar to window in a browser or global in Node.js. 
-    It's used as a universal way to access the global scope in any environment. This function provides 
-    a way to access this object from the Python context.
+    Returns:
+        Proxy: The JavaScript console object.
+    """
+    return Config.get_inst().global_jsi.console
 
-    '''
+def get_globalThis() -> Proxy:
+    """
+    Returns the globalThis object from the JavaScript context.
+
+    The globalThis object is a standard built-in object in JavaScript, akin to 'window' in a browser or 'global' in Node.js.
+    It provides a universal way to access the global scope in any environment. This function offers access to this object
+    from the Python context.
+
+    Returns:
+        Proxy: The JavaScript globalThis object.
+    """
     globalThis = Config.get_inst().global_jsi.globalThis
     return globalThis
-def get_RegExp():
-    '''
-    This function returns the RegExp (Regular Expression) object from the JavaScript context. Regular 
-    Expressions in JavaScript are used to perform pattern-matching and "search-and-replace" functions 
-    on text. This function returns this RegExp object to the Python environment.
-    '''
+
+def get_RegExp() -> Proxy:
+    """
+    Returns the RegExp (Regular Expression) object from the JavaScript context.
+
+    Regular Expressions in JavaScript are utilized for pattern-matching and "search-and-replace" operations on text.
+    This function retrieves the RegExp object and makes it accessible in the Python environment.
+
+    Returns:
+        Proxy: The JavaScript RegExp object.
+    """
     return Config.get_inst().global_jsi.RegExp
+
 
 
 def eval_js(js: str, timeout: int = 10) -> Any:
@@ -292,9 +304,11 @@ def On(emitter: object, event: str, asyncio_loop: Optional[asyncio.BaseEventLoop
         NoAsyncLoop: If asyncio_loop is not set when using a coroutine handler.
 
     Example:
+        
         @On(myEmitter, 'increment', asyncloop)
         async def handleIncrement(this, counter):
-            # Event handling logic
+            
+            pass
     """
     def decor(_fn):
         conf=Config.get_inst()
@@ -359,9 +373,11 @@ def Once(emitter: object, event: str, asyncio_loop: Optional[asyncio.BaseEventLo
         NoAsyncLoop: If asyncio_loop is not set when using a coroutine handler.
 
     Example:
+
         @Once(myEmitter, 'increment', asyncloop)
         async def handleIncrementOnce(this, counter):
-            # One-time event handling logic
+        
+            pass
     """
     def decor(fna):
         i = hash(fna)
