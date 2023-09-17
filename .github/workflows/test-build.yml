@@ -27,7 +27,7 @@ jobs:
     - name: Install pytest and plugins
       run: python -m pip install pytest pytest-asyncio pytest-xdist pytest-cov
     - name: Install js dependencies
-        run: npm install  # Replace with your npm package installation command if needed
+      run: npm install  
 
     - name: Run Pytest
         run: |
