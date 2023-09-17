@@ -5,10 +5,6 @@ import logging
 import pytest
 import asyncio
 
-# Define a class for testing
-class TestJavaScriptLibrary:
-    def __init__(self):
-        self.demo=None
 
 
 class TestJavaScriptLibraryASYNC:
