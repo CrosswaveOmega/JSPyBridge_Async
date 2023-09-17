@@ -159,7 +159,8 @@ class ConnectionClass():
                 #for attribute, value in vars(self.proc).items():  log_print(f"Attribute: {attribute}, Value: {value}")
                 self.proc.stdin.write(j.encode())
                 self.proc.stdin.flush()
-            except Exception:
+            except Exception as error:
+                logs.critical(error,exc_info=True)
                 self.stop()
                 break
 

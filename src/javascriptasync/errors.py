@@ -1,6 +1,7 @@
 import re
 import sys
 import traceback
+from .logging import logs
 from typing import List, Tuple
 
 class JavaScriptError(Exception):
@@ -256,7 +257,7 @@ def getErrorMessage(failed_call, jsStackTrace, pyStacktrace):
 # https://stackoverflow.com/a/28758396/11173996
 try:
     #__IPYTHON__
-    import IPython.core.interactiveshell
+    import IPython
 
     oldLogger = IPython.core.interactiveshell.InteractiveShell.showtraceback
 
@@ -270,7 +271,7 @@ try:
             oldLogger(*a, **kw)
 
     IPython.core.interactiveshell.InteractiveShell.showtraceback = newLogger
-except NameError:
+except ImportError:
     pass
 
 orig_excepthook = sys.excepthook
@@ -280,6 +281,7 @@ def error_catcher(error_type, error, error_traceback):
     """
     Catches JavaScript exceptions and prints them to the console.
     """
+    logs.error('ERROR.')
     if error_type is JavaScriptError:
         pyStacktrace = traceback.format_tb(error_traceback)
         jsStacktrace = error.js

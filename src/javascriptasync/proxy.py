@@ -6,8 +6,6 @@ from .events import EventLoop
 
 
 from .logging import logs
-# This is the Executor, something that sits in the middle of the Bridge and is the interface for
-# Python to JavaScript. This is also used by the bridge to call Python from Node.js.
 
 class Executor:
     """
@@ -20,7 +18,6 @@ class Executor:
         i (int): A unique id for generating request ids.
         self.bridge(PyInterface): shortcut to EventLoop.pyi
     """
-    '''# .'''
     def __init__(self, config_obj:config.JSConfig,loop:EventLoop):
         self.conf=config_obj
         self.loop = loop
@@ -478,6 +475,7 @@ class Proxy(object):
     "Proxy" classes get individually instanciated for every thread and JS object
     that exists. It interacts with an Executor to communicate.
 
+    They're essentially references to objects on the JavaScript side of the bridge.
 
     Attributes:
         ffid (int): Function ID.
