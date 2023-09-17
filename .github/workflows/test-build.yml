@@ -30,8 +30,7 @@ jobs:
       run: npm install  
 
     - name: Run Pytest
-        run: |
-          pytest  
+      run:  pytest  
     - name: Build a binary wheel and a source tarball
       run: >-
         python -m
