@@ -19,8 +19,13 @@ release = '0.1.0'
 # -- General configuration ---------------------------------------------------
 # https://www.sphinx-doc.org/en/master/usage/configuration.html#general-configuration
 
-extensions = [ 'sphinx.ext.autodoc','sphinx.ext.napoleon']
-
+extensions = [ 'sphinx.ext.autodoc','sphinx.ext.napoleon','sphinx.ext.intersphinx']
+# Links used for cross-referencing stuff in other documentation
+intersphinx_mapping = {
+  'py': ('https://docs.python.org/3', None),
+  'aio': ('https://docs.aiohttp.org/en/stable/', None),
+  'req': ('https://requests.readthedocs.io/en/latest/', None)
+}
 templates_path = ['_templates']
 exclude_patterns = ['_build', 'Thumbs.db', '.DS_Store']
 

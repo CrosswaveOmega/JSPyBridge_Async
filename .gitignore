@@ -10,3 +10,10 @@ dist
 build
 HelloWorld.txt
 docs/_build
+classes.dot
+packages.png
+classes.png
+packages.dot
+makeimg.sh
+output.png
+output2.png

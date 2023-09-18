@@ -27,7 +27,7 @@ where = ["src"]
 js   = ["js/*","*.js"]
 
 [options.packages.find]
-exclude = ['tests',  'docs']
+exclude = ['tests',  'docs', 'test']
 
 
 
