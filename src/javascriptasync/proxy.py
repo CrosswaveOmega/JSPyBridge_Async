@@ -13,7 +13,7 @@ from .logging import logs
 class Executor:
     """
     This is the Executor, something that sits in the middle of the Bridge and is the interface for
-    Python to JavaScript. This is also used by the bridge to call Python from Node.js
+    Python to JavaScript. This is also used by the bridge to call Python from Node.js.
 
     Attributes:
         conf (config.JSConfig): Reference to the active JSConfig object.
@@ -37,7 +37,7 @@ class Executor:
         Args:
             action (str): The action to be taken (can be "get", "init", "inspect", "serialize", "set", "keys").  
                             (Only 'get','inspect','serialize',and 'keys' are used elsewhere in code though.).
-            ffid (int): The function ID.
+            ffid (int): The foreign Object Reference ID.
             attr (Any): Attribute to be passed into the key field
             args (Any, optional): Additional parameters for init and set actions
         
@@ -136,7 +136,7 @@ class Executor:
     async def pcallalt(self, ffid:int, action:str, attr:Any, args:Tuple[Any], *, timeout:int=1000, forceRefs:bool=False):
         """
         This function does a two-part call to JavaScript. First, a preliminary request is made to JS
-        with the function ID, attribute, and arguments that Python would like to call. For each of the
+        with the foreign Object Reference ID, attribute, and arguments that Python would like to call. For each of the
         non-primitive objects in the arguments, in the preliminary request, we "request" an FFID from JS
         which is the authoritative side for FFIDs. Only it may assign them; we must request them. Once
         JS receives the pcall, it searches the arguments and assigns FFIDs for everything, then returns
@@ -215,7 +215,7 @@ class Executor:
     def pcall(self, ffid:int, action:str, attr:Any, args:Tuple[Any], *, timeout:int=1000, forceRefs:bool=False):
         """
         This function does a two-part call to JavaScript. First, a preliminary request is made to JS
-        with the function ID, attribute and arguments that Python would like to call. For each of the
+        with the foreign Object Reference ID, attribute and arguments that Python would like to call. For each of the
         non-primitive objects in the arguments, in the preliminary request we "request" an FFID from JS
         which is the authoritative side for FFIDs. Only it may assign them; we must request them. Once
         JS recieves the pcall, it searches the arguments and assigns FFIDs for everything, then returns
@@ -225,7 +225,7 @@ class Executor:
         normal GC by Python. Finally, on the JS side it executes the function call without waiting for
         Python. A init/set operation on a JS object also uses pcall as the semantics are the same.
         Args:
-            ffid (int): unique function id.
+            ffid (int): unique foreign object reference id.
             action (str): The action to be executed.   (can be "init", "set", or "call") 
             attr (Any): attribute to be passed into the 'key' field
             args (Tuple[Any]): Arguments for the action to be executed.
@@ -330,7 +330,7 @@ class Executor:
         Get a property from a JavaScript object.
 
         Args:
-            ffid (int): Function ID.
+            ffid (int): Foreign Object Reference ID.
             method (str): The method to retrieve.
 
         Returns:
@@ -344,7 +344,7 @@ class Executor:
         Set a property on a JavaScript object.
 
         Args:
-            ffid (int): Function ID.
+            ffid (int): Foreign Object Reference ID.
             method (str): The method to set.
             val (Any): The value to set.
 
@@ -359,7 +359,7 @@ class Executor:
         Call a property on a JavaScript object.
 
         Args:
-            ffid (int): Function ID.
+            ffid (int): Foreign Object Reference ID.
             method (str): The method to call.
             args (Tuple[Any]): Arguments for the call.
             timeout (int, optional): Timeout duration. Defaults to None.
@@ -377,7 +377,7 @@ class Executor:
         Initialize a property on a JavaScript object.
 
         Args:
-            ffid (int): Function ID.
+            ffid (int): Foreign Object Reference ID.
             method (str): The method to initialize.
             args (Tuple[Any]): Arguments for the initialization.
 
@@ -391,7 +391,7 @@ class Executor:
         Call a property on a JavaScript object.
 
         Args:
-            ffid (int): Function ID.
+            ffid (int): Foreign Object Reference ID.
             method (str): The method to call.
             args (Tuple[Any]): Arguments for the call.
             timeout (int, optional): Timeout duration. Defaults to None.
@@ -408,7 +408,7 @@ class Executor:
         Initialize a property on a JavaScript object.
 
         Args:
-            ffid (int): Function ID.
+            ffid (int): Foreign Object Reference ID.
             method (str): The method to initialize.
             args (Tuple[Any]): Arguments for the initialization.
 
@@ -423,7 +423,7 @@ class Executor:
         Inspect a JavaScript object.
 
         Args:
-            ffid (int): Function ID.
+            ffid (int): Foreign Object Reference ID.
             mode (str): The inspection mode (e.g., "str", "repr").
 
         Returns:
@@ -437,7 +437,7 @@ class Executor:
         Get the keys of a JavaScript object.
 
         Args:
-            ffid (int): Function ID.
+            ffid (int): Foreign Object Reference ID.
 
         Returns:
             list: The list of keys.
@@ -449,7 +449,7 @@ class Executor:
         Free a local JavaScript object.
 
         Args:
-            ffid (int): Function ID.
+            ffid (int): Foreign Object Reference ID.
         """
         self.loop.freeable.append(ffid)
 
@@ -458,7 +458,7 @@ class Executor:
         Get a local JavaScript object.
 
         Args:
-            ffid (int): Function ID.
+            ffid (int): Foreign Object Reference ID.
 
         Returns:
             Any: The JavaScript object.
@@ -480,10 +480,10 @@ class Proxy(object):
     They're essentially references to objects on the JavaScript side of the bridge.
 
     Attributes:
-        ffid (int): Function ID.
+        ffid (int): Foreign Object Reference ID.
         _exe (Executor): The executor for communication with JavaScript.
         _ix (int): Index.
-        _pffid (int): Property function ID.
+        _pffid (int): Property foreign Object Reference ID.
         _pname (str): Property name.
         _es6 (bool): ES6 class flag.
         _resolved (dict): Resolved values.
@@ -493,8 +493,8 @@ class Proxy(object):
         """
         Args:
             exe (Executor): The executor for communication with JavaScript.
-            ffid (int): Function ID.
-            prop_ffid (int, optional): Property function ID. Defaults to None.
+            ffid (int): Foreign Object Reference ID.
+            prop_ffid (int, optional): Property foreign Object Reference ID. Defaults to None.
             prop_name (str, optional): Property name. Defaults to "".
             es6 (bool, optional): ES6 class flag. Defaults to False.
 
@@ -633,6 +633,7 @@ class Proxy(object):
     def __iter__(self):
         """
         Initalize an iterator
+        
         Returns:
             self: The iterator object.
         """

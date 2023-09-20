@@ -30,7 +30,7 @@ class ConnectionClass():
     """
     Encapsulated connection class for interacting with JavaScript.
 
-    This class manages the communication between Python and JavaScript.
+    This class initalizes a node.js instance, sends information from Python to JavaScript, and recieves input from JavaScript back to Python.
 
     Attributes:
         config (config.JSConfig): Reference to the active JSConfig object.
@@ -149,10 +149,10 @@ class ConnectionClass():
     # but it could be a websocket (slower) or other generic pipe.
     def writeAll(self,objs:List[Union[str,Any]]):
         """
-        Write messages to the node.js process.
+        Transform objects into JSON strings, and write them to the node.js process.
 
         Args:
-            objs (List[Union[str,Any]]): List of messages to be sent.
+            objs (List[Union[str,Any]]): List of messages to be transformed and sent.
         """
         for obj in objs:
             if type(obj) == str:

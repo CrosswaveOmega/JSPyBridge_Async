@@ -39,5 +39,6 @@ html_static_path = ['_static']
 
 html_theme_options = {
     'sidebarwidth':'300px',
-    'stickysidebar': True
+    'stickysidebar': True,
+    'visitedlinkcolor': None,
 }

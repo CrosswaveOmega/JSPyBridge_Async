@@ -63,10 +63,16 @@ javascriptasync.logging module
 javascriptasync.proxy module
 ----------------------------
 
-.. automodule:: javascriptasync.proxy
+.. autoclass:: javascriptasync.proxy.Executor
    :members:
    :undoc-members:
    :show-inheritance:
+
+.. autoclass:: javascriptasync.proxy.Proxy
+   :members:
+   :undoc-members:
+   :show-inheritance:
+   :special-members: __del__, __json__, __repr__, __str__, __contains__, __setitem__, __setattr__, __next__, __iter__, __getitem__,__getattr__,__call__,
 
 javascriptasync.pyi module
 --------------------------

@@ -17,12 +17,14 @@ class Null:
 
 
 class JSConfig(object):
-    '''A configuration class for managing JavaScript runtime settings.
+    '''The configuration class for the JavaScript Bridge.
 
-    This class is used to configure and manage the JavaScript runtime environment.
+    This class is used to configure, manage, and facilitatie communication to an EventLoop, which filters data in/out to an active node subprocess.
+
+    python->
 
     Attributes:
-        event_loop (EventLoop): The event loop for JavaScript execution.
+        event_loop (EventLoop): The event loop to facilitate io between Python and a node.js connection.  
         event_thread (Thread): The thread running the `event_loop.loop` method.
         executor (Executor): The executor for JavaScript code execution.
         global_jsi (Proxy): The root interface to JavaScript with FFID 0.
@@ -57,7 +59,7 @@ class JSConfig(object):
         self.event_thread.start()
 
         self.executor: Executor = Executor(self, self.event_loop)
-        # # The "root" interface to JavaScript with FFID 0
+        # # The "root" interface to JavaScript with FFID(Foreign Object Reference ID) 0
         self.global_jsi: Proxy = Proxy(self.executor, 0)
         self.fast_mode: bool = False
         self.node_emitter_patches: bool = False
