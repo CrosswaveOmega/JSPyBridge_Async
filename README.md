@@ -10,7 +10,7 @@ This is a fork of [JSPyBridge](https://github.com/extremeheat/JSPyBridge) by ext
 
 
 As the purpose of this fork was only to alter the `javascript` package, it's specifically for running Node.js from Python.  No changes are made to `pythonia` or are planned to be made to `pythonia`.
-### current stable install
+### current stable installation
 ```
  pip install -U javascriptasync
 ```
@@ -23,7 +23,7 @@ As the purpose of this fork was only to alter the `javascript` package, it's spe
 Requires Node.js 14 and Python 3.8 or newer.
 
 ## Key Features
-
+* use node.js objects in the same way as python modules.
 * Ability to call async and sync functions and get object properties with a native feel
 * Built-in garbage collection
 * Bidirectional callbacks with arbitrary arguments
@@ -31,23 +31,7 @@ Requires Node.js 14 and Python 3.8 or newer.
 * Object inspection allows you to easily `console.log` or `print()` any foreign objects
 
 * (Bridge to call JS from Python) Native decorator-based event emitter support
-* (Bridge to call JS from Python) **First-class Jupyter Notebook/Google Colab support.** See some Google Colab uses below.
 
-## KEY CHANGES:
-* `javascript` is now `javascriptasync`
-* `config.py` has been encapsulated into the `JSConfig` class, all objects that need to access variables within `JSConfig` have been passed an object reference to a single unique `JSConfig` instance.
- * `__init__.py` utilizes a singleton to ensure that only one instance of an JSConfig class is created at any one time.  You need to call `init()` to start up the bridge!
-* debug output now uses the logging module.
-* `connection.py` has been encapsulated into the `ConnectionClass`, accessable through the `events.EventLoop` class, as `events.EventLoop` is the only place the connection was ever utilized.
-* It's possible to set a custom timeout value when using eval_js.
-* async variants of `require` and `eval_js` are included within __init__.py, as `require_a` and `eval_js_a` respectively.
-* this package is now built using a `pyproject.toml` file instead of a `setup.py` script.
-* `test_general.py` now works with pytest.
-* `console`, `globalThis`, and `RegExp` have to be retrieved with the `get_console()`, `get_globalThis()`, and `get_RegExp()` functions.
-* `start`, `stop`, and `abort` has to be retrieved with through the `ThreadUtils` static class.
-* any call or init operation can be made into a coroutine by passing in the `coroutine=True` keyword.
-* Separate set of wrappers for asyncio tasks through `AsyncTaskUtils` 
-* Event Emitters can utilize Coroutine handlers.
 ### New Javascript from Python usage:
 ```py
 import asyncio
@@ -69,183 +53,23 @@ asyncio.run(main)
  * Code cleanup.
 
 
-## Basic usage example
-
-See some examples [here](https://github.com/CrosswaveOmega/JSPyBridge_Async/tree/master/examples). See [documentation](https://github.com/CrosswaveOmega/JSPyBridge_Async#documentation) below and in [here](https://github.com/CrosswaveOmega/JSPyBridge_Async/tree/master/docs).
-
+## KEY CHANGES:
+* `javascript` is now `javascriptasync`
+* `config.py` has been encapsulated into the `JSConfig` class, all objects that need to access variables within `JSConfig` have been passed an object reference to a single unique `JSConfig` instance.
+ * `__init__.py` utilizes a singleton to ensure that only one instance of an JSConfig class is created at any one time.  You need to call `init()` to start up the bridge!
+* debug output now uses the logging module.
+* `connection.py` has been encapsulated into the `ConnectionClass`, accessable through the `events.EventLoop` class, as `events.EventLoop` is the only place the connection was ever utilized.
+* It's possible to set a custom timeout value when using eval_js.
+* async variants of `require` and `eval_js` are included within __init__.py, as `require_a` and `eval_js_a` respectively.
+* this package is now built using a `pyproject.toml` file instead of a `setup.py` script.
+* `test_general.py` now works with pytest.
+* `console`, `globalThis`, and `RegExp` have to be retrieved with the `get_console()`, `get_globalThis()`, and `get_RegExp()` functions.
+* `start`, `stop`, and `abort` has to be retrieved with through the `ThreadUtils` static class.
+* any call or init operation can be made into a coroutine by passing in the `coroutine=True` keyword.
+* Separate set of wrappers for asyncio tasks through `AsyncTaskUtils` 
+* Event Emitters can utilize Coroutine handlers.
 
 
 ### Examples
  see https://github.com/CrosswaveOmega/JSPyBridge_Async/tree/master/examples
 
-
-
-# Documentation
-
-## From Python
-The bridge has to be initalized before use, this can be done via the `init_js()` function
-```py
-from javascriptasync import init_js
-init_js()
-```
-You can import the bridge module with 
-```py
-from javascriptasync import require
-```
-
-This will import the require function which you can use just like in Node.js. This is a slightly
-modified require function which does dependency management for you. The first paramater is the name
-or location of the file to import. Internally, this calls the ES6 dynamic `import()` function. Which
-supports both CommonJS and ES6 modules.
-
-If you are passing a module name (does not start with / or include a .) such as 'chalk', it will search 
-for the dependency in the internal node_module folder and if not found, install it automatically. 
-This install will only happen once, it won't impact startup afterwards.
-
-The second paramater to the built-in require function is the version of the package you want, for
-example `require('chalk', '^3')` to get a version greater than major version 3. Just like you would
-if you were using `npm install`. It's reccomended to only use the major version as the name and version
-will be internally treated as a unique package, for example 'chalk--^3'. If you leave this empty, 
-we will install `latest` version instead, or use the version that may already be installed globally.
-
-If require is being used within an asyncio coroutine, you should be using `require_a()` instead to prevent blocking your asyncio event loop.
-```py
-import asyncio
-from javascriptasync import init_js, require_a
-init_js()
-async def main():
-  chalk= await require_a("chalk")
-  red=await chalk.red("world!",coroutine=True)
-  print("Hello", red)
-
-asyncio.run(main)
-```
-
-### Usage
-
-* All function calls to JavaScript are thread synchronous **by default.**
-  * This can be changed by including a `coroutine=True` kwarg in a function call on a Proxy.
-  * Currently, only function `calls` and `inits` can be coroutines for the sake of simplicity.
-* ES6 classes can be constructed without new
-* ES5 classes can be constructed with the .new psuedo method
-* Use `@On` decorator when binding event listeners. Use `off` to disable it.
-  * You can bind a coroutine as an event listener, provided you pass in a reference to your running asyncio event loop.
-* All callbacks run on a dedicated callback thread. DO NOT BLOCK in a callback or all other events will be blocked. Instead:
-* ~~Use the @AsyncTask decorator when you need to spawn a new thread for an async JS task.~~
-* The @AsyncTask decorator is only for syncronous functions that you wish to run in a psuedo asyncronous(i.e, not with asyncio) way.  For Coroutines, wrappers are provided to quickly create Tasks which run on your event loop.
-
-For more, see [docs/python.md](https://github.com/CrosswaveOmega/JSPyBridge_Async/tree/master/docs/python.md).
-
-### Usage
-
-<details>
-  <summary>👉 Click here to see some code usage examples 👈</summary>
-
-### Basic import
-
-Let's say we have a file in JS like this called `time.js` ...
-```js
-function whatTimeIsIt() {
-    return (new Date()).toLocaleString()
-}
-module.exports = { whatTimeIsIt }
-```
-
-Then we can call it from Python !
-```py
-from javascript import require
-time = require('./time.js')
-print(time.whatTimeIsIt())
-```
-
-### Event emitter
-
-*You must use the provided On, Once, decorator and off function over the normal dot methods.*
-
-emitter.js
-```js
-const { EventEmitter } = require('events')
-class MyEmitter extends EventEmitter {
-    counter = 0
-    inc() {
-        this.emit('increment', ++this.counter)
-    }
-}
-module.exports = { MyEmitter }
-```
-
-listener.py
-```py
-from javascriptasync import init_js, require, On, off
-init_js()
-MyEmitter = require('./emitter.js')
-# New class instance
-myEmitter = MyEmitter()
-# Decorator usage
-@On(myEmitter, 'increment')
-def handleIncrement(this, counter):
-    print("Incremented", counter)
-    # Stop listening. `this` is the this variable in JS.
-    off(myEmitter, 'increment', handleIncrement)
-# Trigger the event handler
-myEmitter.inc()
-```
-
-### ES5 class
-
-es5.js
-```js
-function MyClass(num) {
-    this.getNum = () => num
-}
-module.exports = { MyClass }
-```
-
-
-es5.py
-```py
-MyEmitter = require('./es5.js')
-myClass = MyClass.new(3)
-print(myClass.getNum())
-```
-
-### Iteration
-items.js
-```js
-module.exports = { items: [5, 6, 7, 8] }
-```
-
-items.py
-```py
-items = require('./items.js')
-for item in items:
-    print(item)
-```
-
-### Callback
-
-callback.js
-```js
-export function method(cb, salt) {
-    cb(42 + salt)
-}
-```
-callback.py
-```py
-method = require('./callback').method
-# Example with a lambda, but you can also pass a function ref
-method(lambda v: print(v), 2) # Prints 44
-```
-
-</details>
-
-
-
-#### Notable details
-
-* The `ffid` keyword is reserved. You cannot use it in variable names, object keys or values as this is used to internlly track objects.
-* On the bridge to call JavaScript from Python, due to the limiatations of Python and cross-platform IPC, we currently communicate over standard error which means that JSON output in JS standard error can interfere with the bridge. The same issue exists on Windows with python. You are however very unlikely to have issues with this.
-
-* You can set the Node.js/Python binary paths by setting the `NODE_BIN` or `PYTHON_BIN` enviornment variables before importing the library. Otherwise, the `node` and `python3` or `python` binaries will be called relative to your PATH enviornment variable. 
-
-* Function calls will timeout after 100000 ms and throw a `BridgeException` error. That default value can be overridden by defining the new value of `REQ_TIMEOUT` in an environment variable.

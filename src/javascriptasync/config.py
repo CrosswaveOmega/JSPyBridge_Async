@@ -95,11 +95,7 @@ class JSConfig(object):
         return self.event_thread.is_alive() and self.event_loop.active
 
 
-class classproperty:
-    def __init__(self,func):
-        self.fget=func
-    def __get__(self,instance,owner):
-        return self.fget(owner)
+
 class Config:
     """
 

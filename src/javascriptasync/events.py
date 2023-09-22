@@ -11,9 +11,9 @@ from .logging import logs, log_print
 from .connection import ConnectionClass
 from .asynciotasks import EventLoopMixin
 class CrossThreadEvent(asyncio.Event):
-    #Initalize Asyncio Event and pass in a specific
-    #Asyncio event loop, and ensure that the event can be
-    #Set outside an asyncio event loop.
+    '''Initalize Asyncio Event and pass in a specific
+    Asyncio event loop, and ensure that the event can be
+    Set outside an asyncio event loop.'''
     def __init__(self, _loop=None,*args, **kwargs):
         super().__init__(*args, **kwargs)
         if self._loop is None:
@@ -26,27 +26,32 @@ class CrossThreadEvent(asyncio.Event):
         self._loop.call_soon_threadsafe(super().clear)
 class TaskState:
     """
-    Represents the state of a thread task.
+    Represents the state of a wrapped "AsyncTask" function.
 
+    This should be the first parameter to all wrapped "AsyncTask" functions.
+    
     Attributes:
-        stopping (bool): Indicates whether the task should stop.
-        sleep (function): A function used to sleep for a specified duration.
+        stopping (bool): When this is set to true, the "AsyncTask" function should stop.
+        sleep (function): Alias for the wait function.
     """
     def __init__(self):
-        self.stopping = False
-        self.sleep = self.wait
+        self.stopping:bool = False
+        self.sleep:Callable = self.wait
 
-    def wait(self, sec):
+    def wait(self, sec:float):
         """
-        Wait for a specified duration.
+        Wait for a specified duration, and will automatically exit the process once self.stopping is true.
 
         Args:
             sec (float): The duration to wait in seconds.
         """
-        stopTime = time.time() + sec
-        while time.time() < stopTime and not self.stopping:
+
+        stop_time = time.time() + sec
+        while time.time() < stop_time and not self.stopping:
             time.sleep(0.2)
         if self.stopping:
+            #This feels unsafe, but it works for threads.  
+            #Will remove when I find something I consider safer.
             sys.exit(1)
 
 

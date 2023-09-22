@@ -6,15 +6,19 @@
 Welcome to AsyncJavascriptBridge's documentation!
 =================================================
 
-AsyncJavascriptBridge is a Python library that allows you to seamlessly run JavaScript code from within your Python applications with built in asyncio support, forked from the JSPyBridge library [here](https://github.com/extremeheat/JSPyBridge)
+``javascriptasync`` is a Python library that allows you to seamlessly run JavaScript code from within your 
+Python applications with built in asyncio support, forked from the JSPyBridge library [here](https://github.com/extremeheat/JSPyBridge)
 
+
+(Pardon the dust)
 Key Features
 ============
 
-- Streamlined asyncio support: AsyncJavascriptBridge offers enhanced compatibility with asyncio applications, so each call/init to node.js won't block the rest of your asyncio event loop.
+- Streamlined asyncio support: AsyncJavascriptBridge offers enhanced compatibility with asyncio applications, 
+   so each call/init to node.js won't block the rest of your asyncio event loop.
 - Switch between Sync/Async JS calls with a single keyword.
 - Greater Timeout Control
-- Improved code organization: With AsyncJavascriptBridge, the codebase has been refactored to ensure better structure, maintainability, and understandability.
+- Improved code organization: the codebase has been refactored to ensure better structure, maintainability, and understandability.
 
 Getting Started
 ^^^^^^^^^^^^^^^
@@ -28,12 +32,13 @@ To get started with the library, just use
 Table of contents
 ^^^^^^^^^^^^^^^^^
 .. toctree::
-   :maxdepth: 2
+   :maxdepth: 1
    :caption: Contents:
 
    javascriptasync
    overview
-   quickstart
+   introduction
+   threadtasks
    modules
 
 

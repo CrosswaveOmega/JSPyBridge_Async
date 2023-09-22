@@ -267,7 +267,7 @@ class ThreadUtils:
     @staticmethod
     def stop(method:Callable):
         """
-        Stop the thread that was assigned the passed in function.
+        Stop the thread that was assigned the passed in function. Please try to utilize this instead of abort() in general situations.
 
         Args:
             method (Callable): The function representing the thread to stop.
@@ -275,16 +275,17 @@ class ThreadUtils:
         conf=Config.get_inst()
         conf.event_loop.stopThread(method)
     @staticmethod
-    def abort(method:Callable,killAfter:float=0.5):
+    def abort(method:Callable, kill_after:float=0.5):
         """
-        Abort Stop the thread that was assigned the passed in function.
+        Abort the thread that was assigned the passed in function.
+        Use if you want to make sure that a thread has stopped, but please try to use stop() instead for general use.
 
         Args:
             method (Callable): The function representing the thread to abort.
-            killAfter (float, optional): The time (in seconds) to wait before forcefully killing the thread. Default is 0.5 seconds.
+            kill_after (float, optional): The time (in seconds) to wait before forcefully killing the thread. Default is 0.5 seconds.
         """
         conf=Config.get_inst()
-        conf.event_loop.abortThread(method,killAfter)
+        conf.event_loop.abortThread(method,kill_after)
 
 # You must use this Once decorator for an EventEmitter in Node.js, otherwise
 # you will not be able to off an emitter.
