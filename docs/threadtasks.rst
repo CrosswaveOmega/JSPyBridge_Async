@@ -74,7 +74,8 @@ You can utilize the `ThreadUtils.start()`, `ThreadUtils.stop()` and `ThreadUtils
 
 
 Actual Asyncio Task wrapping and control
-========================================
+----------------------------------------
+
 
 Unlike ``"AsyncTask"``, this section actually uses asyncrounous methods as python defines them.
 
