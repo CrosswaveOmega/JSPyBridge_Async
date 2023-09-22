@@ -21,7 +21,7 @@ def kill_js():
 
 def require(name:str, version:Optional[str]=None)->Proxy:
     """
-    Import an npm package. and return it as a Proxy.
+    Import an npm package, and return it as a Proxy.
 
     Args:
         name (str): The name of the npm package you want to import.

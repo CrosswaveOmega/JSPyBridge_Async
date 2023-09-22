@@ -19,7 +19,7 @@ release = '0.1.0'
 # -- General configuration ---------------------------------------------------
 # https://www.sphinx-doc.org/en/master/usage/configuration.html#general-configuration
 
-extensions = [ 'sphinx.ext.autodoc','sphinx.ext.napoleon','sphinx.ext.intersphinx']
+extensions = [  'sphinx.highlighting', 'sphinx.ext.autodoc','sphinx.ext.napoleon','sphinx.ext.intersphinx']
 # Links used for cross-referencing stuff in other documentation
 intersphinx_mapping = {
   'py': ('https://docs.python.org/3', None),
@@ -29,7 +29,13 @@ intersphinx_mapping = {
 templates_path = ['_templates']
 exclude_patterns = ['_build', 'Thumbs.db', '.DS_Store']
 
+# Optional: Set the Pygments style for code highlighting
+pygments_style='sphinx'
 
+highlight_options = {
+  'default': {'stripall': True},
+  'javascript': {'startinline': True},
+}
 
 # -- Options for HTML output -------------------------------------------------
 # https://www.sphinx-doc.org/en/master/usage/configuration.html#options-for-html-output

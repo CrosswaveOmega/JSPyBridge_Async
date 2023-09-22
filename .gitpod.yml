@@ -1,4 +1,0 @@
-# Commands to start on workspace startup
-tasks:
-  - init: nvm install 16 && nvm use 16 && npm install
-    command: nvm install 16 && nvm use 16 && npm install

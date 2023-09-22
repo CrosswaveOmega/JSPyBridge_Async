@@ -31,7 +31,11 @@ class NoConfigInitalized(Exception):
     """
     Raised if there was no JSConfig initalized.
     """
-
+class InvalidNodeJS(Exception):
+    """
+    Raised if node.js was either not installed or is unreachable.
+    
+    """
         
 class Chalk:
     """

@@ -176,7 +176,8 @@ module.exports = { MyEmitter }
 
 listener.py
 ```py
-from javascript import require, On, off
+from javascriptasync import init_js, require, On, off
+init_js()
 MyEmitter = require('./emitter.js')
 # New class instance
 myEmitter = MyEmitter()
@@ -238,79 +239,7 @@ method(lambda v: print(v), 2) # Prints 44
 
 </details>
 
-## From JavaScript
 
-* All the Python APIs are async. You must await them all. 
-* Use `python.exit()` or `process.exit()` at the end to quit the Python process.
-* This library doesn't manage the packaging. 
-  * Right now you need to install all the deps from pip globally, but later on we may allow loading from pip-envs.
-* When you do a normal Python function call, you can supply "positional" arguments, which must 
-  be in the correct order to what the Python function expects.
-* Some Python objects accept arbitrary keyword arguments. You can call these functions by using
-  the special `$` function syntax. 
-  * When you do a function call with a `$` before the parenthesis, such as `await some.pythonCall$()`, 
-    the final argument is evaluated as a kwarg dictionary. You can supply named arguments this way.
-* Property access with a $ at the end acts as a error suppression operator. 
-  * Any errors will be ignored and instead undefined will be returned
-* See [docs/javascript.md](docs/javascript.md) for more docs, and the examples for more info
-
-### Usage
-
-<details>
-  <summary>👉 Click here to see some code usage examples 👈</summary>
-
-### Basic import
-
-Let's say we have a file in Python like this called `time.py` ...
-```py
-import datetime
-def what_time_is_it():
-  return str(datetime.datetime.now())
-```
-
-Then we can call it from JavaScript !
-```js
-import { python } from 'pythonia'
-const time = await python('./time.py')
-console.log("It's", await time.what_time_is_it())
-python.exit()
-```
-
-### Iterating
-
-* When iterating a Python object, you *must* use a `for await` loop instead of a normal `for-of` loop.
-
-iter.py
-```py
-import os
-def get_files():
-  for f in os.listdir():
-    yield f
-```
-
-iter.js
-```js
-const iter = await python('./iter.py')
-const files = await iter.get_files()
-for await (const file of files) {
-  console.log(file)
-}
-```
-</details>
-
-## Details
-* When doing a function call, any foreign objects will be sent to you as a reference. For example,
-  if you're in JavaScript and do a function call to Python that returns an array, you won't get a
-  JS array back, but you will get a reference to the Python array. You can still access the array
-  normally with the [] notation, as long as you use await. If you would like the bridge to turn
-  the foreign refrence to something native, you can request a primitive value by calling `.valueOf()`
-  on the Python array. This would give you a JS array. It works the same the other way around.
-* The above behavior makes it very fast to pipe data from one function onto another, avoiding costly
-  conversions.
-* This above behavior is not present for callbacks and function parameters. The bridge will try to
-  serialize what it can, and will give you a foreign reference if it's unable to serialize something.
-  So if you pass a JS object, you'll get a Python dict, but if the dict contains something like a class,
-  you'll get a reference in its place.
 
 #### Notable details
 

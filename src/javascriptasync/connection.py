@@ -7,6 +7,7 @@ from typing import Any, Dict, List, TextIO, Union
 from . import config
 from .logging import logs, log_print
 from .util import haspackage
+from .errors import InvalidNodeJS
 ISCLEAR=False
 ISNOTEBOOK=False
 
@@ -68,9 +69,13 @@ class ConnectionClass():
         Args:
             config (config.JSConfig): Reference to the active JSConfig object.
         """
+
         self.stdout:TextIO = sys.stdout
+        
         self.notebook = False
         self.NODE_BIN = getattr(os.environ, "NODE_BIN") if hasattr(os.environ, "NODE_BIN") else "node"
+        self.check_nodejs_installed()
+
         self.dn = os.path.dirname(__file__)
         self.proc:subprocess.Popen = None
         self.com_thread:threading.Thread = None
@@ -93,7 +98,23 @@ class ConnectionClass():
         # Make sure our child process is killed if the parent one is exiting
         atexit.register(self.stop)
 
-    def supports_color(self):
+
+    def check_nodejs_installed(self):
+        """Check if node.js is installed.
+
+        Raises:
+            InvalidNodeJS: Node.JS was not installed.
+        """        
+
+        try:
+            
+            output = subprocess.check_output([self.NODE_BIN, "-v"])
+            print("NodeJS is installed: Current Version Node.js version:", output.decode().strip())
+        except OSError as e:
+            print("COULD NOT FIND A VALID NODE.JS INSTALLATION!  PLEASE INSTALL NODE.JS FROM https://nodejs.org/  ")
+            raise InvalidNodeJS("Node.js is not installed!") from e
+
+    def supports_color(self)->bool:
         """
         Returns True if the running system's terminal supports color, and False
         otherwise.

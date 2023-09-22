@@ -566,7 +566,7 @@ class Proxy(object):
         return self._call(self._pname, mT, v)
     def __call__(self, *args, timeout=10, forceRefs=False,coroutine=False):
         """
-        Use this proxy to call a method across the bridge.
+        This function calls/inits a method across the bridge.
 
         Args:
             args: Arguments to pass to the method.

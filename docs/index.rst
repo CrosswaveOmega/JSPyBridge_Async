@@ -33,6 +33,7 @@ Table of contents
 
    javascriptasync
    overview
+   quickstart
    modules
 
 
