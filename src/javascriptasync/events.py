@@ -333,6 +333,26 @@ class EventLoop(EventLoopMixin):
         self.callbackExecutor.running = False
         self.queue.put("exit")
 
+    def get_response_from_id(self, request_id:int)->Tuple[Any,threading.Barrier]:
+        """Retrieve a response and associated barrier for a given request ID, 
+         and then removes it from the internal responces dictionary
+
+        Args:
+            request_id (int): The request ID for which the response and barrier are needed.
+
+        Returns:
+            Tuple[Any, threading.Barrier]: A tuple containing the response and the
+            threading.Barrier associated with the request.
+
+        Raises:
+            KeyError: If the specified request ID does not exist in the responses.
+
+        """
+        if not request_id in self.responses:
+            raise KeyError(f"Response id {request_id} not in self.responses")
+        res, barrier = self.responses[request_id]
+        del self.responses[request_id]
+        return res,barrier
     # === LOOP ===
     def loop(self):
         """

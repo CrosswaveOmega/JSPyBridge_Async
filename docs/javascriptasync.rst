@@ -72,7 +72,12 @@ javascriptasync.proxy module
    :members:
    :undoc-members:
    :show-inheritance:
-   :special-members: __del__, __json__, __repr__, __str__, __contains__, __setitem__, __setattr__, __next__, __iter__, __getitem__,__getattr__,__call__,
+
+.. autoclass:: javascriptasync.proxy.NodeOp
+   :members:
+   :undoc-members:
+   :show-inheritance:
+
 
 javascriptasync.pyi module
 --------------------------

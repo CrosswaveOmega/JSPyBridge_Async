@@ -49,7 +49,7 @@ def require(name:str, version:Optional[str]=None)->Proxy:
 
     return conf.global_jsi.require(name, version, calling_dir, timeout=900)
 
-async def require_a(name:str, version:Optional[str]=None)->Proxy:
+async def require_a(name:str, version:Optional[str]=None,amode:bool=False)->Proxy:
     """
     Asyncronously import an npm package as a Coroutine,. and return it as a Proxy.
 
@@ -59,6 +59,7 @@ async def require_a(name:str, version:Optional[str]=None)->Proxy:
                     it will load the file relative to where your calling script is.
         version (str, optional): The version of the npm package you want to install.
                                  Default is None.
+        amode(bool, optional): If the experimental proxy chain should be enabled.  Default false
 
     Returns:
         Proxy: The imported package or module, as a Proxy.
@@ -78,7 +79,9 @@ async def require_a(name:str, version:Optional[str]=None)->Proxy:
             calling_dir = os.getcwd()
     coro=conf.global_jsi.require(name, version, calling_dir, timeout=900,coroutine=True)
     #req=conf.global_jsi.require
-    return await coro
+    module=await coro
+    if amode:  module._amode=True
+    return module
 
 def get_console() -> Proxy:
     """
