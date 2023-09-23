@@ -689,6 +689,7 @@ class Proxy(object):
             Returns:
                 Any: The attribute value.
         """
+        print(attr)
         if self._amode:
             return NodeOp(self,op='get', kwargs={'attr':attr})
         return self.get_attr(attr)
@@ -721,8 +722,9 @@ class Proxy(object):
         return self.init_iterator()
         self._ix = 0
         logs.debug("proxy. __iter__")
-        if self.length == None:
+        if self.get_attr('length') == None:
             self._Keys = self._exe.keys(self.ffid)
+            print('keys are',self._Keys)
         return self
 
     def __next__(self):
@@ -735,7 +737,6 @@ class Proxy(object):
         if self._amode:
             return NodeOp(self,op='next', kwargs={})
         return self.next_item()
-        return self.next_item()
         logs.debug("proxy. __next__")
         if self._Keys:
             if self._ix < len(self._Keys):
@@ -744,7 +745,7 @@ class Proxy(object):
                 return result
             else:
                 raise StopIteration
-        elif self._ix < self.length:
+        elif self._ix < self.get_attr('length'):
             result = self[self._ix]
             self._ix += 1
             return result
@@ -808,7 +809,7 @@ class Proxy(object):
         """
         if self._amode:
             return NodeOp(self,op='setitem',kwargs={'name':name,'value':value})
-        return self.next_item()
+        return self.set_item(name,value)
         return self.set_item(name,value)
         logs.debug("proxy.setitem, name:%s, value:%s",name,value)
         return self._exe.setProp(self.ffid, name, value)
