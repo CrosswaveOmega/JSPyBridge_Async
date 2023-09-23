@@ -143,13 +143,13 @@ class TestJavaScriptLibraryASYNC:
         demo = DemoClass("blue", {"a": 3}, lambda v: print("Should be 3", v))
 
         f = None
-        for i in demo.array():
+        async for i in demo.array():
             print("i", i)
             f = i
         assert f.a == 3
 
         expect = ['x', 'y', 'z']
-        for key in demo.object():
+        async for key in demo.object():
             assert key == expect.pop(0)
 
     async def atest_callback(self):

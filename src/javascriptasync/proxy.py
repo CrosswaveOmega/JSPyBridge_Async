@@ -718,14 +718,9 @@ class Proxy(object):
         """
         
         if self._amode:
+            raise Exception("you need to use an asyncronous iterator when in amode.")
             return NodeOp(self,op='iter', kwargs={})
         return self.init_iterator()
-        self._ix = 0
-        logs.debug("proxy. __iter__")
-        if self.get_attr('length') == None:
-            self._Keys = self._exe.keys(self.ffid)
-            print('keys are',self._Keys)
-        return self
 
     def __next__(self):
         """
@@ -735,22 +730,46 @@ class Proxy(object):
             Any: The next item.
         """
         if self._amode:
+            raise Exception("you need to use an asyncronous iterator when in amode.")
             return NodeOp(self,op='next', kwargs={})
         return self.next_item()
-        logs.debug("proxy. __next__")
+
+ 
+    
+    def __aiter__(self):
+        '''Async variant of iterator.'''
+        self._ix = 0
+        logs.debug("proxy.init_iterator")
+        length=self.get_attr('length')
+        if length is None:
+            self._Keys = self._exe.keys(self.ffid)
+        return self
+        
+ 
+    # return the next awaitable
+    async def __anext__(self):
+        """
+        Get the next item from the iterator.
+
+        Returns:
+            Any: The next item.
+        """
+        logs.debug("proxy.next_item")
+        length=await self.aget('length')
         if self._Keys:
             if self._ix < len(self._Keys):
                 result = self._Keys[self._ix]
                 self._ix += 1
                 return result
             else:
-                raise StopIteration
-        elif self._ix < self.get_attr('length'):
-            result = self[self._ix]
+                raise StopAsyncIteration
+        elif self._ix < length:
+            result = await self.aget(self._ix)
             self._ix += 1
             return result
         else:
-            raise StopIteration
+            raise StopAsyncIteration
+
 
     def __setattr__(self, name, value):
         """
