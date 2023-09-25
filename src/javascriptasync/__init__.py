@@ -8,11 +8,19 @@ from .proxy import Proxy
 
 import threading, inspect, time, atexit, os, sys
 from .errors import NoAsyncLoop
-
 def init_js():
     '''Initalize the node.js bridge.'''
     log_print('Starting up js config.')
     Config('')
+async def init_async():
+    Config('')
+    conf=Config.get_inst()
+
+    conf.set_asyncio_loop(asyncio.get_event_loop())
+
+async def set_async_loop():
+    conf=Config.get_inst()
+    conf.set_asyncio_loop(asyncio.get_event_loop())
 
 def kill_js():
     Config('').kill()
@@ -80,7 +88,7 @@ async def require_a(name:str, version:Optional[str]=None,amode:bool=False)->Prox
     coro=conf.global_jsi.require(name, version, calling_dir, timeout=900,coroutine=True)
     #req=conf.global_jsi.require
     module=await coro
-    if amode:  module._amode=True
+    if amode:  module._asyncmode=True
     return module
 
 def get_console() -> Proxy:
@@ -290,190 +298,4 @@ class ThreadUtils:
         conf=Config.get_inst()
         conf.event_loop.abortThread(method,kill_after)
 
-# You must use this Once decorator for an EventEmitter in Node.js, otherwise
-# you will not be able to off an emitter.
-def On(emitter: object, event: str, asyncio_loop: Optional[asyncio.BaseEventLoop] = None) -> Callable:
-    """
-    Decorator for registering an event handler with an EventEmitter.
-
-    Args:
-        emitter (object): The EventEmitter instance.
-        event (str): The name of the event to listen for.
-        asyncio_loop (Optional[asyncio.BaseEventLoop]): The asyncio event loop (required for coroutine handlers).
-
-    Returns:
-        Callable: The decorated event handler function.
-
-    Raises:
-        NoAsyncLoop: If asyncio_loop is not set when using a coroutine handler.
-
-    Example:
-        
-        @On(myEmitter, 'increment', asyncloop)
-        async def handleIncrement(this, counter):
-            
-            pass
-    """
-    def decor(_fn):
-        conf=Config.get_inst()
-        # Once Colab updates to Node 16, we can remove this.
-        # Here we need to manually add in the `this` argument for consistency in Node versions.
-        # In JS we could normally just bind `this` but there is no bind in Python.
-        if conf.node_emitter_patches:
-            def handler(*args, **kwargs):
-                _fn(emitter, *args, **kwargs)
-
-            fnb = handler
-        else:
-            fnb = _fn
-        # If fn is a coroutine, call this.
-        if inspect.iscoroutinefunction(fnb):
-            #Wrap around run_coroutine_threadsafe
-            if asyncio_loop==None:
-                raise NoAsyncLoop("in @On, asyncio_loop wasn't set!")
-            def wraparound(*args, **kwargs):
-                asyncio.run_coroutine_threadsafe(fnb(*args, **kwargs), asyncio_loop)
-            fn=wraparound
-        else:
-            fn=fnb
-        s=str(repr(emitter)).replace("\n",'')
-        print(s)
-        print(inspect.iscoroutinefunction(fn))
-        emitter.on(event, fn)
-        logs.info("On for: emitter %s, event %s, function %s, iffid %s",s,event,fn,getattr(fn, "iffid"))
-        # We need to do some special things here. Because each Python object
-        # on the JS side is unique, EventEmitter is unable to equality check
-        # when using .off. So instead we need to avoid the creation of a new
-        # PyObject on the JS side. To do that, we need to persist the FFID for
-        # this object. Since JS is the autoritative side, this FFID going out
-        # of refrence on the JS side will cause it to be destoryed on the Python
-        # side. Normally this would be an issue, however it's fine here.
-        ffid = getattr(fn, "iffid")
-        setattr(fn, "ffid", ffid)
-        
-        conf.event_loop.callbacks[ffid] = fn
-        print('cleared on.')
-        return fn
-
-    return decor
-
-
-# The extra logic for this once function is basically just to prevent the program
-# from exiting until the event is triggered at least once.
-def Once(emitter: object, event: str, asyncio_loop: Optional[asyncio.BaseEventLoop] = None) -> Callable:
-    
-    """
-    Decorator for registering a one-time event handler with an EventEmitter.
-
-    Args:
-        emitter (object): The EventEmitter instance.
-        event (str): The name of the event to listen for.
-        asyncio_loop (Optional[asyncio.BaseEventLoop]): The asyncio event loop (required for coroutine handlers).
-
-    Returns:
-        Callable: The decorated one-time event handler function.
-
-    Raises:
-        NoAsyncLoop: If asyncio_loop is not set when using a coroutine handler.
-
-    Example:
-
-        @Once(myEmitter, 'increment', asyncloop)
-        async def handleIncrementOnce(this, counter):
-        
-            pass
-    """
-    def decor(fna):
-        i = hash(fna)
-        if inspect.iscoroutinefunction(fna):
-            if asyncio_loop==None:
-                raise NoAsyncLoop("in @Off, asyncio_loop wasn't set!")
-            def wraparound(*args, **kwargs):
-                asyncio.run_coroutine_threadsafe(fna(*args, **kwargs), asyncio_loop)
-            fn=wraparound
-        else:
-            fn=fna
-        conf=Config.get_inst()
-        def handler(*args, **kwargs):
-            if conf.node_emitter_patches:
-                fn(emitter, *args, **kwargs)
-            else:
-                fn(*args, **kwargs)
-            del conf.event_loop.callbacks[i]
-
-        emitter.once(event, handler)
-        
-        conf.event_loop.callbacks[i] = handler
-
-    return decor
-
-
-def off(emitter: object, event: str, handler: Union[Callable,Coroutine]):
-    """
-    Unregisters an event handler from an EventEmitter.
-
-    Args:
-        emitter (object): The EventEmitter instance.
-        event (str): The name of the event to unregister the handler from.
-        handler (Callable or Coroutine): The event handler function to unregister.  Works with Coroutines too.
-
-    Example:
-        off(myEmitter, 'increment', handleIncrement)
-    """
-    emitter.off(event, handler)
-    conf=Config.get_inst()
-    del conf.event_loop.callbacks[getattr(handler, "ffid")]
-
-
-def once(emitter: object, event: str)->Any:
-    """
-    Listens for an event emitted once and returns a value when it occurs.
-
-    Args:
-        emitter (object): The EventEmitter instance.
-        event (str): The name of the event to listen for.
-
-    Returns:
-        Any: The value emitted when the event occurs.
-
-    Example:
-        val = once(myEmitter, 'increment')
-    """
-    conf=Config.get_inst()
-    val = conf.global_jsi.once(emitter, event, timeout=1000)
-    return val
-
-
-async def off_a(emitter: object, event: str, handler: Union[Callable,Coroutine]):
-    """
-    Asynchronously unregisters an event handler from an EventEmitter.
-
-    Args:
-        emitter (object): The EventEmitter instance.
-        event (str): The name of the event to unregister the handler from.
-        handler (Callable or Coroutine): The event handler function to unregister.
-
-    Example:
-        await off_a(myEmitter, 'increment', handleIncrement)
-    """
-    await emitter.off(event, handler, coroutine=True)
-    conf=Config.get_inst()
-    del conf.event_loop.callbacks[getattr(handler, "ffid")]
-
-async def once_a(emitter: object, event: str)->Any:
-    """
-    Asynchronously listens for an event emitted once and returns a value when it occurs.
-
-    Args:
-        emitter (object): The EventEmitter instance.
-        event (str): The name of the event to listen for.
-
-    Returns:
-        Any: The value emitted when the event occurs.
-
-    Example:
-        val = await once_a(myEmitter, 'increment')
-    """
-    conf=Config.get_inst()
-    val = await conf.global_jsi.once(emitter, event, timeout=1000,  coroutine=True)
-    return val
+from javascriptasync.emitters import On, Once, off,once,off_a,once_a

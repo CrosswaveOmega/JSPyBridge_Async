@@ -81,8 +81,10 @@ The **Proxy** is a mutatable object which stores a reference to some non-primiti
 mapped to a unique **Foreign Object Reference ID** (FFID).  
 
 When you interact with Proxy objects as you would a regular object (getting attribues/setting attributes/calling functions), 
-the library will reflect said operation through the active node.js connection 
+the library will reflect said operation through the active node.js connection.  
 
+
+Calls are synchronous by default, but there is a special asyncio mode available, see below.
 
 
 require NPM packages
@@ -127,10 +129,8 @@ Then in your running python script, set the name arg of ``require()`` to ``./exa
 4: utilizing asyncio  
 --------------------
 
-Every JavaScript operation is blocking by default.  While this isn't really a problem for small, synchronous scripts,
+Every call to the Node.JS Process is blocking by default.  While this isn't really a problem for small, synchronous scripts,
 it is a problem for asyncio applications, where these operations could block your entire asyncio event_loop.
-
-So this library provides asyncio compatible methods to compensate.
 
 ``require_a()`` is a coroutine version of ``require()``
 
@@ -148,4 +148,70 @@ Any Proxy function call can be transformed into an asyncio call via including th
         print("Hello", red)
 
     asyncio.run(main())
+
+Proxy Asyncio Chain
+^^^^^^^^^^^^^^^^^^^
+
+`Proxy` also has async variants of it's get/set/call methods, on top of a special "async operation chaining" system.
+
+But to understand how to use it, you should get an idea about how Proxy objects make calls across the bridge.
+
+Take the code block below as an example.
+
+.. code-block:: python
+
+    red=chalk.red("world!")
+    #Equivalent to
+    redprop=chalk.get_s('red')
+    red=call_s("world!")
+
+It makes two thread synchronous (blocking) calls to Node.JS.  
+One to get a reference for the 'red' property (really a method), and another to call the newly referenced 'red' method the "world" argument.
+
+It's equivalent to the below:
+
+
+.. code-block:: python
+
+    red=await chalk.red("world!", coroutine=True)
+    #Equivalent to
+    redprop=chalk.get_s('red')
+    await redprop.call_a("world!")
+
+Passing in the ``coroutine=True`` keyword argument simply tells call_s to return the coroutine variant specified
+by call_a, which is what the `await` keyword waits for.  
+
+Getting a reference for the 'red' property still requires a synchronous call to node.js.  
+
+
+
+.. code-block:: python
+    
+    chalk.toggle_async_chain(True)
+    red=await chalk.red("world!")
+    #Equivalent to
+    red=await chalk.get_a('red').call_a("world!")
+
+
+In order to transform that synchronous 'get' call into an asyncronous function call, you have to enable *Async chaining* for that proxy 
+through the `Proxy.toggle_async_chain(mode)` method.  
+With Async chaining enabled, no calls to Node.JS are made until the await keyword is used, 
+when each asyncrounous is preformed one after the other until it reaches the end.
+
+
+.. code-block:: python
+    :caption: simple asyncio chaining example.
+
+    import asyncio
+    from javascriptasync import init_js, require_a
+    init_js()
+    async def main():
+        chalk= await require_a("chalk")
+        chalk.toggle_async_chain(True)
+        red=await chalk.red("world!")
+        print("Hello", red)
+
+    asyncio.run(main())
+
+
 

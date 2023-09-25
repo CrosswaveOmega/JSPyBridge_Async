@@ -7,6 +7,7 @@ if (typeof process !== 'undefined' && parseInt(process.versions.node.split('.')[
  * The JavaScript Interface for Python
  */
 const util = require('util')
+const EventEmitter = require('events');
 const { PyBridge } = require('./pyi')
 const { $require } = require('./deps')
 const { once } = require('events')
@@ -124,9 +125,15 @@ class Bridge {
 
   // Call property with new keyword to construct classes
   init (r, ffid, attr, args) {
-    // console.log('init', r, ffid, attr, args)
+    
     this.m[++this.ffid] = attr ? new this.m[ffid][attr](...args) : new this.m[ffid](...args)
-    this.ipc.send({ r, key: 'inst', val: this.ffid })
+    console.log('init', r, ffid, attr, args, this.ffid,  this.m[this.ffid])
+    if (this.m[this.ffid] instanceof EventEmitter) {
+      this.ipc.send({ r, key: 'inste', val: this.ffid })
+    } else {
+      this.ipc.send({ r, key: 'inst', val: this.ffid })
+    }
+    
   }
 
   // Call function with async keyword (also works with sync funcs)

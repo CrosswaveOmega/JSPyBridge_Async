@@ -1,12 +1,13 @@
 
 from __future__ import annotations
+import asyncio
 # THe Python Interface for JavaScript
 
 import inspect, importlib, traceback
 import os, sys, json, types
 import socket
 from . import proxy, events, config
-from .errors import JavaScriptError, getErrorMessage
+from .errors import JavaScriptError, getErrorMessage, NoAsyncLoop
 from weakref import WeakValueDictionary
 from .logging import logs,log_print
 
@@ -68,6 +69,7 @@ class PyInterface:
         # disabled when a for loop is active; use `repr` to request logging instead.
         self.m[0]["sendInspect"] = lambda x: setattr(self, "send_inspect", x)
         self.send_inspect = True
+        self.current_async_loop=None
         self.q = lambda r, key, val, sig="": self.ipc.queue_payload(
             {"c": "pyi", "r": r, "key": key, "val": val, "sig": sig}
         )
@@ -85,6 +87,7 @@ class PyInterface:
     def assign_ffid(self, what):
         self.cur_ffid += 1
         self.m[self.cur_ffid] = what
+        print("NEW FFID ADDED ", self.cur_ffid,what)
         return self.cur_ffid
 
     def length(self, r, ffid, keys, args):
@@ -111,6 +114,7 @@ class PyInterface:
 
     def call(self, r, ffid, keys, args, kwargs, invoke=True):
         v = self.m[ffid]
+        
         # Subtle differences here depending on if we want to call or get a property.
         # Since in Python, items ([]) and attributes (.) function differently,
         # when calling first we want to try . then []
@@ -152,10 +156,17 @@ class PyInterface:
         # object to JS.
         was_class = False
         if invoke:
-            if inspect.isclass(v):
-                was_class = True
-            logs.info("INVOKING %s,%s,%s",v,type(v),was_class)
-            v = v(*args, **kwargs)
+            if inspect.iscoroutinefunction(v):
+                if self.current_async_loop is None:
+                    raise NoAsyncLoop("Tried to call a coroutine callback without setting the asyncio loop!  Use 'await set_async_loop()' somewhere in your code!")
+                future=asyncio.run_coroutine_threadsafe( v(*args, **kwargs),self.current_async_loop)
+                v = future.result()
+            else:
+                print()
+                if inspect.isclass(v):
+                    was_class = True
+                logs.info("INVOKING %s,%s,%s",v,type(v),was_class)
+                v = v(*args, **kwargs)
         typ = type(v)
         if typ is str:
             self.q(r, "string", v)
@@ -230,11 +241,13 @@ class PyInterface:
         return ""
 
     def read(self):
-        data = apiin.readline()
-        if not data:
-            exit()
-        j = json.loads(data)
-        return j
+        #Unused
+        # data = apiin.readline()
+        # if not data:
+        #     exit()
+        # j = json.loads(data)
+        # return j
+        pass
 
     def pcall(self, r, ffid, key, args, set_attr=False):
         # Convert special JSON objects to Python methods

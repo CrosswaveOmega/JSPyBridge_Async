@@ -72,6 +72,11 @@ javascriptasync.proxy module
    :members:
    :undoc-members:
    :show-inheritance:
+   
+.. autoclass:: javascriptasync.proxy.EventEmitterProxy
+   :members:
+   :undoc-members:
+   :show-inheritance:
 
 .. autoclass:: javascriptasync.proxy.NodeOp
    :members:
@@ -83,6 +88,14 @@ javascriptasync.pyi module
 --------------------------
 
 .. automodule:: javascriptasync.pyi
+   :members:
+   :undoc-members:
+   :show-inheritance:
+
+javascriptasync.emitters module
+-------------------------------
+
+.. automodule:: javascriptasync.emitters
    :members:
    :undoc-members:
    :show-inheritance:

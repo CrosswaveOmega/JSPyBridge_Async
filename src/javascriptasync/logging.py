@@ -1,3 +1,4 @@
+import inspect
 import logging
 import os
 '''
@@ -36,6 +37,30 @@ def print_path(frame):
                 clsv = instance.__class__.__name__+"."
         filename = os.path.basename(frame.f_code.co_filename)
         output=f'{output}->[[{filename}].{clsv}{frame.f_code.co_name}]'
+        if frame.f_back is not None:
+            frame = frame.f_back
+        else:
+            break
+    return output
+
+
+
+def print_path_depth(depth=2):
+    frame=inspect.currentframe()
+    for d in range(0,depth):
+        frame = frame.f_back
+    output='now'
+    for _ in range(3):
+        clsv=""
+
+        if "self" in frame.f_locals:
+            instance = frame.f_locals["self"]
+            if hasattr(instance, "__class__"):
+                clsv = instance.__class__.__name__+"."
+
+        filename = os.path.basename(frame.f_code.co_filename)
+        #print(frame.f_code.co_filename)
+        output=f'{output}->[[{filename}].{clsv}{frame.f_code.co_name}]\n'
         if frame.f_back is not None:
             frame = frame.f_back
         else:

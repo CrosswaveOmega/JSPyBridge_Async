@@ -65,7 +65,9 @@ class JSConfig(object):
         self.node_emitter_patches: bool = False
         atexit.register(self.event_loop.on_exit)
 
-
+    def set_asyncio_loop(self, loop:asyncio.AbstractEventLoop):
+        if self.event_loop:
+            self.event_loop.pyi.current_async_loop=loop
     def check_node_patches(self):
         """
         Checks if node patches are needed and updates node_emitter_patches accordingly.
@@ -176,7 +178,22 @@ class Config:
             raise NoConfigInitalized("Still initalizing JSConfig, please wait!")
         return Config._instance
 
+    @classmethod
+    def assign_asyncio_loop(cls):
+        """
+        Checks if JSConfig is initialized, and ensure PYI has a coroutine event loop to utilize.
+        
+        Returns:
+            JSConfig: The JSConfig instance.
 
+        Raises:
+            Exception: If JSConfig is not initialized or initialization is in progress.
+        """
+        if not Config._instance:
+            raise NoConfigInitalized("Never initalized JSConfig, please call javascriptasync.init_js() somewhere in your code first!")
+        elif Config._initalizing:
+            raise NoConfigInitalized("Still initalizing JSConfig, please wait!")
+        Config._instance.set_asyncio_loop(asyncio)
     def __getattr__(self, attr):
         if hasattr(Config,attr):
             return getattr(Config,attr)

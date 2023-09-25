@@ -14,17 +14,21 @@ sys.path.insert(0, os.path.abspath('../src/'))
 project = 'AsyncJavascriptBridge'
 copyright = '2023, TauCetiV'
 author = 'TauCetiV'
-release = '0.1.1'
+release = '0.1.2'
 
 # -- General configuration ---------------------------------------------------
 # https://www.sphinx-doc.org/en/master/usage/configuration.html#general-configuration
 
-extensions = [  'sphinx.highlighting', 'sphinx.ext.autodoc','sphinx.ext.napoleon','sphinx.ext.intersphinx']
+extensions = [  'sphinx.highlighting', 'sphinx.ext.autodoc','sphinx.ext.napoleon','sphinx.ext.intersphinx','sphinx.ext.extlinks']
 # Links used for cross-referencing stuff in other documentation
 intersphinx_mapping = {
   'py': ('https://docs.python.org/3', None),
   'aio': ('https://docs.aiohttp.org/en/stable/', None),
   'req': ('https://requests.readthedocs.io/en/latest/', None)
+}
+
+extlinks = {
+  'nodejs': ('https://nodejs.org/api/events.html%s', '%s')
 }
 templates_path = ['_templates']
 exclude_patterns = ['_build', 'Thumbs.db', '.DS_Store']

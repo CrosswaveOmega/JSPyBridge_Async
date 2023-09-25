@@ -1,14 +1,15 @@
 from __future__ import annotations
 import asyncio
+import inspect
 import time, threading, json, sys, os, traceback
-from typing import Any, Tuple
+from typing import Any, Callable, Coroutine, Literal, Optional, Tuple, Union
 from . import config, json_patch
 
-from .errors import JavaScriptError
+from .errors import JavaScriptError, NoAsyncLoop
 from .events import EventLoop
 
 
-from .logging import logs
+from .logging import logs, print_path_depth
 
 class Executor:
     """
@@ -208,10 +209,12 @@ class Executor:
         callRespId= packet["r"]
         
         l = self.loop.queue_request(callRespId, payload, asyncmode=True, loop=asyncio.get_event_loop())
-        #print('asymc',payload,l)
-        # We only have to wait for a FFID assignment response if
-        # we actually sent any non-primitives, otherwise skip
+        
+        
         if self.expectReply:
+            '''If any non-primitives were sent, then
+               we need to wait for a FFID assignment response if
+               otherwise skip'''
             l2 = self.loop.await_response(ffidRespId, asyncmode=True, loop=asyncio.get_event_loop())
             try:
                 await asyncio.wait_for(l2.wait(), timeout)
@@ -232,8 +235,13 @@ class Executor:
                 # This logic just for Event Emitters
                 try:
                     if hasattr(self.bridge.m[ffid], "__call__"):
-                        setattr(self.bridge.m[ffid], "iffid", ffid)
-                except Exception:
+                        
+                        if inspect.ismethod(self.bridge.m[ffid]):
+                            logs.info('this is a method')
+                        else:
+                            setattr(self.bridge.m[ffid], "iffid", ffid)
+                except Exception as e:
+                    logs.warning('There was an in pcallalt, %s',e)
                     pass
 
             barrier.wait()
@@ -281,49 +289,10 @@ class Executor:
         Returns:
             (Any, Any): The response key and value.
         """
-        wanted = {}
-        self.ctr = 0
-        callRespId, ffidRespId = self.i + 1, self.i + 2
-        self.i += 2
-        self.expectReply = False
-        # p=1 means we expect a reply back, not used at the meoment, but
-        # in the future as an optimization we could skip the wait if not needed
-        packet = {"r": callRespId, "action": action, "ffid": ffid, "key": attr, "args": args}
-
-        def ser(arg):
-            if hasattr(arg, "ffid"):
-                self.ctr += 1
-                return {"ffid": arg.ffid}
-            else:
-                # Anything we don't know how to serialize -- exotic or not -- treat it as an object
-                self.ctr += 1
-                self.expectReply = True
-                wanted[self.ctr] = arg
-                return {"r": self.ctr, "ffid": ""}
-
-        if forceRefs:
-            _block, _locals = args
-            packet["args"] = [args[0], {}]
-            flocals = packet["args"][1]
-            for k in _locals:
-                v = _locals[k]
-                if (
-                    (type(v) is int)
-                    or (type(v) is float)
-                    or (v is None)
-                    or (v is True)
-                    or (v is False)
-                ):
-                    flocals[k] = v
-                else:
-                    flocals[k] = ser(v)
-            packet["p"] = self.ctr
-            payload = json.dumps(packet)
-        else:
-            payload = json.dumps(packet, default=ser)
-            # a bit of a perf hack, but we need to add in the counter after we've already serialized ...
-            payload = payload[:-1] + f',"p":{self.ctr}}}'
-
+        
+        packet, payload, wanted, ffidRespId= self._prepare_pcall_request(ffid, action, attr, args, forceRefs)
+        
+        callRespId= packet["r"]
         l = self.loop.queue_request(callRespId, payload)
         # We only have to wait for a FFID assignment response if
         # we actually sent any non-primitives, otherwise skip
@@ -331,10 +300,11 @@ class Executor:
             l2 = self.loop.await_response(ffidRespId)
             if not l2.wait(timeout):
                 raise Exception("Execution timed out")
-            pre, barrier = self.loop.responses[ffidRespId]
+            #pre, barrier = self.loop.responses[ffidRespId]
+            pre, barrier = self.loop.get_response_from_id(ffidRespId)
             logs.debug("ProxyExec:callRespId:%s ffidRespId:%s",str(callRespId),str(ffidRespId))
 
-            del self.loop.responses[ffidRespId]
+            #del self.loop.responses[ffidRespId]
 
             if "error" in pre:
                 raise JavaScriptError(attr, pre["error"])
@@ -345,8 +315,12 @@ class Executor:
                 # This logic just for Event Emitters
                 try:
                     if hasattr(self.bridge.m[ffid], "__call__"):
-                        setattr(self.bridge.m[ffid], "iffid", ffid)
-                except Exception:
+                        if inspect.ismethod(self.bridge.m[ffid]):
+                            logs.info('this is a method')
+                        else:
+                            setattr(self.bridge.m[ffid], "iffid", ffid)
+                except Exception as e:
+                    logs.warning('There was an issue in pcall, %s',e)
                     pass
 
             barrier.wait()
@@ -361,9 +335,9 @@ class Executor:
             )
         elapsed=(time.time()-now)
         logs.debug("ProxyExec: lock:%s,callRespId:%s ffidRespId:%s, timeout:%s, took: %s",str(l),str(callRespId),str(ffidRespId),timeout,elapsed)
-
-        res, barrier = self.loop.responses[callRespId]
-        del self.loop.responses[callRespId]
+        res, barrier = self.loop.get_response_from_id(callRespId)
+        #res, barrier = self.loop.responses[callRespId]
+        #del self.loop.responses[callRespId]
 
         barrier.wait()
 
@@ -542,16 +516,20 @@ class Executor:
 
 
 
-INTERNAL_VARS = ["ffid", "_ix", "_exe", "_pffid", "_pname", "_es6", "_amode","_resolved", "_ops","_Keys"]
+INTERNAL_VARS = ["ffid", "_ix", "_exe", "_pffid", "_pname", "_es6", "_asyncmode","_resolved", "_ops","_Keys"]
 
-# "Proxy" classes get individually instanciated for every thread and JS object
+# "Proxy" classes get individually instantiated  for every thread and JS object
 # that exists. It interacts with an Executor to communicate.
 class Proxy(object):
     """
-    "Proxy" classes get individually instanciated for every thread and JS object
-    that exists. It interacts with an Executor to communicate.
+    "Proxy" classes get individually instantiated every thread and JS object
+    that exists. It interacts with an Executor to communicate to the Node.JS instance
+    on the other side of the bridge.  
 
-    They're essentially references to objects on the JavaScript side of the bridge.
+    Utilizes magic methods to determine which api calls to make, and is capable of 
+    operating in an single asyncio mode, when it "chains" operations together
+    instead of executing them right away, executing them only with the await keyword.
+
 
     Attributes:
         ffid (int): Foreign Object Reference ID.
@@ -560,7 +538,7 @@ class Proxy(object):
         _pffid (int): Property foreign Object Reference ID.
         _pname (str): Property name.
         _es6 (bool): ES6 class flag.
-        _amode (bool): asyncronous buildup mode.
+        _asyncmode (bool): asyncronous buildup mode: Operations are chained into NodeOp proxy objects.
         _resolved (dict): Resolved values.
         _Keys (list): List of keys.
     """
@@ -585,13 +563,26 @@ class Proxy(object):
         self._resolved = {}
         self._ops=[]
         self._Keys = None
-        self._amode=amode
+        self._asyncmode=amode
         
         logs.debug("new Proxy init done: %s, %s,%s,%s,%s", exe,ffid,prop_ffid,prop_name,es6)
+    def _config(self):
+        '''Access the JSConfig object reference within the executor.'''
+        return self._exe.conf
+    def _loop(self):
+        '''Access the EventLoop reference within the executor.'''
+        return self._exe.loop
+    
+    def toggle_async_chain(self,value:bool):
+        """Turn asyncio chaining on or off
 
+        Args:
+            value (bool): set to True to enable asyncio chaining, False to disable.
+        """
+        self._asyncmode=value
     def _call(self, method, methodType, val):
         """
-        Helper function for processing the result of a calls.
+        Helper function for processing the result of a call.
 
         Args:
             method (str): The method to call.
@@ -605,13 +596,15 @@ class Proxy(object):
 
         logs.debug("Proxy._call: %s, %s,%s,%s", "MT", method, methodType, val)
         if methodType == "fn":
-            return Proxy(self._exe, val, self.ffid, method,amode=self._amode)
+            return Proxy(self._exe, val, self.ffid, method,amode=self._asyncmode)
         if methodType == "class":
-            return Proxy(self._exe, val, es6=True,amode=self._amode)
+            return Proxy(self._exe, val, es6=True,amode=self._asyncmode)
         if methodType == "obj":
-            return Proxy(self._exe, val,amode=self._amode)
+            return Proxy(self._exe, val,amode=self._asyncmode)
         if methodType == "inst":
-            return Proxy(self._exe, val,amode=self._amode)
+            return Proxy(self._exe, val,amode=self._asyncmode)
+        if methodType == "inste":
+            return EventEmitterProxy(self._exe, val,amode=self._asyncmode)
         if methodType == "void":
             return None
         if methodType == "py":
@@ -619,7 +612,7 @@ class Proxy(object):
         else:
             return val
         
-    async def coro_call(self, *args, timeout=10, forceRefs=False, coroutine=True):
+    async def call_a(self, *args, timeout=10, forceRefs=False, coroutine=True):
         """
         Coroutine version of the __call__ method.
 
@@ -631,7 +624,7 @@ class Proxy(object):
         Returns:
             Any: The result of the call.
         """
-        logs.debug("calling coro_call.  Timeout: %d, Args: %s", timeout, str(args))
+        logs.debug("calling call_a.  Timeout: %d, Args: %s", timeout, str(args))
         if self._es6:
             mT,v=await self._exe.initPropAsync(self._pffid, self._pname, args)
         else:
@@ -641,7 +634,8 @@ class Proxy(object):
         if mT == "fn":
             return Proxy(self._exe, v)
         return self._call(self._pname, mT, v)
-    def funccall(self, *args, timeout=10, forceRefs=False,coroutine=False):
+    
+    def call_s(self, *args, timeout=10, forceRefs=False,coroutine=False):
         """
         This function calls/inits a method across the bridge.
 
@@ -655,33 +649,28 @@ class Proxy(object):
             Any: The result of the call.
         """
         if coroutine:
-            return self.coro_call( *args, timeout=timeout, forceRefs=forceRefs)
-        logs.debug("calling __call__.  Timeout: %d, Args: %s", timeout, str(args))
+            return self.call_a( *args, timeout=timeout, forceRefs=forceRefs)
+        
         if self._es6:
+            
             mT,v=self._exe.initProp(self._pffid, self._pname, args)
         else:
             mT,v=self._exe.callProp(
                 self._pffid, self._pname, args, timeout=timeout, forceRefs=forceRefs
             )
-        '''mT, v = (
-            self._exe.initProp(self._pffid, self._pname, args)
-            if self._es6
-            else self._exe.callProp(
-                self._pffid, self._pname, args, timeout=timeout, forceRefs=forceRefs
-            )
-        )'''
+        logs.info("call_s proxy, mT:%s,v:%s.  Timeout: %d, Args: %s",mT,v, timeout, str(args))
         if mT == "fn":
             return Proxy(self._exe, v)
         return self._call(self._pname, mT, v)
     def __call__(self, *args, timeout=10, forceRefs=False,coroutine=False):
-        if self._amode:
+        if self._asyncmode:
             return NodeOp(self,op='call',kwargs={'args':args,'timeout':timeout,'forceRefs':forceRefs,'coroutine':coroutine})
-        return self.funccall(*args,timeout=timeout,forceRefs=forceRefs,coroutine=coroutine)
+        return self.call_s(*args,timeout=timeout,forceRefs=forceRefs,coroutine=coroutine)
 
 
     def __getattr__(self, attr):
         """
-            Get an attribute of the JavaScript object.
+            Get an attribute of the linked JavaScript object.
 
             Args:
                 attr (str): The attribute name.
@@ -689,15 +678,26 @@ class Proxy(object):
             Returns:
                 Any: The attribute value.
         """
-        print(attr)
-        if self._amode:
+        return self.get(attr)
+    
+    def get(self,attr):
+        """
+            Get an attribute of the linked JavaScript object, or begin a NodeOp
+            chain if in asyncmode.
+
+            Args:
+                attr (str): The attribute name.
+
+            Returns:
+                Any: The attribute value.
+        """
+        if self._asyncmode:
             return NodeOp(self,op='get', kwargs={'attr':attr})
         return self.get_attr(attr)
 
-
     def __getitem__(self, attr):
         """
-        Get an item of the JavaScript object.
+        Get an item of the linked JavaScript object.
 
         Args:
             attr (str): The item name.
@@ -705,7 +705,7 @@ class Proxy(object):
         Returns:
             Any: The item value.
         """
-        if self._amode:
+        if self._asyncmode:
             return NodeOp(self,op='getitem', kwargs={'attr':attr})
         return self.get_item(attr)
 
@@ -717,7 +717,7 @@ class Proxy(object):
             self: The iterator object.
         """
         
-        if self._amode:
+        if self._asyncmode:
             raise Exception("you need to use an asyncronous iterator when in amode.")
             return NodeOp(self,op='iter', kwargs={})
         return self.init_iterator()
@@ -729,7 +729,7 @@ class Proxy(object):
         Returns:
             Any: The next item.
         """
-        if self._amode:
+        if self._asyncmode:
             raise Exception("you need to use an asyncronous iterator when in amode.")
             return NodeOp(self,op='next', kwargs={})
         return self.next_item()
@@ -737,7 +737,9 @@ class Proxy(object):
  
     
     def __aiter__(self):
-        '''Async variant of iterator.'''
+        """
+        Async variant of iterator.
+        """
         self._ix = 0
         logs.debug("proxy.init_iterator")
         length=self.get_attr('length')
@@ -755,7 +757,7 @@ class Proxy(object):
             Any: The next item.
         """
         logs.debug("proxy.next_item")
-        length=await self.aget('length')
+        length=await self.get_a('length')
         if self._Keys:
             if self._ix < len(self._Keys):
                 result = self._Keys[self._ix]
@@ -764,7 +766,7 @@ class Proxy(object):
             else:
                 raise StopAsyncIteration
         elif self._ix < length:
-            result = await self.aget(self._ix)
+            result = await self.get_a(self._ix)
             self._ix += 1
             return result
         else:
@@ -773,7 +775,7 @@ class Proxy(object):
 
     def __setattr__(self, name, value):
         """
-        Set an attribute of the JavaScript object.
+        Set an attribute of the linked JavaScript object.
 
         Args:
             name (str): The attribute name.
@@ -787,15 +789,15 @@ class Proxy(object):
         if name in INTERNAL_VARS:
             object.__setattr__(self, name, value)
         else:
-            if self._amode:
+            if self._asyncmode:
                 raise Exception("don't use this in amode!  use .set instead!")
             else:
-                return self.set_attr(name,value)
+                return self.set(name,value)
 
     
     def set(self,name,value):
         """
-        Set an attribute of the JavaScript object.
+        Set an attribute of the linked JavaScript object.
 
         Args:
             name (str): The attribute name.
@@ -808,7 +810,7 @@ class Proxy(object):
         if name in INTERNAL_VARS:
             object.__setattr__(self, name, value)
         else:
-            if self._amode:
+            if self._asyncmode:
                 return NodeOp(self,op='set',kwargs={'name':name,'value':value})
             else:
                 return self.set_attr(name,value)
@@ -817,7 +819,7 @@ class Proxy(object):
 
     def __setitem__(self, name, value):
         """
-        Set an item of the JavaScript object.
+        Set an item of the linked JavaScript object.
 
         Args:
             name (str): The item name.
@@ -826,7 +828,7 @@ class Proxy(object):
         Returns:
             bool: True if successful.
         """
-        if self._amode:
+        if self._asyncmode:
             return NodeOp(self,op='setitem',kwargs={'name':name,'value':value})
         return self.set_item(name,value)
         return self.set_item(name,value)
@@ -835,7 +837,7 @@ class Proxy(object):
 
     def __contains__(self, key):
         """
-        Check if a key is contained in the JavaScript object.
+        Check if a key is contained in the linked JavaScript object.
 
         Args:
             key (Any): The key to check.
@@ -849,7 +851,7 @@ class Proxy(object):
 
     def valueOf(self):
         """
-        Serialize the JavaScript object.
+        Serialize the linked JavaScript object.
 
         Returns:
             Any: The "valueOf" value.
@@ -862,7 +864,7 @@ class Proxy(object):
 
     def __str__(self):
         """
-        Get a string representation of the JavaScript object via an inspect call
+        Get a string representation of the linked JavaScript object via an inspect call
 
         Returns:
             str: The string representation.
@@ -873,7 +875,7 @@ class Proxy(object):
 
     def __repr__(self):
         """
-        Get a representation of the JavaScript object via an inspect call.
+        Get a representation of the linked JavaScript object via an inspect call.
 
         Returns:
             str: The representation.
@@ -884,7 +886,7 @@ class Proxy(object):
 
     def __json__(self):
         """
-        Get a JSON representation of the JavaScript object.
+        Get a JSON representation of the linked JavaScript object.
 
         Returns:
             dict: The JSON representation.
@@ -895,15 +897,16 @@ class Proxy(object):
 
     def __del__(self):
         """
-        Free the JavaScript object.
+        Free the linked JavaScript object.
         """
         return self.free()
         logs.debug("proxy.del")
         self._exe.free(self.ffid)
-    
-    def get_attr(self, attr):
+    def get_s(self,attr):
         """
-        Get an attribute of the JavaScript object.
+        Alias for get_attr.
+        
+        Get an attribute of the linked JavaScript object.
 
         Args:
             attr (str): The attribute name.
@@ -917,36 +920,92 @@ class Proxy(object):
         methodType, val = self._exe.getProp(self._pffid, attr)
         logs.debug("proxy.get_attr %s, methodType: %s, val %s", attr, methodType, val)
         return self._call(attr, methodType, val)
-    
-    async def aget(self,attr):
+    def get_attr(self, attr):
+        """
+        Get an attribute of the linked JavaScript object.
+
+        Args:
+            attr (str): The attribute name.
+
+        Returns:
+            Any: The attribute value.
+        """
         logs.debug("proxy.get_attr start %s", attr)
         if attr == "new":
             return self._call(self._pname if self._pffid == self.ffid else "", "class", self._pffid)
-        methodType, val = await self._exe.getPropAsync(self._pffid, attr)
+        methodType, val = self._exe.getProp(self._pffid, attr)
         logs.debug("proxy.get_attr %s, methodType: %s, val %s", attr, methodType, val)
         return self._call(attr, methodType, val)
+    def set_s(self, name, value):
+        """
+        Alias for set_attr.
+        
+        Get an attribute of the linked JavaScript object.
+        Syncronous.
+
+        Args:
+            attr (str): The attribute name.
+
+        Returns:
+            Any: The attribute value.
+        """
+    def set_attr(self, name, value):
+        """
+        Set an attribute of the linked JavaScript object.
+
+        Args:
+            name (str): The attribute name.
+            value (Any): The attribute value.
+
+        Returns:
+            bool: True if successful.
+        """
+        logs.debug("proxy.set_attr, name:%s, value:%s", name, value)
+        if name in INTERNAL_VARS:
+            object.__setattr__(self, name, value)
+        else:
+            logs.debug("proxy.set_attr, call to setProp needed, name:%s, value:%s", name, value)
+            return self._exe.setProp(self.ffid, name, value)
+
+    async def get_a(self,attr):
+        """
+        Asyncronous equivalent to get(attr).
+        Asynchronously get an attribute of the linked JavaScript object.
+
+        Args:
+            attr (str): The attribute name.
+
+        Returns:
+            Any: The attribute value.
+
+        """
+        logs.debug("proxy.get_async start %s", attr)
+        if attr == "new":
+            return self._call(self._pname if self._pffid == self.ffid else "", "class", self._pffid)
+        methodType, val = await self._exe.getPropAsync(self._pffid, attr)
+        logs.debug("proxy.get_async %s, methodType: %s, val %s", attr, methodType, val)
+        return self._call(attr, methodType, val)
     
-    async def aset(self,name,value):
+    async def set_a(self,name,value):
+        """
+        
+        Asyncronous equivalent to set_attr(name,value).
+        Asynchronously set an attribute of the linked JavaScript object.
+
+        Args:
+            name (str): The attribute name.
+            value (Any): The attribute value.
+
+        Returns:
+            bool: True if successful.
+
+        """
         logs.debug("proxy.set_attr, name:%s, value:%s", name, value)
         if name in INTERNAL_VARS:
             object.__setattr__(self, name, value)
         else:
             logs.debug("proxy.set_attr, call to setProp needed, name:%s, value:%s", name, value)
             return await self._exe.setPropAsync(self.ffid, name, value)
-        
-    def get_item(self, attr):
-        """
-        Get an item of the JavaScript object.
-
-        Args:
-            attr (str): The item name.
-
-        Returns:
-            Any: The item value.
-        """
-        logs.debug("proxy.get_item %s", attr)
-        methodType, val = self._exe.getProp(self.ffid, attr)
-        return self._call(attr, methodType, val)
 
     def init_iterator(self):
         """
@@ -983,27 +1042,27 @@ class Proxy(object):
         else:
             raise StopIteration
 
-    def set_attr(self, name, value):
+        
+    def get_item(self, attr):
         """
-        Set an attribute of the JavaScript object.
+        equivalent to a=self[attr]
+        Get an item of the linked JavaScript object.
 
         Args:
-            name (str): The attribute name.
-            value (Any): The attribute value.
+            attr (str): The item name.
 
         Returns:
-            bool: True if successful.
+            Any: The item value.
         """
-        logs.debug("proxy.set_attr, name:%s, value:%s", name, value)
-        if name in INTERNAL_VARS:
-            object.__setattr__(self, name, value)
-        else:
-            logs.debug("proxy.set_attr, call to setProp needed, name:%s, value:%s", name, value)
-            return self._exe.setProp(self.ffid, name, value)
+        logs.debug("proxy.get_item %s", attr)
+        methodType, val = self._exe.getProp(self.ffid, attr)
+        return self._call(attr, methodType, val)
 
     def set_item(self, name, value):
         """
-        Set an item of the JavaScript object.
+        
+        equivalent to self[name]=a
+        Set an item of the linked JavaScript object.
 
         Args:
             name (str): The item name.
@@ -1014,10 +1073,40 @@ class Proxy(object):
         """
         logs.debug("proxy.set_item, name:%s, value:%s", name, value)
         return self._exe.setProp(self.ffid, name, value)
+        
+    async def get_item_a(self, attr):
+        """
+        equivalent to a=self[attr]
+        Get an item of the linked JavaScript object.
 
+        Args:
+            attr (str): The item name.
+
+        Returns:
+            Any: The item value.
+        """
+        logs.debug("proxy.get_item %s", attr)
+        methodType, val = await self._exe.getPropAsync(self.ffid, attr)
+        return self._call(attr, methodType, val)
+
+    async def set_item_a(self, name, value):
+        """
+        
+        equivalent to self[name]=a
+        Set an item of the linked JavaScript object.
+
+        Args:
+            name (str): The item name.
+            value (Any): The item value.
+
+        Returns:
+            bool: True if successful.
+        """
+        logs.debug("proxy.set_item, name:%s, value:%s", name, value)
+        return await self._exe.setPropAsync(self.ffid, name, value)
     def contains_key(self, key):
         """
-        Check if a key is contained in the JavaScript object.
+        Check if a key is contained in the linked JavaScript object.
 
         Args:
             key (Any): The key to check.
@@ -1030,7 +1119,7 @@ class Proxy(object):
 
     def get_value_of(self):
         """
-        Serialize the JavaScript object.
+        Serialize the linked JavaScript object.
 
         Returns:
             Any: The "valueOf" value.
@@ -1041,7 +1130,7 @@ class Proxy(object):
 
     def get_str(self):
         """
-        Get a string representation of the JavaScript object via an inspect call.
+        Get a string representation of the linked JavaScript object via an inspect call.
 
         Returns:
             str: The string representation.
@@ -1051,7 +1140,7 @@ class Proxy(object):
 
     def get_repr(self):
         """
-        Get a representation of the JavaScript object via an inspect call.
+        Get a representation of the linked JavaScript object via an inspect call.
 
         Returns:
             str: The representation.
@@ -1061,7 +1150,7 @@ class Proxy(object):
 
     def get_json(self):
         """
-        Get a JSON representation of the JavaScript object.
+        Get a JSON representation of the linked JavaScript object.
 
         Returns:
             dict: The JSON representation.
@@ -1071,49 +1160,189 @@ class Proxy(object):
 
     def free(self):
         """
-        Free the JavaScript object.
+        Free the linked JavaScript object.
         """
         logs.debug("proxy.free")
         self._exe.free(self.ffid)
 
+class EventEmitterProxy(Proxy):
+    '''A unique type of Proxy made whenever an EventEmitter is returned, 
+     containing special wrapped on, off, and once functions that ensure the 
+     python side of the bridge knows that it's functions have been set as
+     listeners.'''
+    def on(self, event:str, listener:Union[Callable,Coroutine]):
+        '''
+        Register a python function or coroutine as a listener for this EventEmitter.
+
+        Args:
+            event (str): The name of the event to listen for.
+            listener: (Union[Callable,Coroutine]): The function or coroutine function assigned as the event listener.
+        Returns:
+            Callable: the listener arg passed in, for the @On Decorator
+
+        '''
+        conf=self._config()
+        
+        print("SUPER PROXY ON")
+        # Once Colab updates to Node 16, we can remove this.
+        # Here we need to manually add in the `this` argument for consistency in Node versions.
+        # In JS we could normally just bind `this` but there is no bind in Python.
+        if conf.node_emitter_patches:
+            def handler(*args, **kwargs): listener(self, *args, **kwargs)
+
+            listener = handler
+        else:
+            pass
+
+        
+        #print(s)
+        print(inspect.iscoroutinefunction(listener))
+        #emitter.on(event, listener)
+        self.get('on').call_s(event, listener)
+        logs.info("On for: emitter %s, event %s, function %s, iffid %s",'s',event,listener,getattr(listener, "iffid"))
+        
+        #Persist the FFID for this callback object so it will get deregistered properly.
+
+        ffid = getattr(listener, "iffid")
+        setattr(listener, "ffid", ffid)
+        
+        self._loop().callbacks[ffid] = listener
+        print('cleared on.')
+        return listener
+
+    
+    def off(self, event:str, listener:Union[Callable,Coroutine]):
+        """
+        Unregisters listener as a listener function from this EventEmitter.
+
+        Args:
+            event (str): The name of the event to unregister the handler from.
+            handler (Callable or Coroutine): The event handler function to unregister.  Works with Coroutines too.
+
+        
+        Example:
+            .. code-block:: python
+
+                off(myEmitter, 'increment', handleIncrement)
+        """
+        print("SUPER PROXY OFF")
+        self.get('off').call_s(event, listener)
+
+        del self._loop().callbacks[getattr(listener, "ffid")]
+        
+    async def off_a(self, event:str, listener:Union[Callable,Coroutine]):
+        """
+        Unregisters listener as a listener function from this EventEmitter.
+
+        Args:
+            event (str): The name of the event to unregister the handler from.
+            handler (Callable or Coroutine): The event handler function to unregister.  Works with Coroutines too.
+
+        
+        Example:
+            .. code-block:: python
+
+                off(myEmitter, 'increment', handleIncrement)
+        """
+        print("SUPER PROXY OFF")
+        await self.get_a('off').call_a(event, listener)
+
+        del self._loop().callbacks[getattr(listener, "ffid")]
+    
+    def once(self,event:str, listener:Union[Callable,Coroutine]):
+        '''
+        Register a python function or coroutine as a one time event listener for this EventEmitter.
+        Once it's called, the function will be Unregistered!
+
+        Args:
+            event (str): The name of the event to listen for.
+            listener: (Union[Callable,Coroutine]): The function or coroutine function assigned as the event listener.
+        Returns:
+            Callable: the listener arg passed in, for the @On Decorator
+
+        '''
+        print("SUPER PROXY ONCE")
+        conf=self._config()
+        i = hash(listener)
+
+        def handler(*args, **kwargs):
+            if conf.node_emitter_patches:
+                listener(self, *args, **kwargs)
+            else:
+                listener(*args, **kwargs)
+            del conf.event_loop.callbacks[i]
+
+        output=self.get('once').call_s(event, listener)
+        
+        self._loop().callbacks[i] = handler
+        return output
+    
+    
+        
 
 
-INTERNAL_VARS_NODE = ["_proxy", "_prev", "_op", "_kwargs"]
+
+INTERNAL_VARS_NODE = ["_proxy", "_prev", "_op", "_kwargs", '_depth']
 
 
 class NodeOp():
-    '''When the Proxy's ``_amode`` attribute is set to True, it does not make calls 
-    to node.js immediately, instead creating a stack of linked NodeOp objects that contains
-    the kwargs for each call and a link to the previous NodeOp.
-    Once the await kwarg is used, this stack calls the  aget,aset,and coro_call
-    elements of each returned proxy from the bottom up.
-    
-    
-    '''
-    def __init__(self, proxy:Proxy=None,prev=None,op:str=None,kwargs=None):
+    """Represents a Node operation for asynchronous execution.
+
+    When the Proxy's ``_asyncmode`` attribute is set to True, it does not make calls
+    to Node.js immediately, instead creating a stack of linked NodeOp objects that
+    contains the kwargs for each call and a link to the previous NodeOp. Once the
+    await keyword is used, this stack calls the aget, aset, and call_a elements
+    of each returned proxy from the bottom up.
+
+    Attributes:
+        _proxy (Proxy, optional): The Proxy object associated with this Node operation.
+        _prev (NodeOp, optional): The previous NodeOp in the operation stack.  None if it's the root node.
+        _op (str, optional): The type of operation, such as 'get', 'set', or 'call'.
+        _depth (int): The depth of this NodeOp chain
+        _kwargs (dict, optional): The keyword arguments for the operation.
+
+    """
+
+    def __init__(
+            self, 
+            proxy:Proxy=None,
+            prev=None,
+            op:Literal['get','set','call','getitem','setitem']=None,
+            kwargs=None):
         self._proxy=proxy
         self._prev=prev
+        self._depth=0
+        if self._prev!=None:
+            self._depth=self._prev._depth+1
         self._op=op
         self._kwargs=kwargs
 
     def __await__(self):
-        print('gogogo')
         return self.process().__await__()
 
     
     async def process(self):
-        '''Process each node in the stack.'''
+        """
+        Called when the built NodeOp chain is awaited.
+        Recursively process each node in the stack.
+        """
         proxy=self._proxy
         if self._prev is not None:
             proxy=await self._prev.process()
+
         if self._op=='set':
-            return await proxy.aset(**self._kwargs)
+            return await proxy.set_a(**self._kwargs)
         if self._op=='get':
-            return await proxy.aget(**self._kwargs)
+            return await proxy.get_a(**self._kwargs)
         if self._op=='call':
             args=self._kwargs['args']
             self._kwargs.pop('args')
-            return await proxy.coro_call(*args,**self._kwargs)
+            return await proxy.call_a(*args,**self._kwargs)
+        if self._op=='getitem':
+            return await proxy.get_item_a(**self._kwargs)
+        if self._op=='setitem':
+            return await proxy.set_item_a(**self._kwargs)
+        raise Exception(f'Invalid Operation {self._op}!')
         
         
     def __call__(self, *args, timeout=10, forceRefs=False,coroutine=False):
@@ -1122,11 +1351,7 @@ class NodeOp():
     def __getattr__(self, attr):
         return NodeOp(prev=self,op='get',kwargs={'attr':attr})
 
-
-
-    def __getitem__(self, attr):
-        return NodeOp(prev=self,op='getitem',kwargs={'attr':attr})
-
+    
     def __iter__(self):
         return NodeOp(prev=self,op='iter',kwargs={})
 
@@ -1142,11 +1367,32 @@ class NodeOp():
         raise Exception("don't use this in amode!  use .set instead!")
         
 
+
+    def __getitem__(self, attr):
+        return NodeOp(prev=self,op='getitem',kwargs={'attr':attr})
+
     def __setitem__(self, name, value):
         return NodeOp(prev=self,op='setitem',kwargs={'name':name,'value':value})
     
+    def get(self, attr):
+        """
+        Set the current node to get an attribute of the linked JavaScript object 
+        down the line.
+
+        Args:
+            attr (str): The attribute name.
+
+        Returns:
+            Any: The attribute value.
+
+        """
+        return NodeOp(prev=self,op='get',kwargs={'attr':attr})
+    
     def set(self,name:str,value:Any)->NodeOp: 
-        """Set the attribute 'name' to the specified 'value' for the current node.
+        """
+        equivalent to object.value=newval 
+        
+        Sets the attribute 'name' to the specified 'value' for the current node.
 
         Args:
             name (str): The name of the attribute to be set.
@@ -1167,4 +1413,14 @@ class NodeOp():
 
     # def valueOf(self):
     #     return NodeOp(prev=self,op='valueOf',kwargs={})
+    def __repr__(self):
+        """
+        View a representation of the operation chain to be processed as a coroutine.
 
+        Returns:
+            str: The representation.
+        """
+        previous=''
+        if self._prev is not None:
+            previous=repr(self._prev)+">"
+        return previous+f"[{self._op}, {self._depth}, {self._kwargs},{str(self._proxy)}]"

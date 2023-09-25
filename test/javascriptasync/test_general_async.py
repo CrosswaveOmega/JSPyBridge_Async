@@ -1,4 +1,5 @@
-from javascriptasync import require, require_a, On, Once, off, once, eval_js, eval_js_a, init_js
+from javascriptasync import require, require_a,  eval_js, eval_js_a, init_async
+from javascriptasync.emitters import On, Once, off, once
 from javascriptasync import AsyncTaskA, AsyncTaskUtils
 from javascriptasync.logging import set_log_level
 import logging
@@ -157,14 +158,15 @@ class TestJavaScriptLibraryASYNC:
 
     async def atest_events(self):
         print('events start')
-        @On(self.demo, "increment",asyncio.get_event_loop())
+        @On(self.demo, "increment")
         async def handler(this, fn, num, obj):
             print("Handler called", fn, num, obj)
             if num == 7:
                 print('off')
-                off(self.demo, "increment", handler)
+                self.demo.off("increment", handler)
+                #off(self.demo, "increment", handler)
 
-        @Once(self.demo, "increment",asyncio.get_event_loop())
+        @Once(self.demo, "increment")
         async def onceIncrement(this, *args):
             print("Hey, I'm only called once !")
 
@@ -295,7 +297,7 @@ atestorder=[
 
 @pytest.mark.asyncio
 async def test_my_coroutine():
-    init_js()
+    await init_async()
     
     set_log_level(logging.WARNING)
 

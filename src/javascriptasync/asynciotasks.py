@@ -24,7 +24,8 @@ class TaskStateAsync:
         while time.time() < stopTime and not self.stopping:
             await asyncio.sleep(0.2)
         if self.stopping:
-            print('STOP IN WAIT!')
+            pass
+            #print('STOP IN WAIT!')
             #sys.exit(1)
 
 class EventLoopMixin:

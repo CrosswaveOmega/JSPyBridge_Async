@@ -39,6 +39,7 @@ Table of contents
    overview
    introduction
    threadtasks
+   eventemitters
    modules
 
 
