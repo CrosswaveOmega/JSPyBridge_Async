@@ -86,9 +86,7 @@ def off(emitter: EventEmitterProxy, event: str, handler: Union[Callable,Coroutin
 
     """
     return emitter.off(event,handler)
-    emitter.off(event, handler)
-    conf=Config.get_inst()
-    del conf.event_loop.callbacks[getattr(handler, "ffid")]
+
 
 
 def once(emitter: EventEmitterProxy, event: str)->Any:
@@ -118,9 +116,7 @@ async def off_a(emitter: EventEmitterProxy, event: str, handler: Union[Callable,
         handler (Callable or Coroutine): The event handler function to unregister.
 
     """
-    await emitter.off(event, handler, coroutine=True)
-    conf=Config.get_inst()
-    del conf.event_loop.callbacks[getattr(handler, "ffid")]
+    await emitter.off_a(event, handler, coroutine=True)
 
 async def once_a(emitter: EventEmitterProxy, event: str)->Any:
     """
