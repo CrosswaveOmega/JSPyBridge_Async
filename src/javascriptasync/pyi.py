@@ -133,7 +133,7 @@ class PyInterface:
         self.current_async_loop=None
         
         #self.executor:proxy.Executor = exe
-    def q(self,r,key,val,sig):
+    def q(self,r,key,val,sig=""):
 
         self.ipc.queue_payload(
                     {"c": "pyi", "r": r, "key": key, "val": val, "sig": sig}
