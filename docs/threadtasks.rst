@@ -10,46 +10,46 @@ help you avoid boilerplate and are simple to use.
 **This section is still a work in progress.  Names are not finalized.**
 
 
-AsyncTask and Threads control
+AsyncThread and Threads control
 -----------------------------
 
 .. code-block:: python
     :caption: general example.
 
-    from javascriptasync import init_js, AsyncTask, ThreadUtils
+    from javascriptasync import init_js, AsyncThread, ThreadUtils
     init_js()
     start,stop,abort=get_start_stop_abort()
-    @AsyncTask(start=True)
-    def routine(task: TaskState):
+    @AsyncThread(start=True)
+    def routine(task: ThreadState):
     ...
 
     # The signatures for the above functions :
     def ThreadUtils.start(fn: Function): ...
     def ThreadUtils.stop(fn: Function): ...
     def ThreadUtils.abort(fn: Function, killAfterSeconds: Optional[Int]): ...
-    class TaskState:
+    class ThreadState:
         sleeping: bool
         def wait(seconds: Int): ...
         sleep = wait # Sleep is an alias to wait.
 
 
-The "AsyncTask" decorator (no, it's not related to asyncio tasks) is a wrapper for creating background task threads.
+The "AsyncThread" decorator (no, it's not related to asyncio tasks) is a wrapper for creating background task threads.
 Any (non ``async``) function you wrap with it will result in the creation of a thread, 
 bound to the specified function. It will *not* automatically start the thread, unless the `start` parameter is set to True. 
 
 Despite the name, it does not utilize the ``asyncio`` library.  It's for running synchronous methods in 
 an almost "psuedo async" manner.  There is a equivalent wrapper for actual Asyncio Tasks after this section.
 
-The first parameter to all "AsyncTask" methods should be a `TaskState` object:
+The first parameter to all "AsyncThread" methods should be a `ThreadState` object:
 
-.. autoclass:: javascriptasync.events.TaskState
+.. autoclass:: javascriptasync.events.ThreadState
    :members:
    :undoc-members:
    :no-index:
    
 
 You can utilize the `ThreadUtils.start()`, `ThreadUtils.stop()` and `ThreadUtils.abort()` functions to control 
-"AsyncTask" threads.
+"AsyncThread" threads.
 
 .. autoclass:: javascriptasync.ThreadUtils
    :members:
@@ -57,13 +57,13 @@ You can utilize the `ThreadUtils.start()`, `ThreadUtils.stop()` and `ThreadUtils
    :no-index:
 
 .. code-block:: python
-    :caption: AsyncTask example
+    :caption: AsyncThread example
 
     import time
-    from javascriptasync import init_js, AsyncTask, ThreadUtils
+    from javascriptasync import init_js, AsyncThread, ThreadUtils
     init_js()
-    @AsyncTask(start=False)
-    def routine(task: TaskState):
+    @AsyncThread(start=False)
+    def routine(task: ThreadState):
     while not task.stopping: # You can also just do `while True` as long as you use task.sleep and not time.sleep
         ... do some repeated task ...
         task.sleep(1) # Sleep for a bit to not block everything else
@@ -77,7 +77,7 @@ Actual Asyncio Task wrapping and control
 ----------------------------------------
 
 
-Unlike ``"AsyncTask"``, this section actually uses asyncrounous methods as python defines them.
+Unlike ``"AsyncThread"``, this section actually uses asyncrounous methods as python defines them.
 
 You don't really need the provided wrappers when dealing with asyncio Tasks, 
 but it may help avoid boilerplate code like with the thread wrappers above.  
@@ -105,10 +105,10 @@ Controlling asyncio tasks though this libary is done through the `AsyncTaskUtils
 * Stop the operation of Asyncio Tasks passed into `AsyncTaskUtils.start()` using `AsyncTaskUtils.stop()`
 * Abort Asyncio Task operation using `AsyncTaskUtils.abort()`
 
-The internal `TaskStateAsync` object is identical to `TaskState`, but uses `asyncio.sleep()` instead of `time.sleep()`.
+The internal `TaskStateAsync` object is identical to `ThreadState`, but uses `asyncio.sleep()` instead of `time.sleep()`.
 
 .. code-block:: python
-    :caption: AsyncTask example
+    :caption: AsyncThread example
 
     from javascriptasync import init_js, AsyncTaskA,AsyncTaskUtils 
     init_js()

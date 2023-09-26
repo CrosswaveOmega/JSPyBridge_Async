@@ -1,10 +1,11 @@
+from .abc import *
 import re
 import sys
 import traceback
 from .logging import logs
 from typing import List, Optional, Tuple
 from .util import haspackage
-class JavaScriptError(Exception):
+class JavaScriptError(BaseError):
     """
     Custom exception class for JavaScript errors.
     """
@@ -22,16 +23,16 @@ class JavaScriptError(Exception):
         self.js = jsStackTrace
         self.py = pyStacktrace
 
-class NoAsyncLoop(Exception):
+class NoAsyncLoop(BaseError):
     """
     Raised when calling @On when the passed in handler is an async function
     And no event loop was passed into the args
     """
-class NoConfigInitalized(Exception):
+class NoConfigInitalized(BaseError):
     """
     Raised if there was no JSConfig initalized.
     """
-class InvalidNodeJS(Exception):
+class InvalidNodeJS(BaseError):
     """
     Raised if node.js was either not installed or is unreachable.
     

@@ -542,7 +542,7 @@ class Proxy(object):
         _resolved (dict): Resolved values.
         _Keys (list): List of keys.
     """
-    def __init__(self, exe, ffid, prop_ffid=None, prop_name="", es6=False, amode=False):
+    def __init__(self, exe:Executor, ffid, prop_ffid=None, prop_name="", es6=False, amode=False):
         """
         Args:
             exe (Executor): The executor for communication with JavaScript.
@@ -1309,8 +1309,8 @@ class NodeOp():
             prev=None,
             op:Literal['get','set','call','getitem','setitem']=None,
             kwargs=None):
-        self._proxy=proxy
-        self._prev=prev
+        self._proxy:Proxy=proxy
+        self._prev:NodeOp=prev
         self._depth=0
         if self._prev!=None:
             self._depth=self._prev._depth+1

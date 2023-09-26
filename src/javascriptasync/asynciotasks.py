@@ -1,7 +1,7 @@
 import asyncio, time, sys
-
+from .abc import *
 from .logging import logs
-class TaskStateAsync:
+class TaskStateAsync(ThreadTaskStateBase):
     """
     Represents the state of a asyncio task.
 

@@ -2,6 +2,7 @@ from __future__ import annotations
 import asyncio
 import time, threading, json, sys
 from typing import Any, Callable, Dict, List, Tuple
+from .abc import *
 from . import pyi, config
 from queue import Queue
 from weakref import WeakValueDictionary
@@ -24,14 +25,15 @@ class CrossThreadEvent(asyncio.Event):
 
     def clear(self):
         self._loop.call_soon_threadsafe(super().clear)
-class TaskState:
-    """
-    Represents the state of a wrapped "AsyncTask" function.
 
-    This should be the first parameter to all wrapped "AsyncTask" functions.
+class ThreadState(ThreadTaskStateBase):
+    """
+    Represents the state of a wrapped "AsyncThread" function.
+
+    This should be the first parameter to all wrapped "AsyncThread" functions.
     
     Attributes:
-        stopping (bool): When this is set to true, the "AsyncTask" function should stop.
+        stopping (bool): When this is set to true, the "AsyncThread" function should stop.
         sleep (function): Alias for the wait function.
     """
     def __init__(self):
@@ -56,7 +58,7 @@ class TaskState:
 
 
 class EventExecutorThread(threading.Thread): 
-    """Represents a thread for executing events locally
+    """Represents a thread for executing Pythonside Callbacks.
 
     Attributes:
         running (bool): Indicates whether the thread is running.
@@ -102,7 +104,7 @@ class EventExecutorThread(threading.Thread):
 # The event loop here is shared across all threads. All of the IO between the
 # JS and Python happens through this event loop. Because of Python's "Global Interperter Lock"
 # only one thread can run Python at a time, so no race conditions to worry about.
-class EventLoop(EventLoopMixin):
+class EventLoop(EventLoopBase,EventLoopMixin):
     """
     A shared syncronous event loop which manages all IO between Python and Node.JS.
 
@@ -182,7 +184,7 @@ class EventLoop(EventLoopMixin):
         Returns:
             threading.Thread: The created thread.
         """
-        state = TaskState()
+        state = ThreadState()
         t = threading.Thread(target=handler, args=(state, *args), daemon=True)
         self.threads.append([state, handler, t])
         logs.debug(

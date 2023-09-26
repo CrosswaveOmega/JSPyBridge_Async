@@ -189,7 +189,7 @@ async def eval_js_a(js: str, timeout: int = 10, as_thread: bool = False) -> Any:
         del frame
     return await rv
 
-def AsyncTask(start=False):
+def AsyncThread(start=False):
     """
     A decorator for creating a psuedo-asynchronous task out of a syncronous function.
 
@@ -298,4 +298,4 @@ class ThreadUtils:
         conf=Config.get_inst()
         conf.event_loop.abortThread(method,kill_after)
 
-from javascriptasync.emitters import On, Once, off,once,off_a,once_a
+#from javascriptasync.emitters import On, Once, off,once,off_a,once_a
