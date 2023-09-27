@@ -527,8 +527,9 @@ class Proxy(object):
     on the other side of the bridge.  
 
     Utilizes magic methods to determine which api calls to make, and is capable of 
-    operating in an single asyncio mode, when it "chains" operations together
-    instead of executing them right away, executing them only with the await keyword.
+    operating in an single asyncio mode, when it "stacks" operations together
+    instead of executing them right away, running them only with the await keyword
+    and .
 
 
     Attributes:
@@ -538,7 +539,7 @@ class Proxy(object):
         _pffid (int): Property foreign Object Reference ID.
         _pname (str): Property name.
         _es6 (bool): ES6 class flag.
-        _asyncmode (bool): asyncronous buildup mode: Operations are chained into NodeOp proxy objects.
+        _asyncmode (bool): asyncronous stacking mode: Operations are assembled into a stack of NodeOp  objects.
         _resolved (dict): Resolved values.
         _Keys (list): List of keys.
     """
@@ -574,10 +575,18 @@ class Proxy(object):
         return self._exe.loop
     
     def toggle_async_chain(self,value:bool):
-        """Turn asyncio chaining on or off
+        """Alias for toggle_async_stack.
+        Turn asyncio stacking on or off.
 
         Args:
-            value (bool): set to True to enable asyncio chaining, False to disable.
+            value (bool): set to True to enable asyncio stacking, False to disable. 
+        """
+        self._asyncmode=value
+    def toggle_async_stack(self,value:bool):
+        """Turn asyncio stacking on or off
+
+        Args:
+            value (bool): set to True to enable asyncio stacking, False to disable.
         """
         self._asyncmode=value
     def _call(self, method, methodType, val):

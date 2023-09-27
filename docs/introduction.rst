@@ -149,12 +149,15 @@ Any Proxy function call can be transformed into an asyncio call via including th
 
     asyncio.run(main())
 
-Proxy Asyncio Chain
-^^^^^^^^^^^^^^^^^^^
+Proxy Asyncio Stacking
+^^^^^^^^^^^^^^^^^^^^^^
 
-`Proxy` also has async variants of it's get/set/call methods, on top of a special "async operation chaining" system.
+`Proxy` also has async variants of it's get/set/call methods, 
+on top of a special "async operation stacking" system.
 
-But to understand how to use it, you should get an idea about how Proxy objects make calls across the bridge.
+But to understand how to use it, 
+you should get an idea about how Proxy objects make calls from the 
+Python side of the bridge to the NodeJS side of the bridge.
 
 Take the code block below as an example.
 
@@ -165,11 +168,9 @@ Take the code block below as an example.
     redprop=chalk.get_s('red')
     red=call_s("world!")
 
-It makes two thread synchronous (blocking) calls to Node.JS.  
-One to get a reference for the 'red' property (really a method), and another to call the newly referenced 'red' method the "world" argument.
-
-It's equivalent to the below:
-
+It makes two thread synchronous (blocking) calls to NodeJS.  
+One to get a reference for the 'red' property (really a method),
+and another to call the newly referenced 'red' method the "world" argument.
 
 .. code-block:: python
 
@@ -178,7 +179,8 @@ It's equivalent to the below:
     redprop=chalk.get_s('red')
     await redprop.call_a("world!")
 
-Passing in the ``coroutine=True`` keyword argument simply tells call_s to return the coroutine variant specified
+Passing in the ``coroutine=True`` keyword argument simply tells call_s
+to return the coroutine variant specified
 by call_a, which is what the `await` keyword waits for.  
 
 Getting a reference for the 'red' property still requires a synchronous call to node.js.  
@@ -186,17 +188,21 @@ Getting a reference for the 'red' property still requires a synchronous call to 
 
 
 .. code-block:: python
-    
-    chalk.toggle_async_chain(True)
+    :caption: Async Stacking Example
+
+    chalk.toggle_async_stack(True)
     red=await chalk.red("world!")
     #Equivalent to
     red=await chalk.get_a('red').call_a("world!")
 
 
-In order to transform that synchronous 'get' call into an asyncronous function call, you have to enable *Async chaining* for that proxy 
-through the `Proxy.toggle_async_chain(mode)` method.  
-With Async chaining enabled, no calls to Node.JS are made until the await keyword is used, 
-when each asyncrounous is preformed one after the other until it reaches the end.
+In order to transform that synchronous 'get' call into an asyncronous function call,
+you have to enable the Proxy's *Async Call Stacking* (sometimes called *Async Chaining*) mode
+through the `Proxy.toggle_async_stack(mode)` method.  
+
+With Async call stacking enabled, no calls to Node.JS are made until the await keyword is used, 
+when each asyncrounous operation is preformed one after the other until the 
+end of the stack is reached.
 
 
 .. code-block:: python
@@ -207,7 +213,7 @@ when each asyncrounous is preformed one after the other until it reaches the end
     init_js()
     async def main():
         chalk= await require_a("chalk")
-        chalk.toggle_async_chain(True)
+        chalk.toggle_async_stack(True)
         red=await chalk.red("world!")
         print("Hello", red)
 

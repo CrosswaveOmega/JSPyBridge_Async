@@ -1,5 +1,5 @@
-javascriptasync package
-=======================
+API documentation
+=================
 
 Submodules
 ----------

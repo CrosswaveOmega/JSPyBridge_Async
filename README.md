@@ -1,10 +1,11 @@
 # JSPyBridge_async - javascript asyncio fork
 [![PyPI](https://img.shields.io/pypi/v/javascriptasync)](https://pypi.org/project/javascriptasync/)
+[![Documentation Status](https://readthedocs.org/projects/asyncjavascriptbridge/badge/?version=latest)](https://asyncjavascriptbridge.readthedocs.io/?badge=latest)
 [![Build Status](https://github.com/CrosswaveOmega/JSPyBridge_Async/workflows/Node.js%20CI/badge.svg)](https://github.com/extremeheat/JSPyBridge/actions/workflows/)
 
 
 
-Interoperate Node.js from Python, with asyncio compatibility. **Work in progress.** 
+Interoperate Node.js from Python, with built in asyncio compatibility. 
 
 This is a fork of [JSPyBridge](https://github.com/extremeheat/JSPyBridge) by extremeheat, created to properly integrate `asyncio` events and coroutines into the python side of the bridge.
 

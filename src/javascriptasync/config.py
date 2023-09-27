@@ -20,7 +20,7 @@ class JSConfig(object):
     '''The configuration class for the JavaScript Bridge.
 
     This class is used to configure, manage, and facilitatie communication to an EventLoop, which filters data in/out to an active node subprocess.
-
+    It also stores the 
     python->
 
     Attributes:
@@ -43,6 +43,7 @@ class JSConfig(object):
         self.dead="\n** The Node process has crashed. Please restart the runtime to use JS APIs. **\n"
         self.event_loop: EventLoop = None
         self.event_thread: threading.Thread = None
+        
         self.executor: Executor = None
         self.global_jsi: Proxy = None
         self.fast_mode: bool = False
@@ -118,11 +119,8 @@ class Config:
         Initializes the Config class and JSConfig instance.
 
         Args:
-            arg: Description of the argument (replace with a meaningful description).
-            asyncmode (bool, optional): Whether to enable asynchronous mode. Defaults to False.
+            arg: unused.
 
-        Raises:
-            Exception: If JSConfig is not initialized or initialization is in progress.
         """
         frame=inspect.currentframe()
         last_path=print_path(frame.f_back)
@@ -138,6 +136,7 @@ class Config:
             lp=print_path(frame)
             logs.warning(lp)
             log_print(f'attempted init during initalization:[{lp}]')
+
     def kill(self):
         """
         Stops the JSConfig event loop and resets the instance.
@@ -151,6 +150,7 @@ class Config:
             raise NoConfigInitalized("Still initalizing JSConfig, please wait!")
         Config._instance.event_loop.on_exit()
         Config._instance=None
+        
     @classmethod
     def inst(cls):
         """

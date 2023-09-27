@@ -73,7 +73,7 @@ class ConnectionClass():
         self.stdout:TextIO = sys.stdout
         
         self.notebook = False
-        self.NODE_BIN = getattr(os.environ, "NODE_BIN") if hasattr(os.environ, "NODE_BIN") else "node"
+        self.NODE_BIN = os.environ.get("NODE_BIN") if hasattr(os.environ, "NODE_BIN") else "node"
         self.check_nodejs_installed()
 
         self.dn = os.path.dirname(__file__)

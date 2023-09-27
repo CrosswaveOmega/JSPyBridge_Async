@@ -491,7 +491,7 @@ class PyInterface:
 
     def onMessage(self, r: int, action: str, ffid: int, key: str, args: List):
         """Determine which action to preform based on the 
-         action string, and execute it actions.
+         action string, and execute the action.
 
         Args:
             r (int): The request ID.
