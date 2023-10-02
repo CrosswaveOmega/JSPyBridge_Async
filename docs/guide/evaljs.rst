@@ -60,7 +60,7 @@ Expression evaluation
 You also use the `eval_js` function to evaluate JavaScript code
 within the current Python context. 
 
-`eval_js`` preserves references in the python scope, passing them all
+`eval_js` preserves references in the python scope, passing them all
 to NodeJS as references.
 
 

@@ -37,14 +37,22 @@ Basic Terms
 
 Upon initalization, This library creates a "bridge" between your active Python Process and a 
 NodeJS Process. 
-* When Python needs to get data, set data, or invoke a function  that's within 
-NodeJS, it will send a message across this bridge to a reciever object in NodeJS.
-* This reciever object will process this message and preform the operation in NodeJS.
-* When the operation is finished, the reciever sends a new message back across the 
-bridge to Python indicating that it finished.
+- When Python needs to get data, set data, or invoke a function  that's within NodeJS, it will send a message across this bridge to a reciever object in NodeJS.
+- This reciever object will process this message and preform the operation in NodeJS.
+- When the operation is finished, the reciever sends a new message back across the bridge to Python indicating that it finished.
 
 
+Guide
+=====
+.. toctree::
+   :maxdepth: 2
+   :caption: Guide
 
+   guide/introduction
+   guide/proxy
+   guide/eventemitters
+   guide/threadtasks
+   guide/evaljs
 
 Table of contents
 =================
@@ -54,9 +62,6 @@ Table of contents
 
    javascriptasync
    overview
-   introduction
-   threadtasks
-   eventemitters
    modules
 
 

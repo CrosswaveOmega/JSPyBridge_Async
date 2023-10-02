@@ -48,8 +48,41 @@ async function waitFor (cb, withTimeout, onTimeout) {
   return ret
 }
 
+const SnowflakeMode = {
+  //A unique "mode" Enum for generating a unique snowflake based on the desired request.
+  pyrid: 0,
+  jsffid: 1,
+  jsrid: 2,
+  pyffid: 3,
+};
+function generateSnowflake(parameter, mode = SnowflakeMode.jsrid) {
+  /*
+    Generates a unique snowflake value based on the current timestamp
+    and a passed in 'mode' parameter.
+
+    Args:
+        parameter(int): integer from 0-131071.
+        mode(int,SnowflakeMode): Determines which type of snowflake to generate.  
+        The nodejs side of the bridge only uses SnowflakeMode.jsffid and SnowflakeMode.jsrid
+
+    
+    */
+  // Validate that parameter is within the 0-131071 (0x1FFFF) range, use a modulo if it isn't.
+  let param=parameter
+  if (!(param >= 0 && param <= 0x1FFFF)) {
+    param=param% (0x20000)
+    //throw new Error("Parameter value must be in the range [0, 131071]");
+  }
+  
+  const timestamp = Math.floor(Date.now()/1000) & 0xFFFFFFFF;  // Get the current time in SECONDS, and limit it to 32 bits.
+  const snowflake = (timestamp << 20) | ((mode & 0x07) << 17) | (param & 0x1FFFF);  // Combine timestamp, mode, and parameter
+  return snowflake;
+}
+
 let nextReqId = 10000
-const nextReq = () => nextReqId++
+//function nextReq(){  return generateSnowflake(nextReqId++)}
+const nextReq = () => generateSnowflake(nextReqId++)
+
 
 class PyBridge {
   constructor (com, jsi) {
@@ -126,8 +159,10 @@ class PyBridge {
   // We also need to keep track of the Python objects so we can GC them.
   async call (ffid, stack, args, kwargs, set, timeout) {
     const r = nextReq()
+    //console.log('callffid',ffid, stack, args, kwargs, set, timeout)
     const req = { r, c: 'pyi', action: set ? 'setval' : 'pcall', ffid: ffid, key: stack, val: [args, kwargs] }
     const payload = JSON.stringify(req, (k, v) => {
+
       if (!k) return v
       if (v && !v.r) {
         if (v.ffid) return { ffid: v.ffid }
@@ -135,9 +170,12 @@ class PyBridge {
           typeof v === 'function' ||
           (typeof v === 'object' && (v.constructor.name !== 'Object' && v.constructor.name !== 'Array'))
         ) {
-          const ffid = ++this.jsi.ffid
-          this.jsi.m[ffid] = v
-          this.queueForCollection(ffid, v)
+
+          //console.log(this.jsi.ffid);
+          const ffid = this.jsi.ffidinc();
+          //console.log(ffid);
+          this.jsi.m[ffid] = v;
+          this.queueForCollection(ffid, v);
           return { ffid }
         }
       }
@@ -145,7 +183,6 @@ class PyBridge {
     })
 
     const stacktrace = new PythonException(stack)
-
     const resp = await waitFor(resolve => this.com.writeRaw(payload, r, resolve), timeout || REQ_TIMEOUT, () => {
       throw new BridgeException(`Attempt to access '${stack.join('.')}' failed.`)
     })
@@ -314,4 +351,4 @@ class PyBridge {
   }
 }
 
-module.exports = { PyBridge }
+module.exports = { PyBridge, SnowflakeMode,generateSnowflake }

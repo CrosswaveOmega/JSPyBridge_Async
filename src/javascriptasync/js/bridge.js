@@ -8,7 +8,7 @@ if (typeof process !== 'undefined' && parseInt(process.versions.node.split('.')[
  */
 const util = require('util')
 const EventEmitter = require('events');
-const { PyBridge } = require('./pyi')
+const { PyBridge, SnowflakeMode,generateSnowflake } = require('./pyi')
 const { $require } = require('./deps')
 const { once } = require('events')
 
@@ -47,6 +47,7 @@ class Bridge {
     // This is an ID that increments each time a new object is returned
     // to Python.
     this.ffid = 0
+    this.lastadd=0
     // This contains a refrence map of FFIDs to JS objects.
     this.m = {
       0: {
@@ -78,6 +79,11 @@ class Bridge {
 
     // ipc.on('message', this.onMessage)
   }
+  ffidinc(){
+    let snow_ffid=generateSnowflake(++this.lastadd,SnowflakeMode.jsffid);
+    this.ffid=snow_ffid;
+    return snow_ffid;
+  }
 
   addWeakRef (object, ffid) {
     const weak = new WeakRef(object)
@@ -102,13 +108,13 @@ class Bridge {
       case 'num': return this.ipc.send({ r, key: 'num', val: v })
       case 'py': return this.ipc.send({ r, key: 'py', val: v.ffid })
       case 'class':
-        this.m[++this.ffid] = v
+        this.m[this.ffidinc()] = v
         return this.ipc.send({ r, key: 'class', val: this.ffid })
       case 'fn':
-        this.m[++this.ffid] = v
+        this.m[this.ffidinc()] = v
         return this.ipc.send({ r, key: 'fn', val: this.ffid })
       case 'obj':
-        this.m[++this.ffid] = v
+        this.m[this.ffidinc()] = v
         return this.ipc.send({ r, key: 'obj', val: this.ffid })
       default: return this.ipc.send({ r, key: 'void', val: this.ffid })
     }
@@ -126,8 +132,8 @@ class Bridge {
   // Call property with new keyword to construct classes
   init (r, ffid, attr, args) {
     
-    this.m[++this.ffid] = attr ? new this.m[ffid][attr](...args) : new this.m[ffid](...args)
-    console.log('init', r, ffid, attr, args, this.ffid,  this.m[this.ffid])
+    this.m[this.ffidinc()] = attr ? new this.m[ffid][attr](...args) : new this.m[ffid](...args)
+    //console.log('init', r, ffid, attr, args, this.ffid,  this.m[this.ffid])
     if (this.m[this.ffid] instanceof EventEmitter) {
       this.ipc.send({ r, key: 'inste', val: this.ffid })
     } else {
@@ -155,15 +161,15 @@ class Bridge {
       case 'num': return this.ipc.send({ r, key: 'num', val: v })
       case 'py': return this.ipc.send({ r, key: 'py', val: v.ffid })
       case 'class':
-        this.m[++this.ffid] = v
+        this.m[this.ffidinc()] = v
         return this.ipc.send({ r, key: 'class', val: this.ffid })
       case 'fn':
         // Fix for functions that return functions, use .call() wrapper
         // this.m[++this.ffid] = { call: v }
-        this.m[++this.ffid] = v
+        this.m[this.ffidinc()] = v
         return this.ipc.send({ r, key: 'fn', val: this.ffid })
       case 'obj':
-        this.m[++this.ffid] = v
+        this.m[this.ffidinc()] = v
         return this.ipc.send({ r, key: 'obj', val: this.ffid })
       default: return this.ipc.send({ r, key: 'void', val: this.ffid })
     }
@@ -203,7 +209,7 @@ class Bridge {
         const v = input[k]
         if (v && typeof v === 'object') {
           if (v.r && v.ffid === '') {
-            ++this.ffid
+            this.ffidinc()
             const proxy = this.pyi.makePyObject(this.ffid)
             this.m[this.ffid] = proxy
             made[input[k].r] = this.ffid
@@ -225,7 +231,7 @@ class Bridge {
   }
 
   async onMessage ({ r, action, p, ffid, key, args }) {
-    // console.debug('onMessage!', arguments, r, action)
+    //console.log('onMessage!',  r, action, p, ffid, key, args)
     try {
       if (p) {
         this.process(r + 1, args)
@@ -256,15 +262,20 @@ const handlers = {}
 
 const ipc = {
   send: data => {
+    
+    //console.log('js->py',data)
     debug('js -> py', data)
     process.stderr.write(JSON.stringify(data) + '\n')
   },
   writeRaw: (data, r, cb) => {
+    //console.log('js->py',data)
     debug('js -> py', data)
     handlers[r] = cb
     process.stderr.write(data + '\n')
   },
   write (data, cb) {
+    
+    //console.log('js->py',data)
     handlers[data.r] = cb
     this.send(data)
   }
@@ -297,6 +308,7 @@ process.stdin.on('end', () => {
   if (message.length > 0) {
     debug('py -> js', message)
     for (const line of message.split('\n')) {
+      
         try { var j = JSON.parse(line) } catch (e) { continue } // eslint-disable-line
       if (j.c === 'pyi') {
         handlers[j.r]?.(j)

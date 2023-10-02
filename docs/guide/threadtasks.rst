@@ -11,7 +11,7 @@ help you avoid boilerplate and are simple to use.
 
 
 AsyncThread and Threads control
------------------------------
+-------------------------------
 
 .. code-block:: python
     :caption: general example.

@@ -7,6 +7,8 @@ import inspect, importlib, traceback
 import os, sys, json, types
 import socket
 from typing import Any, Dict, List, Tuple
+
+from .util import generate_snowflake,SnowflakeMode
 from . import proxy, events, config
 from .errors import JavaScriptError, getErrorMessage, NoAsyncLoop
 from weakref import WeakValueDictionary
@@ -124,8 +126,9 @@ class PyInterface:
         # Things added to this dict are auto GC'ed
         self.weakmap = WeakValueDictionary()
         self.cur_ffid = 10000
+        self.ffid_param = 10000
         self.config=config_obj
-        self.ipc = ipc
+        self.ipc:events.EventLoop = ipc
         # This toggles if we want to send inspect data for console logging. It's auto
         # disabled when a for loop is active; use `repr` to request logging instead.
         self.m[0]["sendInspect"] = lambda x: setattr(self, "send_inspect", x)
@@ -160,10 +163,13 @@ class PyInterface:
         Returns:
             int: The assigned FFID.
         """
-        self.cur_ffid += 1
-        self.m[self.cur_ffid] = what
-        print("NEW FFID ADDED ", self.cur_ffid,what)
-        return self.cur_ffid
+        #self.cur_ffid += 1
+        self.ffid_param+=1
+        self.cur_ffid=generate_snowflake(self.ffid_param)
+        ffid_snow=self.cur_ffid #generate_snowflake(self.cur_ffid)
+        self.m[ffid_snow] = what
+        log_print("NEW FFID ADDED ", ffid_snow,what)
+        return ffid_snow
 
     def length(self, r: int, ffid: int, keys: List, args: Tuple):
         """Gets the length of an object specified by keys, 
@@ -230,14 +236,13 @@ class PyInterface:
         # For example with the .append function we don't want ['append'] taking
         # precedence in a dict. However if we're only getting objects, we can
         # first try bracket for dicts, then attributes.
-        #print(r,ffid,keys,args,kwargs)
         if invoke:
             
-            logs.info("INVOKING MODE %s,%s,%s,%s",v,type(v),str(repr(keys)),str(repr(args)))
+            logs.debug("INVOKING MODE %s,%s,%s,%s",v,type(v),str(repr(keys)),str(repr(args)))
             for key in keys:
                 t = getattr(v, str(key), None)
                 
-                logs.info("GET MODE %s,%s,%s,%s",v,type(v),str(key),str(args))
+                logs.debug("GET MODE %s,%s,%s,%s",v,type(v),str(key),str(args))
                 if t:
                     v = t
                 elif hasattr(v, "__getitem__"):
@@ -271,10 +276,9 @@ class PyInterface:
                 future=asyncio.run_coroutine_threadsafe( v(*args, **kwargs),self.current_async_loop)
                 v = future.result()
             else:
-                print()
                 if inspect.isclass(v):
                     was_class = True
-                logs.info("INVOKING %s,%s,%s",v,type(v),was_class)
+                logs.debug("INVOKING %s,%s,%s",v,type(v),was_class)
                 v = v(*args, **kwargs)
         typ = type(v)
         if typ is str:
@@ -284,7 +288,7 @@ class PyInterface:
             self.q(r, "int", v)
             return
         if inspect.isclass(v) or isinstance(v, type):
-            # We need to increment FFID
+            # generate a new ffid.
             self.q(r, "class", self.assign_ffid(v), self.make_signature(v))
             return
         if callable(v):  # anything with __call__
@@ -517,4 +521,5 @@ class PyInterface:
 
         """
         logs.debug("PYI, %s",j)
+        #print(j)
         return self.onMessage(j["r"], j["action"], j["ffid"], j["key"], j["val"])

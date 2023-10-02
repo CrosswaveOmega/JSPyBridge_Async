@@ -59,7 +59,7 @@ def require(name:str, version:Optional[str]=None)->Proxy:
 
 async def require_a(name:str, version:Optional[str]=None,amode:bool=False)->Proxy:
     """
-    Asyncronously import an npm package as a Coroutine,. and return it as a Proxy.
+    Asyncronously import an npm package and return it as a Proxy.
 
     Args:
         name (str): The name of the npm package you want to import.

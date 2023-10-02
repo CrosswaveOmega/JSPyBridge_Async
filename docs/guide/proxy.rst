@@ -1,81 +1,22 @@
 
 
-Getting Started
-===============
-
-.. contents:: Go To:
-    :local:
+Require, and Proxy operations
+=============================
 
 
-1: Installation
----------------
+Require API
+^^^^^^^^^^^
+.. automodule:: javascriptasync
+   :members: require, require_a
+   :undoc-members:
+   :show-inheritance:
+   :no-index:
 
-You can install this library via the PIP package manager.
-
-.. code:: 
-
-   python3 -m pip install -U javascriptasync
-
-
-.. code:: 
-
-   pip install -U javascriptasync
-
-   
-.. code:: 
-
-   py -3 -m pip install -U javascriptasync
-
-2: Install node.js
-------------------
-
-Since this library is a bridge between python and node.js, it follows that you need to install node.js.
-
-Windows and MacOS
-^^^^^^^^^^^^^^^^^
-Visit https://nodejs.org/en/download and click on the relevant installer.
-
-Linux
-^^^^^
-The easiest way to install node.js on a linux system is via nvm.
-
-Just follow the instructions at the Node Version Manager (nvm) repository:
-    https://github.com/nvm-sh/nvm
-
-3: Start up the bridge 
-----------------------
-
-Unlike the original ``javascript`` library, ``javascriptasync`` does not
-automatically initalize everything after importing. *You have to import and call the 
-``init_js`` function to create a connection to a node.js subprocess.*
-
-.. code:: python
-
-    from javascriptasync import init_js
-    init_js()
-
-
-4: require
-----------
-
-After starting up the bridge, just use the library's ``require`` function.  
-It's utilized in the same manner as within node.js, 
-where you can pass in the name of an NPM package or module.
-
-.. code:: python
-
-    from javascriptasync import init_js, require
-    init_js()
-    chalk= require("chalk")
-    red=chalk.red("world!")
-    print("Hello", red)
-
-``require`` can import npm packages **or** your own node.js module files via a relative import.  
 
 Proxy
 ^^^^^
 
-``require`` returns what this library refers to as a **Proxy** object.  
+`require` returns what this library refers to as a **Proxy** object.  
 
 The **Proxy** is a mutatable object which stores a reference to some non-primitive object within the utilized JS context, 
 mapped to a unique **Foreign Object Reference ID** (FFID).  
@@ -126,7 +67,7 @@ Then in your running python script, set the name arg of ``require()`` to ``./exa
     examplejs = require('./example.js')
     print(examplejs.greet())
 
-4: utilizing asyncio  
+utilizing asyncio  
 --------------------
 
 Every call to the Node.JS Process is blocking by default.  While this isn't really a problem for small, synchronous scripts,
@@ -179,13 +120,13 @@ and another to call the newly referenced 'red' method the "world" argument.
     redprop=chalk.get_s('red')
     await redprop.call_a("world!")
 
-Passing in the ``coroutine=True`` keyword argument simply tells call_s
+Passing in the ``coroutine=True`` keyword argument simply tells `Proxy.call_s`
 to return the coroutine variant specified
-by call_a, which is what the `await` keyword waits for.  
+by `Proxy.call_a`, which is executed via the `await` keyword.
 
 Getting a reference for the 'red' property still requires a synchronous call to node.js.  
 
-
+It gets messy 
 
 .. code-block:: python
     :caption: Async Stacking Example
@@ -220,4 +161,4 @@ end of the stack is reached.
     asyncio.run(main())
 
 
-
+NodeJS Event Emitters: :next:

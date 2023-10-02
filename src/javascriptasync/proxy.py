@@ -9,6 +9,7 @@ from .errors import JavaScriptError, NoAsyncLoop
 from .events import EventLoop
 
 
+from .util import generate_snowflake,SnowflakeMode
 from .logging import logs, print_path_depth
 
 class Executor:
@@ -46,7 +47,8 @@ class Executor:
             res: The response after executing the action.
         """
         self.i += 1
-        r = self.i  # unique request ts, acts as ID for response
+
+        r = generate_snowflake(self.i,SnowflakeMode.pyrid)  # unique request ts, acts as ID for response
         l = None  # the lock
         if action == "get":  # return obj[prop]
             l = self.queue(r, {"r": r, "action": "get", "ffid": ffid, "key": attr})
@@ -88,7 +90,7 @@ class Executor:
         """
         timeout=10
         self.i += 1
-        r = self.i  # unique request ts, acts as ID for response
+        r = generate_snowflake(self.i,SnowflakeMode.pyrid)   # unique request ts, acts as ID for response
         l = None  # the lock
         amode=True
         aloop=asyncio.get_event_loop()
@@ -135,7 +137,7 @@ class Executor:
         """
         wanted = {}
         self.ctr = 0
-        callRespId, ffidRespId = self.i + 1, self.i + 2
+        callRespId, ffidRespId = generate_snowflake(self.i + 1,SnowflakeMode.pyrid) , generate_snowflake(self.i + 2,SnowflakeMode.pyrid) 
         self.i += 2
         self.expectReply = False
         # p=1 means we expect a reply back, not used at the moment, but

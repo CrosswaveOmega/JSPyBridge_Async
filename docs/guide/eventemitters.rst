@@ -86,6 +86,7 @@ methods of NodeJS's EventEmitters.
 
 Now, javascriptasync automatically wraps up EventEmitters into it's own type of proxy,
 called the `EventEmitterProxy`.  It handles all the extra logic on it's own. 
+
 EventEmitterProxy
 ^^^^^^^^^^^^^^^^^
 .. autoclass:: javascriptasync.proxy.EventEmitterProxy
