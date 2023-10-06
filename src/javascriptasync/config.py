@@ -170,7 +170,7 @@ class Config:
             JSConfig: The JSConfig instance.
 
         Raises:
-            Exception: If JSConfig is not initialized or initialization is in progress.
+            NoConfigInitalized: If JSConfig is not initialized or initialization is in progress.
         """
         if not Config._instance:
             raise NoConfigInitalized("Never initalized JSConfig, please call javascriptasync.init_js() somewhere in your code first!")

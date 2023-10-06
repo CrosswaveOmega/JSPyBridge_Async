@@ -3,6 +3,8 @@
 Getting Started
 ===============
 
+This guide covers the essential steps to get started with the ``javascriptasync`` library, from installation to initiating communication between Python and Node.js.
+
 .. contents:: Go To:
     :local:
 
@@ -10,71 +12,88 @@ Getting Started
 1: Installation
 ---------------
 
-You can install this library via the PIP package manager.
+You can install the ``javascriptasync`` library via the Python package manager, pip. 
+Open your terminal and run one of the following commands:
 
-.. code:: 
+For Python 3:
+
+.. code-block:: bash
 
    python3 -m pip install -U javascriptasync
 
+For Python 2 or Python 3:
 
-.. code:: 
+.. code-block:: bash
 
    pip install -U javascriptasync
 
-   
-.. code:: 
+If you prefer using a specific Python version (e.g., Python 3), you can use the following command:
+
+.. code-block:: bash
 
    py -3 -m pip install -U javascriptasync
 
-2: Install node.js
+
+2: Install Node.js
 ------------------
 
-Since this library is a bridge between python and node.js, it follows that you need to install node.js.
+As ``javascriptasync`` serves as a bridge between Python and Node.js, 
+you must have Node.js installed on your system. 
+The installation process varies depending on your operating system:
 
-Windows and MacOS
-^^^^^^^^^^^^^^^^^
-Visit https://nodejs.org/en/download and click on the relevant installer.
+**Windows and MacOS:**
 
-Linux
-^^^^^
-The easiest way to install node.js on a linux system is via nvm.
+Visit the official Node.js website at 
+[https://nodejs.org/en/download](https://nodejs.org/en/download) 
+and download the installer for your platform. Follow the installation instructions provided.
 
-Just follow the instructions at the Node Version Manager (nvm) repository:
-    https://github.com/nvm-sh/nvm
+**Linux:**
 
-3: Start up the bridge 
-----------------------
-
-Unlike the original ``javascript`` library, ``javascriptasync`` does not
-automatically initalize the bridge after you import the library
-
-You have to import and call the `init_js` function to create a bridge connection to a node.js subprocess.
-
-.. code:: python
-
-    from javascriptasync import init_js
-    init_js()
+The recommended way to install Node.js on Linux 
+is by using Node Version Manager (nvm). 
+You can follow the instructions on the 
+nvm repository at [https://github.com/nvm-sh/nvm](https://github.com/nvm-sh/nvm).
 
 
-4: require
-----------
+3: Initializing the Bridge
+--------------------------
 
-After starting up the bridge,  use the library's `require` function to initalize 
-any NodeJS packages or modules, and the library will return a `Proxy`.  
+Unlike the original ``javascript`` library, ``javascriptasync`` 
+does not automatically set up the bridge upon import. 
+You must explicitly initialize the bridge using the `init_js` function.
 
-It's utilized in the same manner as within node.js, 
-where you can pass in the name of an NPM package or module.
+.. code-block:: python
+
+   from javascriptasync import init_js
+   init_js()
+
+
+
+
+4: Using `require` for Communication
+--------------------------------------
+
+
+After initializing the bridge, you can use the `require` function to create connections 
+to Node.js packages or modules. The `require` function returns a `Proxy` object.
+
+A `Proxy` object in ``javascriptasync`` is akin to a Python class,
+but with a unique behavior. When you access its properties or methods,
+it transparently communicates with Node.js across the bridge to fetch 
+the equivalent Node.js values and functionality.
+
 
 .. code:: python
 
     from javascriptasync import init_js, require
     init_js()
+    
+    # Import an NPM package (chalk in this case)
     chalk= require("chalk")
+    # Use the returned `Proxy` object as if it were a Python object
     red=chalk.red("world!")
     print("Hello", red)
 
+- The require function can import NPM packages or your custom Node.js module files via relative imports.
+- The returned Proxy object can be manipulated like any other Python object, and when you interact with its properties or methods, it seamlessly communicates with Node.js to retrieve the corresponding values or functionality.
 
-- `require` can import npm packages **or** your own node.js module files via a relative import.  
-- The newly returned `Proxy` object can be used as any other Python Object.  
-
-Require and Proxys: :next:

@@ -8,17 +8,28 @@ from .proxy import Proxy
 
 import threading, inspect, time, atexit, os, sys
 from .errors import NoAsyncLoop
+
 def init_js():
-    '''Initalize the node.js bridge.'''
+    '''Initalize a new bridge to node.js if it does not already exist.'''
+    
     log_print('Starting up js config.')
     Config('')
-async def init_async():
+
+async def init_js_a():
+    '''Initalize a new node.js bridge if it does not already exist,
+      and set the callback event loop to the current asyncio loop.'''
     Config('')
     conf=Config.get_inst()
 
     conf.set_asyncio_loop(asyncio.get_event_loop())
 
 async def set_async_loop():
+    '''Set the callback event loop to the current asyncio loop.
+    
+    Raises:
+        NoConfigInitalized: If `init_js` or `init_js_a` was not called prior,  or if the bridge is still being initialization is in progress.
+
+    '''
     conf=Config.get_inst()
     conf.set_asyncio_loop(asyncio.get_event_loop())
 
@@ -40,6 +51,11 @@ def require(name:str, version:Optional[str]=None)->Proxy:
 
     Returns:
         Proxy: The imported package or module, as a Proxy.
+
+    
+    Raises:
+        NoConfigInitalized: If `init_js` or `init_js_a` was not called prior,  or if the bridge is still being initialization is in progress.
+
     """
     calling_dir = None
     conf=Config.get_inst()
@@ -67,10 +83,16 @@ async def require_a(name:str, version:Optional[str]=None,amode:bool=False)->Prox
                     it will load the file relative to where your calling script is.
         version (str, optional): The version of the npm package you want to install.
                                  Default is None.
-        amode(bool, optional): If the experimental proxy chain should be enabled.  Default false
+        amode(bool, optional): If the Proxy's async call stacking mode should be enabled.
+            Default false.
 
     Returns:
         Proxy: The imported package or module, as a Proxy.
+
+    
+    Raises:
+        NoConfigInitalized: If `init_js` or `init_js_a` was not called prior,  or if the bridge is still being initialization is in progress.
+
     """
     calling_dir = None
     conf=Config.get_inst()
@@ -100,6 +122,10 @@ def get_console() -> Proxy:
 
     Returns:
         Proxy: The JavaScript console object.
+
+    Raises:
+        NoConfigInitalized: If `init_js` or `init_js_a` was not called prior,  or if the bridge is still being initialization is in progress.
+
     """
     return Config.get_inst().global_jsi.console
 
@@ -113,6 +139,10 @@ def get_globalThis() -> Proxy:
 
     Returns:
         Proxy: The JavaScript globalThis object.
+
+    Raises:
+        NoConfigInitalized: If `init_js` or `init_js_a` was not called prior,  or if the bridge is still being initialization is in progress.
+
     """
     globalThis = Config.get_inst().global_jsi.globalThis
     return globalThis
@@ -126,6 +156,10 @@ def get_RegExp() -> Proxy:
 
     Returns:
         Proxy: The JavaScript RegExp object.
+
+    Raises:
+        NoConfigInitalized: If `init_js` or `init_js_a` was not called prior,  or if the bridge is still being initialization is in progress.
+
     """
     return Config.get_inst().global_jsi.RegExp
 
@@ -141,6 +175,10 @@ def eval_js(js: str, timeout: int = 10) -> Any:
 
     Returns:
         Any: The result of the JavaScript evaluation.
+
+    Raises:
+        NoConfigInitalized: If `init_js` or `init_js_a` was not called prior,  or if the bridge is still being initialization is in progress.
+
     """
     frame = inspect.currentframe()
     
@@ -170,6 +208,10 @@ async def eval_js_a(js: str, timeout: int = 10, as_thread: bool = False) -> Any:
 
     Returns:
         Any: The result of evaluating the JavaScript code.
+
+    Raises:
+        NoConfigInitalized: If `init_js` or `init_js_a` was not called prior,  or if the bridge is still being initialization is in progress.
+
     """
     frame = inspect.currentframe()
     conf=Config.get_inst()
@@ -198,6 +240,10 @@ def AsyncThread(start=False):
 
     Returns:
         callable: A decorator function for creating asynchronous tasks.
+
+    Raises:
+        NoConfigInitalized: If `init_js` or `init_js_a` was not called prior,  or if the bridge is still being initialization is in progress.
+
     """
     def decor(fn):
         conf=Config.get_inst() 
@@ -213,6 +259,10 @@ def AsyncTaskA():
 
     Returns:
         callable: A decorator function for marking functions as asynchronous tasks.
+
+    Raises:
+        NoConfigInitalized: If `init_js` or `init_js_a` was not called prior,  or if the bridge is still being initialization is in progress.
+
     """
     def decor(fn):
         conf=Config.get_inst() 
@@ -227,6 +277,8 @@ def AsyncTaskA():
 class AsyncTaskUtils:
     """
     Utility class for managing asyncio tasks through the library.
+
+
     """
     @staticmethod
     async def start(method:Coroutine):
@@ -235,6 +287,10 @@ class AsyncTaskUtils:
 
         Args:
             method (Coroutine): The coroutine to start as an asyncio task.
+    
+        Raises:
+            NoConfigInitalized: If `init_js` or `init_js_a` was not called prior,  or if the bridge is still being initialization is in progress.
+
         """
         conf=Config.get_inst()
         await conf.event_loop.startTask(method)
@@ -245,6 +301,9 @@ class AsyncTaskUtils:
 
         Args:
             method (Coroutine): The coroutine representing the task to stop.
+
+        Raises:
+            NoConfigInitalized: If `init_js` or `init_js_a` was not called prior,  or if the bridge is still being initialization is in progress.
         """
         conf=Config.get_inst()
         await conf.event_loop.stopTask(method)
@@ -256,6 +315,9 @@ class AsyncTaskUtils:
         Args:
             method (Coroutine): The coroutine representing the task to abort.
             killAfter (float, optional): The time (in seconds) to wait before forcefully killing the task. Default is 0.5 seconds.
+
+        Raises:
+            NoConfigInitalized: If `init_js` or `init_js_a` was not called prior,  or if the bridge is still being initialization is in progress.
 
         """
         conf=Config.get_inst()
@@ -272,6 +334,10 @@ class ThreadUtils:
 
         Args:
             method (Callable): The function to execute in a separate thread.
+
+        Raises:
+            NoConfigInitalized: If `init_js` or `init_js_a` was not called prior,  or if the bridge is still being initialization is in progress.
+
         """
         conf=Config.get_inst()
         conf.event_loop.startThread(method)
@@ -282,6 +348,9 @@ class ThreadUtils:
 
         Args:
             method (Callable): The function representing the thread to stop.
+
+        Raises:
+            NoConfigInitalized: If `init_js` or `init_js_a` was not called prior,  or if the bridge is still being initialization is in progress.
         """
         conf=Config.get_inst()
         conf.event_loop.stopThread(method)
@@ -294,6 +363,10 @@ class ThreadUtils:
         Args:
             method (Callable): The function representing the thread to abort.
             kill_after (float, optional): The time (in seconds) to wait before forcefully killing the thread. Default is 0.5 seconds.
+
+        Raises:
+            NoConfigInitalized: If `init_js` or `init_js_a` was not called prior,  or if the bridge is still being initialization is in progress.
+
         """
         conf=Config.get_inst()
         conf.event_loop.abortThread(method,kill_after)

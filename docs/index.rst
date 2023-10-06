@@ -16,12 +16,11 @@ greater degree of control over how calls are made across the bridge.
 Key Features
 ============
 
-- Streamlined asyncio support: AsyncJavascriptBridge offers enhanced compatibility with asyncio applications, 
-   so each call/init to node.js won't block the rest of your asyncio event loop.
-- Switch between Sync/Async JS calls with a single keyword.
-- Greater Timeout Control.
-- Built in Event Emitter support.
-- Improved code organization: the codebase has been refactored to ensure better structure, maintainability, and understandability.
+- Seamless asyncio support: JavaScript calls do not block your asyncio event loop.
+- Simple switch between Sync and Async JavaScript calls using a single keyword.
+- Enhanced timeout control.
+- Built-in Event Emitter support.
+- Improved code organization: The codebase has been refactored for better structure, maintainability, and understandability.
 
 Getting Started
 ^^^^^^^^^^^^^^^
@@ -35,12 +34,19 @@ To get started with the library, just use
 Basic Terms
 ===========
 
-Upon initalization, This library creates a "bridge" between your active Python Process and a 
-NodeJS Process. 
-- When Python needs to get data, set data, or invoke a function  that's within NodeJS, it will send a message across this bridge to a reciever object in NodeJS.
-- This reciever object will process this message and preform the operation in NodeJS.
-- When the operation is finished, the reciever sends a new message back across the bridge to Python indicating that it finished.
+Initialization
+--------------
 
+When you initialize this library, it establishes a "bridge" between your active Python process and a Node.js process. The bridge allows Python to communicate with Node.js seamlessly.
+
+Communication Flow
+------------------
+
+The communication flow between Python and Node.js involves the following steps:
+
+1. Python sends a message across the bridge to a receiver object in Node.js when it needs to retrieve data, set data, invoke a function, or something else in Node.js.
+2. The Node.js receiver processes the message and performs the requested operation.
+3. Once the operation is complete, the receiver sends a response message back to Python via the bridge, indicating that it has finished.
 
 Guide
 =====

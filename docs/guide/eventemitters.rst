@@ -151,7 +151,7 @@ Async/Coroutine Event Handling
 It's even possible to use `@On` and `@Once` on coroutine handler functions.
 
 However, you will have to specify what asyncio event loop the coroutine will run in, 
-you can either use `init_async`, or `set_async_loop` as of this update.
+you can either use `init_js_a`, or `set_async_loop` as of this update.
 
 
 .. code-block:: python
@@ -161,7 +161,7 @@ you can either use `init_async`, or `set_async_loop` as of this update.
     from javascriptasync.emitters import On, Once, off, once
 
     import asyncio
-
+    init_js()
     async def main():
         await set_async_loop()
         MyEmitter = await require_a('./emitter.js')

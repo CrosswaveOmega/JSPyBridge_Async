@@ -1,4 +1,4 @@
-from javascriptasync import require, require_a,  eval_js, eval_js_a, init_async
+from javascriptasync import require, require_a,  eval_js, eval_js_a, init_js_a
 from javascriptasync.emitters import On, Once, off, once
 from javascriptasync import AsyncTaskA, AsyncTaskUtils
 from javascriptasync.logging import set_log_level
@@ -297,7 +297,7 @@ atestorder=[
 
 @pytest.mark.asyncio
 async def test_my_coroutine():
-    await init_async()
+    await init_js_a()
     
     set_log_level(logging.WARNING)
 

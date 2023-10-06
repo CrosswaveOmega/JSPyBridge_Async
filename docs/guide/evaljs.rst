@@ -93,7 +93,7 @@ There's also an asyncrounous variant in `eval_js_a`.
     import javascriptasync
     import asyncio
     async def main()
-        javascriptasync.init_async()
+        javascriptasync.init_js_a()
         countUntil = 9
         myArray = [1]
         myObject = { 'hello': '' }
