@@ -10,6 +10,7 @@ from weakref import WeakValueDictionary
 from .logging import logs, log_print
 
 from .connection import ConnectionClass
+from .util import generate_snowflake
 from .asynciotasks import EventLoopMixin
 class CrossThreadEvent(asyncio.Event):
     '''Initalize Asyncio Event and pass in a specific
@@ -333,6 +334,8 @@ class EventLoop(EventLoopBase,EventLoopMixin):
             time.sleep(0.4)
         time.sleep(0.8)  # Allow final IO
         self.callbackExecutor.running = False
+        self.queue_payload({'r':generate_snowflake(4092,0),
+                            'action':'shutdown'})
         self.queue.put("exit")
 
     def get_response_from_id(self, request_id:int)->Tuple[Any,threading.Barrier]:

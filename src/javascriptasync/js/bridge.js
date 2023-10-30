@@ -194,6 +194,11 @@ class Bridge {
     this.ipc.send({ r, keys })
   }
 
+  async shutdown(r,ffid){
+    process.exit();
+    
+  }
+
   free (r, ffid, attr, args) {
     for (const id of args) {
       delete this.m[id]
@@ -320,6 +325,6 @@ process.stdin.on('end', () => {
 })
 
 process.on('exit', () => {
-  debug('** Node exiting')
+  console.log(`Shutting down node js process ${process.pid}.`)
 })
 // console.log('JS Started!')
