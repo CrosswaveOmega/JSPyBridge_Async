@@ -114,6 +114,7 @@ class Config:
 
     _instance = None
     _initalizing=False
+    _reset=False;
     def __init__(self, arg='none'):
         """
         Initializes the Config class and JSConfig instance.
@@ -125,7 +126,8 @@ class Config:
         frame=inspect.currentframe()
         last_path=print_path(frame.f_back)
         logs.debug(f'attempted init:[{last_path}]')
-        if not Config._instance and not Config._initalizing:
+        if (not Config._instance and not Config._initalizing) or Config._reset:
+            Config._reset=False;
             Config._initalizing=True
             instance = JSConfig()
             Config._instance = instance
@@ -149,7 +151,8 @@ class Config:
         elif Config._initalizing:
             raise NoConfigInitalized("Still initalizing JSConfig, please wait!")
         Config._instance.event_loop.on_exit()
-        Config._instance=None
+        Config._instance.reset_self;
+        Config._reset=True;
         
     @classmethod
     def inst(cls):

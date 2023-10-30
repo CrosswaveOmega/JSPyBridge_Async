@@ -95,7 +95,11 @@ class ConnectionClass():
         #     os.environ["FORCE_COLOR"] = "1"
         # else:
         #     os.environ["FORCE_COLOR"] = "0"
+        #If child process was killed before parent.
+        self.earlyterm=False
+
         # Make sure our child process is killed if the parent one is exiting
+        
         atexit.register(self.stop)
 
 
@@ -269,6 +273,8 @@ class ConnectionClass():
             
         print("Termination condition", self.endself)
         if not self.endself:
+            print("early terminate")
+            self.earlyterm=True
             self.stop()
 
 
@@ -297,15 +303,15 @@ class ConnectionClass():
         """
         Terminate the node.js process.
         """
+        if self.earlyterm:
+            print("Early Termination, stopping.")
+            return
         self.endself=True
         time.sleep(2)
         log_print('terminating JS connection..')
         try:
             self.proc.terminate()
             print('Terminated JS Runtime.')
-            time.sleep(3)
-            print('Killing JS runtime.')
-            self.proc.kill()
             
         except Exception as e:
             raise e

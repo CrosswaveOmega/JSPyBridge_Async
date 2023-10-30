@@ -371,10 +371,13 @@ class EventLoop(EventLoopBase,EventLoopMixin):
             #     time.sleep(0.4)
             #     continue
             job=self.queue.get(block=True)
-
+            if job=="exit":
+                self.active=False;
+                break;
+                
             #logs.debug("Loop: Queue get got %s",qu)
             # Empty the jobs & start running stuff !
-            # NOTE: self.queue.empty doesn't empty queue's, it just checks if the queue
+            # NOTE: self.queue.empty does not empty queue's, it just checks if the queue
             # is empty.
             #self.queue.empty() - 
 
