@@ -3,42 +3,46 @@ import asyncio
 from typing import Any, Coroutine, Optional, Callable, Union
 from . import config
 from .config import Config
-from .logging import log_print,logs
+from .logging import log_print, logs
 from .proxy import Proxy
 
 import threading, inspect, time, atexit, os, sys
 from .errors import NoAsyncLoop
 
+
 def init_js():
-    '''Initalize a new bridge to node.js if it does not already exist.'''
-    
-    log_print('Starting up js config.')
-    Config('')
+    """Initalize a new bridge to node.js if it does not already exist."""
+
+    log_print("Starting up js config.")
+    Config("")
+
 
 async def init_js_a():
-    '''Initalize a new node.js bridge if it does not already exist,
-      and set the callback event loop to the current asyncio loop.'''
-    Config('')
-    conf=Config.get_inst()
+    """Initalize a new node.js bridge if it does not already exist,
+    and set the callback event loop to the current asyncio loop."""
+    Config("")
+    conf = Config.get_inst()
 
     conf.set_asyncio_loop(asyncio.get_event_loop())
 
+
 async def set_async_loop():
-    '''Set the callback event loop to the current asyncio loop.
-    
+    """Set the callback event loop to the current asyncio loop.
+
     Raises:
         NoConfigInitalized: If `init_js` or `init_js_a` was not called prior,  or if the bridge is still being initialization is in progress.
 
-    '''
-    conf=Config.get_inst()
+    """
+    conf = Config.get_inst()
     conf.set_asyncio_loop(asyncio.get_event_loop())
 
+
 def kill_js():
-    Config('').kill()
-    print('killed js')
+    Config("").kill()
+    print("killed js")
 
 
-def require(name:str, version:Optional[str]=None)->Proxy:
+def require(name: str, version: Optional[str] = None) -> Proxy:
     """
     Import an npm package, and return it as a Proxy.
 
@@ -52,13 +56,13 @@ def require(name:str, version:Optional[str]=None)->Proxy:
     Returns:
         Proxy: The imported package or module, as a Proxy.
 
-    
+
     Raises:
         NoConfigInitalized: If `init_js` or `init_js_a` was not called prior,  or if the bridge is still being initialization is in progress.
 
     """
     calling_dir = None
-    conf=Config.get_inst()
+    conf = Config.get_inst()
     if name.startswith("."):
         # Some code to extract the caller's file path, needed for relative imports
         try:
@@ -73,7 +77,8 @@ def require(name:str, version:Optional[str]=None)->Proxy:
 
     return conf.global_jsi.require(name, version, calling_dir, timeout=900)
 
-async def require_a(name:str, version:Optional[str]=None,amode:bool=False)->Proxy:
+
+async def require_a(name: str, version: Optional[str] = None, amode: bool = False) -> Proxy:
     """
     Asyncronously import an npm package and return it as a Proxy.
 
@@ -89,13 +94,13 @@ async def require_a(name:str, version:Optional[str]=None,amode:bool=False)->Prox
     Returns:
         Proxy: The imported package or module, as a Proxy.
 
-    
+
     Raises:
         NoConfigInitalized: If `init_js` or `init_js_a` was not called prior,  or if the bridge is still being initialization is in progress.
 
     """
     calling_dir = None
-    conf=Config.get_inst()
+    conf = Config.get_inst()
     if name.startswith("."):
         # Some code to extract the caller's file path, needed for relative imports
         try:
@@ -107,11 +112,13 @@ async def require_a(name:str, version:Optional[str]=None,amode:bool=False)->Prox
         except Exception:
             # On Notebooks, the frame info above does not exist, so assume the CWD as caller
             calling_dir = os.getcwd()
-    coro=conf.global_jsi.require(name, version, calling_dir, timeout=900,coroutine=True)
-    #req=conf.global_jsi.require
-    module=await coro
-    if amode:  module._asyncmode=True
+    coro = conf.global_jsi.require(name, version, calling_dir, timeout=900, coroutine=True)
+    # req=conf.global_jsi.require
+    module = await coro
+    if amode:
+        module._asyncmode = True
     return module
+
 
 def get_console() -> Proxy:
     """
@@ -128,6 +135,7 @@ def get_console() -> Proxy:
 
     """
     return Config.get_inst().global_jsi.console
+
 
 def get_globalThis() -> Proxy:
     """
@@ -147,6 +155,7 @@ def get_globalThis() -> Proxy:
     globalThis = Config.get_inst().global_jsi.globalThis
     return globalThis
 
+
 def get_RegExp() -> Proxy:
     """
     Returns the RegExp (Regular Expression) object from the JavaScript context.
@@ -162,7 +171,6 @@ def get_RegExp() -> Proxy:
 
     """
     return Config.get_inst().global_jsi.RegExp
-
 
 
 def eval_js(js: str, timeout: int = 10) -> Any:
@@ -181,15 +189,15 @@ def eval_js(js: str, timeout: int = 10) -> Any:
 
     """
     frame = inspect.currentframe()
-    
-    conf=Config.get_inst()
+
+    conf = Config.get_inst()
     rv = None
     try:
         local_vars = {}
         for local in frame.f_back.f_locals:
             if not local.startswith("__"):
                 local_vars[local] = frame.f_back.f_locals[local]
-        rv = conf.global_jsi.evaluateWithContext(js, local_vars,  timeout=timeout,forceRefs=True)
+        rv = conf.global_jsi.evaluateWithContext(js, local_vars, timeout=timeout, forceRefs=True)
     finally:
         del frame
     return rv
@@ -214,22 +222,23 @@ async def eval_js_a(js: str, timeout: int = 10, as_thread: bool = False) -> Any:
 
     """
     frame = inspect.currentframe()
-    conf=Config.get_inst()
+    conf = Config.get_inst()
     rv = None
     try:
         local_vars = {}
-        locals=frame.f_back.f_locals
-        
+        locals = frame.f_back.f_locals
+
         for local in frame.f_back.f_locals:
             if not local.startswith("__"):
                 local_vars[local] = frame.f_back.f_locals[local]
         if not as_thread:
-            rv = conf.global_jsi.evaluateWithContext(js, local_vars, timeout=timeout,forceRefs=True,coroutine=True)
+            rv = conf.global_jsi.evaluateWithContext(js, local_vars, timeout=timeout, forceRefs=True, coroutine=True)
         else:
-            rv = asyncio.to_thread(conf.global_jsi.evaluateWithContext,js, local_vars, timeout=timeout,forceRefs=True)
+            rv = asyncio.to_thread(conf.global_jsi.evaluateWithContext, js, local_vars, timeout=timeout, forceRefs=True)
     finally:
         del frame
     return await rv
+
 
 def AsyncThread(start=False):
     """
@@ -245,14 +254,17 @@ def AsyncThread(start=False):
         NoConfigInitalized: If `init_js` or `init_js_a` was not called prior,  or if the bridge is still being initialization is in progress.
 
     """
+
     def decor(fn):
-        conf=Config.get_inst() 
+        conf = Config.get_inst()
         fn.is_async_task = True
         t = conf.event_loop.newTaskThread(fn)
         if start:
             t.start()
 
     return decor
+
+
 def AsyncTaskA():
     """
     A decorator for marking coroutines as asynchronous tasks.
@@ -264,8 +276,9 @@ def AsyncTaskA():
         NoConfigInitalized: If `init_js` or `init_js_a` was not called prior,  or if the bridge is still being initialization is in progress.
 
     """
+
     def decor(fn):
-        conf=Config.get_inst() 
+        conf = Config.get_inst()
         fn.is_async_task = True
         return fn
         # t = conf.event_loop.newTask(fn)
@@ -274,28 +287,31 @@ def AsyncTaskA():
 
     return decor
 
+
 class AsyncTaskUtils:
     """
     Utility class for managing asyncio tasks through the library.
 
 
     """
+
     @staticmethod
-    async def start(method:Coroutine):
+    async def start(method: Coroutine):
         """
         Start an asyncio task.
 
         Args:
             method (Coroutine): The coroutine to start as an asyncio task.
-    
+
         Raises:
             NoConfigInitalized: If `init_js` or `init_js_a` was not called prior,  or if the bridge is still being initialization is in progress.
 
         """
-        conf=Config.get_inst()
+        conf = Config.get_inst()
         await conf.event_loop.startTask(method)
+
     @staticmethod
-    async def stop(method:Coroutine):
+    async def stop(method: Coroutine):
         """
         Stop an asyncio task.
 
@@ -305,10 +321,11 @@ class AsyncTaskUtils:
         Raises:
             NoConfigInitalized: If `init_js` or `init_js_a` was not called prior,  or if the bridge is still being initialization is in progress.
         """
-        conf=Config.get_inst()
+        conf = Config.get_inst()
         await conf.event_loop.stopTask(method)
+
     @staticmethod
-    async def abort(method:Coroutine,killAfter:float=0.5):
+    async def abort(method: Coroutine, killAfter: float = 0.5):
         """
         Abort an asyncio task.
 
@@ -320,15 +337,17 @@ class AsyncTaskUtils:
             NoConfigInitalized: If `init_js` or `init_js_a` was not called prior,  or if the bridge is still being initialization is in progress.
 
         """
-        conf=Config.get_inst()
-        await conf.event_loop.abortTask(method,killAfter)
+        conf = Config.get_inst()
+        await conf.event_loop.abortTask(method, killAfter)
+
 
 class ThreadUtils:
     """
     Utility class for managing threads through the library.
     """
+
     @staticmethod
-    def start(method:Callable):
+    def start(method: Callable):
         """
         Assign a method to a thread, and start that thread.
 
@@ -339,10 +358,11 @@ class ThreadUtils:
             NoConfigInitalized: If `init_js` or `init_js_a` was not called prior,  or if the bridge is still being initialization is in progress.
 
         """
-        conf=Config.get_inst()
+        conf = Config.get_inst()
         conf.event_loop.startThread(method)
+
     @staticmethod
-    def stop(method:Callable):
+    def stop(method: Callable):
         """
         Stop the thread that was assigned the passed in function. Please try to utilize this instead of abort() in general situations.
 
@@ -352,10 +372,11 @@ class ThreadUtils:
         Raises:
             NoConfigInitalized: If `init_js` or `init_js_a` was not called prior,  or if the bridge is still being initialization is in progress.
         """
-        conf=Config.get_inst()
+        conf = Config.get_inst()
         conf.event_loop.stopThread(method)
+
     @staticmethod
-    def abort(method:Callable, kill_after:float=0.5):
+    def abort(method: Callable, kill_after: float = 0.5):
         """
         Abort the thread that was assigned the passed in function.
         Use if you want to make sure that a thread has stopped, but please try to use stop() instead for general use.
@@ -368,7 +389,8 @@ class ThreadUtils:
             NoConfigInitalized: If `init_js` or `init_js_a` was not called prior,  or if the bridge is still being initialization is in progress.
 
         """
-        conf=Config.get_inst()
-        conf.event_loop.abortThread(method,kill_after)
+        conf = Config.get_inst()
+        conf.event_loop.abortThread(method, kill_after)
 
-#from javascriptasync.emitters import On, Once, off,once,off_a,once_a
+
+# from javascriptasync.emitters import On, Once, off,once,off_a,once_a

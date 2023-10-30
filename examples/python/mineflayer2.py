@@ -27,12 +27,7 @@ host = sys.argv[1]
 port = sys.argv[2]
 username = sys.argv[3] if len(sys.argv) > 3 else "boat"
 
-bot = mineflayer.createBot({
-    "host": host,
-    "port": port,
-    "username": username,
-    "port": port
-})
+bot = mineflayer.createBot({"host": host, "port": port, "username": username, "port": port})
 
 Item = require("prismarine-item")(bot.version)
 
@@ -215,8 +210,7 @@ def playerCollect(this, collector, collected):
     if collector.type == "player" and collected.type == "object":
         raw_item = collected.metadata[10]
         item = Item.fromNotch(raw_item)
-        header = ("I'm so jealous. " + collector.username) if (
-            collector.username != bot.username) else "I "
+        header = ("I'm so jealous. " + collector.username) if (collector.username != bot.username) else "I "
         bot.chat(f"{header} collected {item.count} {item.displayName}")
 
 

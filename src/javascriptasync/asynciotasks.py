@@ -1,6 +1,8 @@
 import asyncio, time, sys
 from .abc import *
 from .logging import logs
+
+
 class TaskStateAsync(ThreadTaskStateBase):
     """
     Represents the state of a asyncio task.
@@ -9,6 +11,7 @@ class TaskStateAsync(ThreadTaskStateBase):
         stopping (bool): Indicates whether the task should stop.
         sleep (function): A function used to sleep for a specified duration.
     """
+
     def __init__(self):
         self.stopping = False
         self.sleep = self.wait
@@ -25,14 +28,17 @@ class TaskStateAsync(ThreadTaskStateBase):
             await asyncio.sleep(0.2)
         if self.stopping:
             pass
-            #print('STOP IN WAIT!')
-            #sys.exit(1)
+            # print('STOP IN WAIT!')
+            # sys.exit(1)
+
 
 class EventLoopMixin:
-    '''
+    """
     A mixin for EventLoop which defines additional functions for managing asyncio tasks.
-    '''
-    tasks=[]
+    """
+
+    tasks = []
+
     def __init__(self):
         self.tasks = []
 
@@ -49,14 +55,10 @@ class EventLoopMixin:
             asyncio.Task: The created task.
         """
         state = TaskStateAsync()
-        print('asynciotype',handler,type(handler))
+        print("asynciotype", handler, type(handler))
         task = asyncio.create_task(handler(state, *args))
         self.tasks.append([state, handler, task])
-        logs.debug(
-            "EventLoop: adding Task. state=%s. handler=%s, args=%s",
-            str(state),
-            str(handler),
-            args)
+        logs.debug("EventLoop: adding Task. state=%s. handler=%s, args=%s", str(state), str(handler), args)
 
         return task
 
@@ -72,8 +74,8 @@ class EventLoopMixin:
                 return
 
         task = await self.newTask(method)
-        #asyncio.create_task(await task)
-        #await task
+        # asyncio.create_task(await task)
+        # await task
 
     async def stopTask(self, method):
         """
@@ -84,9 +86,7 @@ class EventLoopMixin:
         """
         for state, handler, task in self.tasks:
             if method == handler:
-                logs.debug(
-                    "EventLoop: stopping task with handler %s",
-                    str(method))
+                logs.debug("EventLoop: stopping task with handler %s", str(method))
                 state.stopping = True
 
     async def abortTask(self, method, killAfter=0.5):
@@ -101,9 +101,7 @@ class EventLoopMixin:
             if handler == method:
                 state.stopping = True
                 killTime = time.time() + killAfter
-                logs.debug(
-                    "EventLoop: aborting task with handler %s, kill time %f",
-                    str(method), (killAfter))
+                logs.debug("EventLoop: aborting task with handler %s, kill time %f", str(method), (killAfter))
                 while not task.done():
                     await asyncio.sleep(0.2)
                     if time.time() > killTime:
@@ -120,9 +118,7 @@ class EventLoopMixin:
         """
         for state, handler, task in self.tasks:
             if handler == method:
-                logs.debug(
-                    "EventLoop: terminate task with handler %s",
-                    str(method))
+                logs.debug("EventLoop: terminate task with handler %s", str(method))
                 task.cancel()
 
         self.tasks = [x for x in self.tasks if x[1] != method]

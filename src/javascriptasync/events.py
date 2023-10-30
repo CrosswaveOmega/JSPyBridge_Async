@@ -12,11 +12,14 @@ from .logging import logs, log_print
 from .connection import ConnectionClass
 from .util import generate_snowflake
 from .asynciotasks import EventLoopMixin
+
+
 class CrossThreadEvent(asyncio.Event):
-    '''Initalize Asyncio Event and pass in a specific
+    """Initalize Asyncio Event and pass in a specific
     Asyncio event loop, and ensure that the event can be
-    Set outside an asyncio event loop.'''
-    def __init__(self, _loop=None,*args, **kwargs):
+    Set outside an asyncio event loop."""
+
+    def __init__(self, _loop=None, *args, **kwargs):
         super().__init__(*args, **kwargs)
         if self._loop is None:
             self._loop = _loop
@@ -27,21 +30,23 @@ class CrossThreadEvent(asyncio.Event):
     def clear(self):
         self._loop.call_soon_threadsafe(super().clear)
 
+
 class ThreadState(ThreadTaskStateBase):
     """
     Represents the state of a wrapped "AsyncThread" function.
 
     This should be the first parameter to all wrapped "AsyncThread" functions.
-    
+
     Attributes:
         stopping (bool): When this is set to true, the "AsyncThread" function should stop.
         sleep (function): Alias for the wait function.
     """
-    def __init__(self):
-        self.stopping:bool = False
-        self.sleep:Callable = self.wait
 
-    def wait(self, sec:float):
+    def __init__(self):
+        self.stopping: bool = False
+        self.sleep: Callable = self.wait
+
+    def wait(self, sec: float):
         """
         Wait for a specified duration, and will automatically exit the process once self.stopping is true.
 
@@ -53,12 +58,12 @@ class ThreadState(ThreadTaskStateBase):
         while time.time() < stop_time and not self.stopping:
             time.sleep(0.2)
         if self.stopping:
-            #This feels unsafe, but it works for threads.  
-            #Will remove when I find something I consider safer.
+            # This feels unsafe, but it works for threads.
+            # Will remove when I find something I consider safer.
             sys.exit(1)
 
 
-class EventExecutorThread(threading.Thread): 
+class EventExecutorThread(threading.Thread):
     """Represents a thread for executing Pythonside Callbacks.
 
     Attributes:
@@ -66,14 +71,13 @@ class EventExecutorThread(threading.Thread):
         jobs (Queue[Tuple(str,str,Callable,Tuple[Any, ...])]): A queue for storing jobs to be executed.
         doing (list): A list of jobs currently being executed.
     """
-    
 
     def __init__(self):
-        self.doing:List[Any] = []
-        self.running:bool = True
-        self.jobs:Queue[Tuple(str,str,Callable,Tuple[Any, ...])] = Queue()
+        self.doing: List[Any] = []
+        self.running: bool = True
+        self.jobs: Queue[Tuple(str, str, Callable, Tuple[Any, ...])] = Queue()
         super().__init__(daemon=True)
-        #self.daemon=True
+        # self.daemon=True
 
     def add_job(self, request_id, cb_id, job, args):
         """
@@ -96,7 +100,7 @@ class EventExecutorThread(threading.Thread):
         """
         while self.running:
             request_id, cb_id, job, args = self.jobs.get()
-            logs.debug('EVT %s, %s,%s,%s',request_id,cb_id,job,args)
+            logs.debug("EVT %s, %s,%s,%s", request_id, cb_id, job, args)
             ok = job(args)
             if self.jobs.empty():
                 self.doing = []
@@ -105,7 +109,7 @@ class EventExecutorThread(threading.Thread):
 # The event loop here is shared across all threads. All of the IO between the
 # JS and Python happens through this event loop. Because of Python's "Global Interperter Lock"
 # only one thread can run Python at a time, so no race conditions to worry about.
-class EventLoop(EventLoopBase,EventLoopMixin):
+class EventLoop(EventLoopBase, EventLoopMixin):
     """
     A shared syncronous event loop which manages all IO between Python and Node.JS.
 
@@ -123,15 +127,14 @@ class EventLoop(EventLoopBase,EventLoopMixin):
         conf(JSConfig): The JSConfig instance this class belongs to.
     """
 
-
-    def __init__(self,config_container:config.JSConfig):
+    def __init__(self, config_container: config.JSConfig):
         """
         Initialize the EventLoop.
 
         Args:
             config_container (config.JSConfig): Reference to the active JSConfig object
         """
-        self.active:bool = True
+        self.active: bool = True
         self.queue = Queue()
         self.freeable = []
 
@@ -146,7 +149,7 @@ class EventLoop(EventLoopBase,EventLoopMixin):
 
         # The threads created managed by this event loop.
         self.threads = []
-        self.tasks=[]
+        self.tasks = []
         self.outbound = []
 
         # After a socket request is made, it's ID is pushed to self.requests. Then, after a response
@@ -154,19 +157,18 @@ class EventLoop(EventLoopBase,EventLoopMixin):
         # by the consumer.
         self.requests = {}  # Map of requestID -> threading.Lock
         self.responses = {}  # Map of requestID -> response payload
-        self.conn= ConnectionClass(config_container)
-        self.conf=config_container
-        #if not amode:
+        self.conn = ConnectionClass(config_container)
+        self.conf = config_container
+        # if not amode:
         self.conn.start()
         self.callbackExecutor.start()
-        self.pyi:pyi.PyInterface = pyi.PyInterface(config_container,self, None)
-
+        self.pyi: pyi.PyInterface = pyi.PyInterface(config_container, self, None)
 
     # async def add_loop(self):
     #     loop=asyncio.get_event_loop()
     #     self.conn.set_conn(loop)
-        
-        #self.callbackExecutor.start()
+
+    # self.callbackExecutor.start()
     def stop(self):
         """
         Stop the event loop.
@@ -188,11 +190,7 @@ class EventLoop(EventLoopBase,EventLoopMixin):
         state = ThreadState()
         t = threading.Thread(target=handler, args=(state, *args), daemon=True)
         self.threads.append([state, handler, t])
-        logs.debug(
-            "EventLoop: adding Task Thread. state=%s. handler=%s, args=%s",
-                    str(state),
-                    str(handler),
-                    args)
+        logs.debug("EventLoop: adding Task Thread. state=%s. handler=%s, args=%s", str(state), str(handler), args)
 
         return t
 
@@ -220,9 +218,7 @@ class EventLoop(EventLoopBase,EventLoopMixin):
         """
         for state, handler, thread in self.threads:
             if method == handler:
-                logs.debug(
-                    "EventLoop: stopping thread with handler %s",
-                    str(method))
+                logs.debug("EventLoop: stopping thread with handler %s", str(method))
                 state.stopping = True
 
     # Force the thread to stop -- if it doesn't kill after a set amount of time.
@@ -238,9 +234,7 @@ class EventLoop(EventLoopBase,EventLoopMixin):
             if handler == method:
                 state.stopping = True
                 killTime = time.time() + killAfter
-                logs.debug(
-                    "EventLoop: aborting thread with handler %s, kill time %f",
-                    str(method),(killAfter))
+                logs.debug("EventLoop: aborting thread with handler %s, kill time %f", str(method), (killAfter))
                 while thread.is_alive():
                     time.sleep(0.2)
                     if time.time() < killTime:
@@ -258,16 +252,14 @@ class EventLoop(EventLoopBase,EventLoopMixin):
         """
         for state, handler, thread in self.threads:
             if handler == method:
-                logs.debug(
-                    "EventLoop: terminate thread with handler %s",
-                    str(method))
+                logs.debug("EventLoop: terminate thread with handler %s", str(method))
                 thread.terminate()
         self.threads = [x for x in self.threads if x[1] != method]
 
     # == IO ==
 
     # `queue_request` pushes this event onto the Payload
-    def queue_request(self, request_id, payload, timeout=None,asyncmode=False,loop=None)->threading.Event:
+    def queue_request(self, request_id, payload, timeout=None, asyncmode=False, loop=None) -> threading.Event:
         """
         Queue a request to be sent with the payload
 
@@ -285,7 +277,13 @@ class EventLoop(EventLoopBase,EventLoopMixin):
         else:
             lock = threading.Event()
         self.requests[request_id] = [lock, timeout]
-        logs.debug("EventLoop: queue_request. rid %s. payload=%s,  lock=%s, timeout:%s",str(request_id),str(payload),str(lock),timeout)
+        logs.debug(
+            "EventLoop: queue_request. rid %s. payload=%s,  lock=%s, timeout:%s",
+            str(request_id),
+            str(payload),
+            str(lock),
+            timeout,
+        )
         self.queue.put("send")
         return lock
 
@@ -297,10 +295,10 @@ class EventLoop(EventLoopBase,EventLoopMixin):
             payload: The payload to be sent.
         """
         self.outbound.append(payload)
-        logs.debug("EventLoop: added %s to payload",str(payload))
+        logs.debug("EventLoop: added %s to payload", str(payload))
         self.queue.put("send")
 
-    def await_response(self, request_id, timeout=None,asyncmode=False,loop=None)->threading.Event:
+    def await_response(self, request_id, timeout=None, asyncmode=False, loop=None) -> threading.Event:
         """
         Await a response for a request.
 
@@ -316,7 +314,7 @@ class EventLoop(EventLoopBase,EventLoopMixin):
         else:
             lock = threading.Event()
         self.requests[request_id] = [lock, timeout]
-        logs.debug("EventLoop: await_response. rid %s.  lock=%s, timeout:%s",str(request_id),str(lock),timeout)
+        logs.debug("EventLoop: await_response. rid %s.  lock=%s, timeout:%s", str(request_id), str(lock), timeout)
         self.queue.put("send")
         return lock
 
@@ -324,22 +322,21 @@ class EventLoop(EventLoopBase,EventLoopMixin):
         """
         Handle the exit of the event loop.
         """
-        log_print('calling self.exit')
+        log_print("calling self.exit")
         log_print(str(self.responses))
         log_print(str(self.requests))
         log_print(str(self.pyi))
         if len(self.callbacks):
-            logs.debug("%s,%s","cannot exit because active callback", self.callbacks)
+            logs.debug("%s,%s", "cannot exit because active callback", self.callbacks)
         while len(self.callbacks) and self.conn.is_alive():
             time.sleep(0.4)
         time.sleep(0.8)  # Allow final IO
         self.callbackExecutor.running = False
-        self.queue_payload({'r':generate_snowflake(4092,0),
-                            'action':'shutdown'})
+        self.queue_payload({"r": generate_snowflake(4092, 0), "action": "shutdown"})
         self.queue.put("exit")
 
-    def get_response_from_id(self, request_id:int)->Tuple[Any,threading.Barrier]:
-        """Retrieve a response and associated barrier for a given request ID, 
+    def get_response_from_id(self, request_id: int) -> Tuple[Any, threading.Barrier]:
+        """Retrieve a response and associated barrier for a given request ID,
          and then removes it from the internal responces dictionary
 
         Args:
@@ -357,56 +354,56 @@ class EventLoop(EventLoopBase,EventLoopMixin):
             raise KeyError(f"Response id {request_id} not in self.responses")
         res, barrier = self.responses[request_id]
         del self.responses[request_id]
-        return res,barrier
+        return res, barrier
+
     # === LOOP ===
     def loop(self):
         """
         Main loop for processing events and managing IO.
         """
-        r=0
+        r = 0
         while self.active:
             # Wait until we have jobs
             # if self.queue.empty():
             #     log_print('not empty')
             #     time.sleep(0.4)
             #     continue
-            job=self.queue.get(block=True)
-            if job=="exit":
-                self.active=False;
-                break;
-                
-            #logs.debug("Loop: Queue get got %s",qu)
+            job = self.queue.get(block=True)
+            if job == "exit":
+                self.active = False
+                break
+
+            # logs.debug("Loop: Queue get got %s",qu)
             # Empty the jobs & start running stuff !
             # NOTE: self.queue.empty does not empty queue's, it just checks if the queue
             # is empty.
-            #self.queue.empty() - 
+            # self.queue.empty() -
 
             # Send the next outbound request batch
             self.conn.writeAll(self.outbound)
-            
+
             self.outbound = []
 
             # Iterate over the open threads and check if any have been killed, if so
             # remove them from self.threads
-            #logs.debug("Loop: checking self.threads %s",",".join([str(s) for s in self.threads]))
+            # logs.debug("Loop: checking self.threads %s",",".join([str(s) for s in self.threads]))
             self.threads = [x for x in self.threads if x[2].is_alive()]
-            self.tasks = [x for x in self.tasks if x[2].done()==False]
-            
+            self.tasks = [x for x in self.tasks if x[2].done() == False]
+
             if len(self.freeable) > 40:
                 #
                 self.queue_payload({"r": r, "action": "free", "ffid": "", "args": self.freeable})
-                self.freeable = [] 
+                self.freeable = []
 
             # Read the inbound data and route it to correct handler
             inbounds = self.conn.readAll()
             for inbound in inbounds:
-                logs.debug("Loop: inbounds was %s",str(inbound))
+                logs.debug("Loop: inbounds was %s", str(inbound))
                 r = inbound["r"]
                 cbid = inbound["cb"] if "cb" in inbound else None
                 if "c" in inbound and inbound["c"] == "pyi":
-                    
-                    logs.debug("Loop, inbound C request was %s",str(inbound))
-                    #print(inbound)
+                    logs.debug("Loop, inbound C request was %s", str(inbound))
+                    # print(inbound)
                     j = inbound
                     self.callbackExecutor.add_job(r, cbid, self.pyi.inbound, inbound)
                 if r in self.requests:
@@ -414,6 +411,6 @@ class EventLoop(EventLoopBase,EventLoopMixin):
                     barrier = threading.Barrier(2, timeout=5)
                     self.responses[r] = inbound, barrier
                     del self.requests[r]
-                    #print(inbound,lock)
+                    # print(inbound,lock)
                     lock.set()  # release, allow calling thread to resume
                     barrier.wait()

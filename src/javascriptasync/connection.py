@@ -1,4 +1,3 @@
-
 from __future__ import annotations
 import asyncio
 import threading, subprocess, json, time, signal
@@ -8,26 +7,28 @@ from . import config
 from .logging import logs, log_print
 from .util import haspackage
 from .errors import InvalidNodeJS
-ISCLEAR=False
-ISNOTEBOOK=False
+
+ISCLEAR = False
+ISNOTEBOOK = False
 
 try:
     if haspackage("IPython"):
         from IPython import get_ipython
+
         if "COLAB_GPU" in os.environ:
-            ISCLEAR= True
+            ISCLEAR = True
         else:
             shell = get_ipython().__class__.__name__
             if shell == "ZMQInteractiveShell":
-                ISNOTEBOOK= True
+                ISNOTEBOOK = True
     else:
-        ISCLEAR=False
+        ISCLEAR = False
 except Exception as s:
-    ISCLEAR= False
+    ISCLEAR = False
 # The "root" interface to JavaScript with FFID 0
 
 
-class ConnectionClass():
+class ConnectionClass:
     """
     Encapsulated connection class for interacting with JavaScript.
 
@@ -47,9 +48,9 @@ class ConnectionClass():
         sendQ (list): Queue for outgoing messages to JavaScript.
         stderr_lines (list): Lines piped from JavaScript Process
     """
-    #Encapsulated connection to make this file easier to work with.
-    # Special handling for IPython jupyter notebooks
 
+    # Encapsulated connection to make this file easier to work with.
+    # Special handling for IPython jupyter notebooks
 
     def is_notebook(self):
         """
@@ -60,9 +61,7 @@ class ConnectionClass():
         """
         return ISNOTEBOOK
 
-        
-
-    def __init__(self,configval:config.JSConfig):
+    def __init__(self, configval: config.JSConfig):
         """
         Initialize the ConnectionClass.
 
@@ -70,55 +69,53 @@ class ConnectionClass():
             config (config.JSConfig): Reference to the active JSConfig object.
         """
 
-        self.stdout:TextIO = sys.stdout
-        
+        self.stdout: TextIO = sys.stdout
+
         self.notebook = False
         self.NODE_BIN = os.environ.get("NODE_BIN") if hasattr(os.environ, "NODE_BIN") else "node"
         self.check_nodejs_installed()
 
         self.dn = os.path.dirname(__file__)
-        self.proc:subprocess.Popen = None
-        self.com_thread:threading.Thread = None
-        self.stdout_thread:threading.Thread = None
-        self.stderr_lines:List = []
-        self.sendQ:list = []
-        self.config:config.JSConfig=configval
+        self.proc: subprocess.Popen = None
+        self.com_thread: threading.Thread = None
+        self.stdout_thread: threading.Thread = None
+        self.stderr_lines: List = []
+        self.sendQ: list = []
+        self.config: config.JSConfig = configval
         # Modified stdout
-        self.endself=False
-        self.modified_stdout = (sys.stdout != sys.__stdout__) or (getattr(sys, 'ps1', sys.flags.interactive) == '>>> ')
+        self.endself = False
+        self.modified_stdout = (sys.stdout != sys.__stdout__) or (getattr(sys, "ps1", sys.flags.interactive) == ">>> ")
 
         if self.is_notebook() or self.modified_stdout:
             self.notebook = True
             self.stdout = subprocess.PIPE
-        #I don't want to forcefully change os env settings.
+        # I don't want to forcefully change os env settings.
         # if self.supports_color():
         #     os.environ["FORCE_COLOR"] = "1"
         # else:
         #     os.environ["FORCE_COLOR"] = "0"
-        #If child process was killed before parent.
-        self.earlyterm=False
+        # If child process was killed before parent.
+        self.earlyterm = False
 
         # Make sure our child process is killed if the parent one is exiting
-        
-        atexit.register(self.stop)
 
+        atexit.register(self.stop)
 
     def check_nodejs_installed(self):
         """Check if node.js is installed.
 
         Raises:
             InvalidNodeJS: Node.JS was not installed.
-        """        
+        """
 
         try:
-            
             output = subprocess.check_output([self.NODE_BIN, "-v"])
             print("NodeJS is installed: Current Version Node.js version:", output.decode().strip())
         except OSError as e:
             print("COULD NOT FIND A VALID NODE.JS INSTALLATION!  PLEASE INSTALL NODE.JS FROM https://nodejs.org/  ")
             raise InvalidNodeJS("Node.js is not installed!") from e
 
-    def supports_color(self)->bool:
+    def supports_color(self) -> bool:
         """
         Returns True if the running system's terminal supports color, and False
         otherwise.
@@ -127,22 +124,17 @@ class ConnectionClass():
         supported_platform = plat != "Pocket PC" and (plat == "win32" or "ANSICON" in os.environ)
         # isatty is not always implemented, #6223.
         is_a_tty = hasattr(sys.stdout, "isatty") and sys.stdout.isatty()
-        if 'idlelib.run' in sys.modules:
+        if "idlelib.run" in sys.modules:
             return False
         if self.notebook and not self.modified_stdout:
             return True
         return supported_platform and is_a_tty
 
-
-    
-
     # Currently this uses process standard input & standard error pipes
     # to communicate with JS, but this can be turned to a socket later on
     # ^^ Looks like custom FDs don't work on Windows, so let's keep using STDIO.
 
-    
-
-    def read_stderr(self,stderrs:List[str])->List[Dict]:
+    def read_stderr(self, stderrs: List[str]) -> List[Dict]:
         """
         Read and process stderr messages from the node.js process, transforming them
         into Dictionaries via json.loads
@@ -164,15 +156,15 @@ class ConnectionClass():
                     continue
                 try:
                     d = json.loads(line)
-                    logs.debug("%s,%d,%s","connection: [js -> py]", int(time.time() * 1000), line)
+                    logs.debug("%s,%d,%s", "connection: [js -> py]", int(time.time() * 1000), line)
                     ret.append(d)
                 except ValueError as v_e:
-                    print(v_e,"[JSE]", line)
+                    print(v_e, "[JSE]", line)
         return ret
 
     # Write a message to a remote socket, in this case it's standard input
     # but it could be a websocket (slower) or other generic pipe.
-    def writeAll(self,objs:List[Union[str,Any]]):
+    def writeAll(self, objs: List[Union[str, Any]]):
         """
         Transform objects into JSON strings, and write them to the node.js process.
 
@@ -184,23 +176,21 @@ class ConnectionClass():
                 j = obj + "\n"
             else:
                 j = json.dumps(obj) + "\n"
-            logs.debug("connection: %s,%d,%s","[py -> js]", int(time.time() * 1000), j)
-            
-            #log_print('procstatus',self.proc)
+            logs.debug("connection: %s,%d,%s", "[py -> js]", int(time.time() * 1000), j)
+
+            # log_print('procstatus',self.proc)
             if not self.proc:
                 self.sendQ.append(j.encode())
                 continue
             try:
                 # Iterate over all attributes of the instance
-                #for attribute, value in vars(self.proc).items():  log_print(f"Attribute: {attribute}, Value: {value}")
+                # for attribute, value in vars(self.proc).items():  log_print(f"Attribute: {attribute}, Value: {value}")
                 self.proc.stdin.write(j.encode())
                 self.proc.stdin.flush()
             except Exception as error:
-                logs.critical(error,exc_info=True)
+                logs.critical(error, exc_info=True)
                 self.stop()
                 break
-
-
 
     # Reads from the socket, in this case it's standard error. Returns an array
     # of responses from the server.
@@ -215,7 +205,6 @@ class ConnectionClass():
         self.stderr_lines.clear()
         return ret
 
-    
     def com_io(self):
         """
         Handle communication with the node.js process.
@@ -233,21 +222,21 @@ class ConnectionClass():
             exceptions occur during communication.
         """
         try:
-            if os.name == 'nt' and 'idlelib.run' in sys.modules:
-                logs.debug('subprossess mode s')
+            if os.name == "nt" and "idlelib.run" in sys.modules:
+                logs.debug("subprossess mode s")
                 self.proc = subprocess.Popen(
                     [self.NODE_BIN, self.dn + "/js/bridge.js"],
                     stdin=subprocess.PIPE,
                     stdout=self.stdout,
                     stderr=subprocess.PIPE,
-                    creationflags = subprocess.CREATE_NO_WINDOW
+                    creationflags=subprocess.CREATE_NO_WINDOW,
                 )
             else:
                 self.proc = subprocess.Popen(
                     [self.NODE_BIN, self.dn + "/js/bridge.js"],
                     stdin=subprocess.PIPE,
                     stdout=self.stdout,
-                    stderr=subprocess.PIPE
+                    stderr=subprocess.PIPE,
                 )
 
         except Exception as e:
@@ -266,17 +255,15 @@ class ConnectionClass():
             self.stdout_thread.start()
 
         while self.proc.poll() == None:
-            
-            readline=self.proc.stderr.readline()
+            readline = self.proc.stderr.readline()
             self.stderr_lines.append(readline)
             self.config.event_loop.queue.put("stdin")
-            
+
         print("Termination condition", self.endself)
         if not self.endself:
             print("early terminate")
-            self.earlyterm=True
+            self.earlyterm = True
             self.stop()
-
 
     def stdout_read(self):
         """
@@ -284,11 +271,9 @@ class ConnectionClass():
         This is only for Jupyter notebooks.
         """
         while self.proc.poll() is None:
-
             if not self.endself:
-                #log_print('kill')
+                # log_print('kill')
                 print(self.proc.stdout.readline().decode("utf-8"))
-
 
     def start(self):
         """
@@ -298,7 +283,6 @@ class ConnectionClass():
         self.com_thread = threading.Thread(target=self.com_io, args=(), daemon=True)
         self.com_thread.start()
 
-
     def stop(self):
         """
         Terminate the node.js process.
@@ -306,18 +290,16 @@ class ConnectionClass():
         if self.earlyterm:
             print("Early Termination, stopping.")
             return
-        self.endself=True
+        self.endself = True
         time.sleep(2)
-        log_print('terminating JS connection..')
+        log_print("terminating JS connection..")
         try:
             self.proc.terminate()
-            print('Terminated JS Runtime.')
-            
+            print("Terminated JS Runtime.")
+
         except Exception as e:
             raise e
         self.config.reset_self()
-
-
 
     def is_alive(self):
         """

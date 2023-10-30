@@ -8,6 +8,7 @@ def testpy():
     import os
     import time
     from javascriptasync import require, On, Once, off, once, eval_js, init_js, get_console
+
     init_js()
     console = get_console()  # TODO: Remove this in 1.0
     DemoClass = require("./test.js").DemoClass
@@ -27,17 +28,13 @@ def testpy():
 
     console.log(demo.other(demo2), demo.array(), demo.array()["0"])
 
-
     for i in demo.array():
         print("i", i)
-
 
     def some_method(*args):
         print("Callback called with", args)
 
-
     demo.callback(some_method)
-
 
     @On(demo, "increment")
     def handler(this, fn, num, obj):
@@ -45,11 +42,9 @@ def testpy():
         if num == 7:
             off(demo, "increment", handler)
 
-
     @Once(demo, "increment")
     def onceIncrement(this, *args):
         print("Hey, I'm only called once !")
-
 
     demo.increment()
     time.sleep(0.5)

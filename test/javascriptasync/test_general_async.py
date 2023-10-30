@@ -1,4 +1,4 @@
-from javascriptasync import require, require_a,  eval_js, eval_js_a, init_js_a
+from javascriptasync import require, require_a, eval_js, eval_js_a, init_js_a
 from javascriptasync.emitters import On, Once, off, once
 from javascriptasync import AsyncTaskA, AsyncTaskUtils
 from javascriptasync.logging import set_log_level
@@ -7,10 +7,9 @@ import pytest
 import asyncio
 
 
-
 class TestJavaScriptLibraryASYNC:
     def __init__(self):
-        self.demo=None
+        self.demo = None
 
     def assertEquals(self, cond, val):
         assert cond == val
@@ -28,9 +27,9 @@ class TestJavaScriptLibraryASYNC:
         demo2 = DemoClass.new("blue", {"a": 3}, lambda v: self.assertEquals(v, 3))
 
         assert self.demo.ok()(1, 2, 3) == 6
-        assert self.demo.toString() == '123!'
-        assert self.demo.ok().x == 'wow'
-        assert DemoClass.hello() == 'world'
+        assert self.demo.toString() == "123!"
+        assert self.demo.ok().x == "wow"
+        assert DemoClass.hello() == "world"
 
     def test_iter(self):
         DemoClass = require("./test.js").DemoClass
@@ -42,14 +41,13 @@ class TestJavaScriptLibraryASYNC:
             f = i
         assert f.a == 3
 
-        expect = ['x', 'y', 'z']
+        expect = ["x", "y", "z"]
         for key in demo.object():
             assert key == expect.pop(0)
 
     def some_method(self, text):
         print("Callback called with", text)
-        assert text == 'It works !'
-
+        assert text == "It works !"
 
     def test_events(self):
         @On(self.demo, "increment")
@@ -115,7 +113,7 @@ class TestJavaScriptLibraryASYNC:
         print("My var", pythonObject)
 
     def test_bigint(self):
-        bigInt = eval_js('100000n')
+        bigInt = eval_js("100000n")
         print(bigInt)
 
     def test_nullFromJsReturnsNone(self):
@@ -133,11 +131,11 @@ class TestJavaScriptLibraryASYNC:
         self.demo = await DemoClass("blue", {"a": 3}, lambda v: self.assertEquals(v, 3), coroutine=True)
         # New psuedo operator
         demo2 = await DemoClass.new("blue", {"a": 3}, lambda v: self.assertEquals(v, 3), coroutine=True)
-        
-        assert await self.demo.ok()(1, 2, 3,coroutine=True) == 6
-        assert self.demo.toString() == '123!'
-        assert self.demo.ok().x == 'wow'
-        assert DemoClass.hello() == 'world'
+
+        assert await self.demo.ok()(1, 2, 3, coroutine=True) == 6
+        assert self.demo.toString() == "123!"
+        assert self.demo.ok().x == "wow"
+        assert DemoClass.hello() == "world"
 
     async def atest_iter(self):
         DemoClass = require("./test.js").DemoClass
@@ -149,22 +147,23 @@ class TestJavaScriptLibraryASYNC:
             f = i
         assert f.a == 3
 
-        expect = ['x', 'y', 'z']
+        expect = ["x", "y", "z"]
         async for key in demo.object():
             assert key == expect.pop(0)
 
     async def atest_callback(self):
-        await self.demo.callback(self.some_method,coroutine=True)
+        await self.demo.callback(self.some_method, coroutine=True)
 
     async def atest_events(self):
-        print('events start')
+        print("events start")
+
         @On(self.demo, "increment")
         async def handler(this, fn, num, obj):
             print("Handler called", fn, num, obj)
             if num == 7:
-                print('off')
+                print("off")
                 self.demo.off("increment", handler)
-                #off(self.demo, "increment", handler)
+                # off(self.demo, "increment", handler)
 
         @Once(self.demo, "increment")
         async def onceIncrement(this, *args):
@@ -226,23 +225,25 @@ class TestJavaScriptLibraryASYNC:
         print("My var", pythonObject)
 
     async def atest_bigint(self):
-        bigInt = eval_js('100000n')
+        bigInt = eval_js("100000n")
         print(bigInt)
 
     async def atest_nullFromJsReturnsNone(self):
         assert self.demo.returnNull() is None
+
     async def asynctask_stop(self):
         @AsyncTaskA()
         async def routine(task):
-            
-            while not task.stopping: # You can also just do `while True` as long as you use task.sleep and not time.sleep
+            while (
+                not task.stopping
+            ):  # You can also just do `while True` as long as you use task.sleep and not time.sleep
                 print(task)
-                #print('asynciotask')
-                await task.sleep(1) # Sleep for a bit to not block everything else
+                # print('asynciotask')
+                await task.sleep(1)  # Sleep for a bit to not block everything else
 
         await AsyncTaskUtils.start(routine)
         await asyncio.sleep(1)
-        print('stop!')
+        print("stop!")
         await AsyncTaskUtils.stop(routine)
         await asyncio.sleep(1)
 
@@ -250,16 +251,18 @@ class TestJavaScriptLibraryASYNC:
         @AsyncTaskA()
         async def my_function(task):
             # Your function's logic here
-            for i in range(0,5):
-                print(str(task),'this is a run ',i)
+            for i in range(0, 5):
+                print(str(task), "this is a run ", i)
                 await asyncio.sleep(0.4)  # Simulating some work
-            print('TASK OVER.')
-        print('corororo')
+            print("TASK OVER.")
+
+        print("corororo")
         await AsyncTaskUtils.start(my_function)
-        for i in range(0,3):
-            print('MAIN LOOP')
+        for i in range(0, 3):
+            print("MAIN LOOP")
             await asyncio.sleep(1)
         await asyncio.sleep(1)
+
 
 # Define the order of test methods
 test_order = [
@@ -273,15 +276,13 @@ test_order = [
     "test_once",
     "test_assignment",
     "test_eval",
-    "test_bigint"
+    "test_bigint",
 ]
-atestorder=[
+atestorder = [
     "atest_require",
     "atest_classes",
     "atest_iter",
-    
     "atest_callback",
-    
     "atest_events",
     "atest_arrays",
     "atest_errors",
@@ -291,25 +292,26 @@ atestorder=[
     "atest_eval",
     "atest_bigint",
     "atest_nullFromJsReturnsNone",
-    'asynctask_stop',
-    "long_running_asynctask"
+    "asynctask_stop",
+    "long_running_asynctask",
 ]
+
 
 @pytest.mark.asyncio
 async def test_my_coroutine():
     await init_js_a()
-    
+
     set_log_level(logging.WARNING)
 
-    async_instance=TestJavaScriptLibraryASYNC()
+    async_instance = TestJavaScriptLibraryASYNC()
     for test_name in test_order:
-        print('testing sync',test_name)
+        print("testing sync", test_name)
         getattr(async_instance, test_name)()
     for test_name in atestorder:
-        print('testing async',test_name)
+        print("testing async", test_name)
         await getattr(async_instance, test_name)()
     del async_instance
-    
+
     # test_instance = TestJavaScriptLibrary()
     # for test_name in test_order:
     #     print('testing ',test_name)
@@ -317,9 +319,8 @@ async def test_my_coroutine():
     # del async_instance.demo
 
 
-
 if __name__ == "__main__":
     asyncio.run(test_my_coroutine())
 
     # Run all test methods in the specified order
-    #pytest.main()
+    # pytest.main()

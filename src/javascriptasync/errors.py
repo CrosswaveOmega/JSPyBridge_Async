@@ -5,6 +5,8 @@ import traceback
 from .logging import logs
 from typing import List, Optional, Tuple
 from .util import haspackage
+
+
 class JavaScriptError(BaseError):
     """
     Custom exception class for JavaScript errors.
@@ -13,7 +15,7 @@ class JavaScriptError(BaseError):
     def __init__(self, call: str, jsStackTrace: List[str], pyStacktrace: Optional[List[str]] = None):
         """
         Initialize a JavaScriptError object.
-        
+
         Args:
             call (str): The failed JavaScript call.
             jsStackTrace (List[str]): JavaScript stack trace.
@@ -23,25 +25,32 @@ class JavaScriptError(BaseError):
         self.js = jsStackTrace
         self.py = pyStacktrace
 
+
 class NoAsyncLoop(BaseError):
     """
     Raised when calling @On when the passed in handler is an async function
     And no event loop was passed into the args
     """
+
+
 class NoConfigInitalized(BaseError):
     """
     Raised if there was no JSConfig initalized.
     """
+
+
 class InvalidNodeJS(BaseError):
     """
     Raised if node.js was either not installed or is unreachable.
-    
+
     """
-        
+
+
 class Chalk:
     """
     Chalk class for text coloring.
     """
+
     def red(self, text):
         return "\033[91m" + text + "\033[0m"
 
@@ -125,14 +134,13 @@ def format_line(line: str) -> str:
     return line
 
 
-
 def print_error(
     failedCall: str,
     jsErrorline: str,
     jsStackTrace: List[str],
     jsErrorMessage: str,
     pyErrorline: str,
-    pyStacktrace: List[Tuple[str, str]]
+    pyStacktrace: List[Tuple[str, str]],
 ) -> List[str]:
     """
     Print JavaScript error details with formatted stack traces.
@@ -144,7 +152,7 @@ def print_error(
     :param pyErrorline: Python error line.
     :param pyStacktrace: Formatted Python stack trace.
     :return: List of formatted lines to be printed.
-    """    
+    """
     lines = []
     log = lambda *s: lines.append(" ".join(s))
     log(
@@ -266,7 +274,7 @@ def getErrorMessage(failed_call, jsStackTrace, pyStacktrace):
 # Fix for IPython as it blocks the exception hook
 # https://stackoverflow.com/a/28758396/11173996
 try:
-    #__IPYTHON__
+    # __IPYTHON__
     if haspackage("IPython"):
         import IPython
 
@@ -292,7 +300,7 @@ def error_catcher(error_type, error, error_traceback):
     """
     Catches JavaScript exceptions and prints them to the console.
     """
-    logs.error('ERROR.')
+    logs.error("ERROR.")
     if error_type is JavaScriptError:
         pyStacktrace = traceback.format_tb(error_traceback)
         jsStacktrace = error.js

@@ -1,6 +1,6 @@
-
 from __future__ import annotations
 import asyncio
+
 # THe Python Interface for JavaScript
 
 import inspect, importlib, traceback
@@ -8,14 +8,14 @@ import os, sys, json, types
 import socket
 from typing import Any, Dict, List, Tuple
 
-from .util import generate_snowflake,SnowflakeMode
+from .util import generate_snowflake, SnowflakeMode
 from . import proxy, events, config
 from .errors import JavaScriptError, getErrorMessage, NoAsyncLoop
 from weakref import WeakValueDictionary
-from .logging import logs,log_print
+from .logging import logs, log_print
 
 
-def python(method:str)-> types.ModuleType:
+def python(method: str) -> types.ModuleType:
     """
     Import a Python module or function dynamically from javascript.
 
@@ -110,10 +110,11 @@ class PyInterface:
         ipc(EventLoop): The EventLoop used to broker communication to NodeJS.
         send_inspect (bool): Whether to send inspect data for console logging.
         current_async_loop: The current asyncio event loop.
-       
+
 
     """
-    def __init__(self,config_obj:config.JSConfig, ipc, exe=None):
+
+    def __init__(self, config_obj: config.JSConfig, ipc, exe=None):
         """Initalize a new PYInterface.
 
         Args:
@@ -127,34 +128,34 @@ class PyInterface:
         self.weakmap = WeakValueDictionary()
         self.cur_ffid = 10000
         self.ffid_param = 10000
-        self.config=config_obj
-        self.ipc:events.EventLoop = ipc
+        self.config = config_obj
+        self.ipc: events.EventLoop = ipc
         # This toggles if we want to send inspect data for console logging. It's auto
         # disabled when a for loop is active; use `repr` to request logging instead.
         self.m[0]["sendInspect"] = lambda x: setattr(self, "send_inspect", x)
         self.send_inspect = True
-        self.current_async_loop=None
-        
-        #self.executor:proxy.Executor = exe
-    def q(self,r,key,val,sig=""):
+        self.current_async_loop = None
 
-        self.ipc.queue_payload(
-                    {"c": "pyi", "r": r, "key": key, "val": val, "sig": sig}
-                )
-        
+        # self.executor:proxy.Executor = exe
+
+    def q(self, r, key, val, sig=""):
+        self.ipc.queue_payload({"c": "pyi", "r": r, "key": key, "val": val, "sig": sig})
+
     def __str__(self):
         """Return a string representation of the PyInterface object."""
-        res=str(self.m)
+        res = str(self.m)
         return res
-            
+
     @property
     def executor(self):
-        '''Get the executor object currently initalized in JSConfig.'''
+        """Get the executor object currently initalized in JSConfig."""
         return self.config.executor
+
     @executor.setter
     def executor(self, executor):
         pass
-    def assign_ffid(self, what:Any):
+
+    def assign_ffid(self, what: Any):
         """Assign a new FFID (foreign object reference id) for an object.
 
         Args:
@@ -163,16 +164,16 @@ class PyInterface:
         Returns:
             int: The assigned FFID.
         """
-        #self.cur_ffid += 1
-        self.ffid_param+=1
-        self.cur_ffid=generate_snowflake(self.ffid_param)
-        ffid_snow=self.cur_ffid #generate_snowflake(self.cur_ffid)
+        # self.cur_ffid += 1
+        self.ffid_param += 1
+        self.cur_ffid = generate_snowflake(self.ffid_param)
+        ffid_snow = self.cur_ffid  # generate_snowflake(self.cur_ffid)
         self.m[ffid_snow] = what
-        log_print("NEW FFID ADDED ", ffid_snow,what)
+        log_print("NEW FFID ADDED ", ffid_snow, what)
         return ffid_snow
 
     def length(self, r: int, ffid: int, keys: List, args: Tuple):
-        """Gets the length of an object specified by keys, 
+        """Gets the length of an object specified by keys,
         and return that value back to NodeJS.
 
         Args:
@@ -201,7 +202,7 @@ class PyInterface:
         self.q(r, "num", l)
 
     def init(self, r: int, ffid: int, key: str, args: Tuple):
-        """Initialize an object on the Python side, assign an FFID to it, and 
+        """Initialize an object on the Python side, assign an FFID to it, and
         return that object back to NodeJS.
 
         Args:
@@ -229,7 +230,7 @@ class PyInterface:
 
         """
         v = self.m[ffid]
-        
+
         # Subtle differences here depending on if we want to call or get a property.
         # Since in Python, items ([]) and attributes (.) function differently,
         # when calling first we want to try . then []
@@ -237,12 +238,11 @@ class PyInterface:
         # precedence in a dict. However if we're only getting objects, we can
         # first try bracket for dicts, then attributes.
         if invoke:
-            
-            logs.debug("INVOKING MODE %s,%s,%s,%s",v,type(v),str(repr(keys)),str(repr(args)))
+            logs.debug("INVOKING MODE %s,%s,%s,%s", v, type(v), str(repr(keys)), str(repr(args)))
             for key in keys:
                 t = getattr(v, str(key), None)
-                
-                logs.debug("GET MODE %s,%s,%s,%s",v,type(v),str(key),str(args))
+
+                logs.debug("GET MODE %s,%s,%s,%s", v, type(v), str(key), str(args))
                 if t:
                     v = t
                 elif hasattr(v, "__getitem__"):
@@ -272,13 +272,15 @@ class PyInterface:
         if invoke:
             if inspect.iscoroutinefunction(v):
                 if self.current_async_loop is None:
-                    raise NoAsyncLoop("Tried to call a coroutine callback without setting the asyncio loop!  Use 'await set_async_loop()' somewhere in your code!")
-                future=asyncio.run_coroutine_threadsafe( v(*args, **kwargs),self.current_async_loop)
+                    raise NoAsyncLoop(
+                        "Tried to call a coroutine callback without setting the asyncio loop!  Use 'await set_async_loop()' somewhere in your code!"
+                    )
+                future = asyncio.run_coroutine_threadsafe(v(*args, **kwargs), self.current_async_loop)
                 v = future.result()
             else:
                 if inspect.isclass(v):
                     was_class = True
-                logs.debug("INVOKING %s,%s,%s",v,type(v),was_class)
+                logs.debug("INVOKING %s,%s,%s", v, type(v), was_class)
                 v = v(*args, **kwargs)
         typ = type(v)
         if typ is str:
@@ -324,7 +326,6 @@ class PyInterface:
         o = self.call(r, ffid, keys, [], {}, invoke=False)
         return o
 
-
     def inspect(self, r: int, ffid: int, keys: List, args: Tuple):
         """Inspect an object and send the representation to NodeJS.
 
@@ -353,14 +354,14 @@ class PyInterface:
             args (List[int]): List of foreign object reference IDs to free.
 
         """
-        logs.debug('free: %s, %s, %s, %s', r, ffid, key, args)
+        logs.debug("free: %s, %s, %s, %s", r, ffid, key, args)
         logs.debug(str(self))
         for i in args:
             if i not in self.m:
                 continue
             logs.debug(f"purged {i}")
             del self.m[i]
-        logs.debug(str(self))    
+        logs.debug(str(self))
 
     def make_signature(self, what: Any) -> str:
         """Generate a signature for an object.
@@ -377,7 +378,7 @@ class PyInterface:
         return ""
 
     def read(self):
-        #Unused and commenting out 
+        # Unused and commenting out
         # because apiin isn't defined.
         # data = apiin.readline()
         # if not data:
@@ -425,6 +426,7 @@ class PyInterface:
             set_attr (bool): Whether to set an attribute of the object.
 
         """
+
         # Convert special JSON objects to Python methods
         def process(json_input, lookup_key):
             if isinstance(json_input, dict):
@@ -468,7 +470,7 @@ class PyInterface:
     # and .call methods do where they only return numeric/strings as
     # primitive values and everything else is an object refrence.
     def value(self, r: int, ffid: int, keys: List, args: Tuple):
-        """Retrieve the primitive representation of an object, 
+        """Retrieve the primitive representation of an object,
         and send it back to Node.JS
 
         Args:
@@ -489,12 +491,12 @@ class PyInterface:
 
         # TODO: do we realy want to worry about functions/classes here?
         # we're only supposed to send primitives, probably best to ignore
-        # everything else. 
+        # everything else.
         # payload = json.dumps(v, default=lambda arg: None)
         self.q(r, "ser", v)
 
     def onMessage(self, r: int, action: str, ffid: int, key: str, args: List):
-        """Determine which action to preform based on the 
+        """Determine which action to preform based on the
          action string, and execute the action.
 
         Args:
@@ -505,8 +507,8 @@ class PyInterface:
             args (List): List of arguments for the action.
 
         """
-        #current valid acts:
-        #length, get, setval,pcall, inspect, value, free
+        # current valid acts:
+        # length, get, setval,pcall, inspect, value, free
         try:
             return getattr(self, action)(r, ffid, key, args)
         except Exception:
@@ -520,6 +522,6 @@ class PyInterface:
             j (Dict[str, Any]): The incoming data as a dictionary.
 
         """
-        logs.debug("PYI, %s",j)
-        #print(j)
+        logs.debug("PYI, %s", j)
+        # print(j)
         return self.onMessage(j["r"], j["action"], j["ffid"], j["key"], j["val"])
