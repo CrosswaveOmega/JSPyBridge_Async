@@ -1176,6 +1176,29 @@ class Proxy(object):
         ser = self._exe.ipc("serialize", self.ffid, "")
         logs.debug("proxy.get_value_of, %s", ser)
         return ser["val"]
+    
+    def get_dict(self)->dict:
+        """
+        Serialize a linked JavaScript object into a python dictionary.
+
+        Returns:
+            Any: The "valueOf" value.
+        """
+        ser = self._exe.ipc("serialize", self.ffid, "")
+        logs.debug("proxy.get_value_of, %s", ser)
+        return ser["val"]
+    
+    async def get_dict_a(self)->dict:
+        """
+        Serialize a linked JavaScript object into a python dictionary.
+
+        Returns:
+            Any: The "valueOf" value.
+        """
+        ser = await self._exe.ipc_async("serialize", self.ffid, "")
+        logs.debug("proxy.get_value_of, %s", ser)
+        print()
+        return ser["val"]
 
     def get_str(self):
         """
