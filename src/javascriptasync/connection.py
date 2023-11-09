@@ -254,7 +254,7 @@ class ConnectionClass:
             self.stdout_thread = threading.Thread(target=self.stdout_read, args=(), daemon=True)
             self.stdout_thread.start()
 
-        while self.proc.poll() == None:
+        while self.proc.poll() is None:
             readline = self.proc.stderr.readline()
             self.stderr_lines.append(readline)
             self.config.event_loop.queue.put("stdin")

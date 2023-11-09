@@ -20,3 +20,5 @@ output2.png
 testcode.py
 testevent.js
 classesCUST.dot
+.eslintrc.json
+package.json
