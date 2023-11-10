@@ -156,13 +156,14 @@ def print_error(
     lines = []
     log = lambda *s: lines.append(" ".join(s))
     log(
-        "☕",
+        "NodeJS",
         chalk.bold(chalk.bgred(" JavaScript Error ")),
         f"Call to '{failedCall.replace('~~', '')}' failed:",
     )
 
+    log('[Context: Python]')
     for at, line in pyStacktrace:
-        if "javascript" in at or "IPython" in at:
+        if "javascriptasync" in at or "IPython" in at:
             continue
         if not line:
             log(" ", chalk.gray(at))
@@ -172,13 +173,13 @@ def print_error(
 
     log(chalk.gray(">"), format_line(pyErrorline))
 
-    log("\n... across the bridge ...\n")
+    log("\n[Context: NodeJS]\n")
 
     for traceline in reversed(jsStackTrace):
         log(" ", chalk.gray(traceline))
 
     log(chalk.gray(">"), format_line(jsErrorline))
-    log("🌉", chalk.bold(jsErrorMessage))
+    log("Bridge", chalk.bold(jsErrorMessage))
 
     return lines
 
@@ -249,12 +250,17 @@ def processJsStacktrace(stack, allowInternal=False):
 
     if allowInternal and not error_line:
         error_line = "^"
-    return (error_line, message_line, lines) if error_line else None
+    if error_line:
+        return (error_line, message_line, lines)
+    return None
 
 
 def getErrorMessage(failed_call, jsStackTrace, pyStacktrace):
     try:
-        jse, jsm, jss = processJsStacktrace(jsStackTrace) or processJsStacktrace(jsStackTrace, True)
+        tuple_a = processJsStacktrace(jsStackTrace)
+        if tuple_a is None:
+            tuple_a=processJsStacktrace(jsStackTrace, True)
+        (jse, jsm, jss)=tuple_a
         pye, pys = processPyStacktrace(pyStacktrace)
 
         lines = print_error(failed_call, jse, jss, jsm, pye, pys)

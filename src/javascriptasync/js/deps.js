@@ -9,9 +9,9 @@ const LOCK_PATH = join(
     __dirname, NODE_PM === 'npm' ? 'package-lock.json' : 'yarn.lock',
 );
 const MOD_PATH = join(__dirname, 'node_modules');
-console.log('mypath', process.env.NODE_PATH);
-process.env.NODE_PATH = join(__dirname, 'node_modules');
-console.log('mypath', process.env.NODE_PATH);
+// console.log('mypath', process.env.NODE_PATH);
+// process.env.NODE_PATH = join(__dirname, 'node_modules');
+// console.log('mypath', process.env.NODE_PATH);
 const log = (...what) => console.log('\x1b[1m', ...what, '\x1b[0m');
 
 const defaultjson=`
@@ -199,7 +199,7 @@ async function $require(name, version, relativeTo) {
   if (relativeTo) {
     console.log('relto', relativeTo);
     console.log('file://' + join(relativeTo, name));
-    process.env.NODE_PATH= MOD_PATH;
+    // process.env.NODE_PATH= MOD_PATH;
     const mod = await import('file://' + join(relativeTo, name));
     return mod.default ?? mod;
   }

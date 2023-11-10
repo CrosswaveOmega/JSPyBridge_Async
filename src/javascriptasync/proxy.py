@@ -10,7 +10,7 @@ from .events import EventLoop
 
 
 from .util import generate_snowflake, SnowflakeMode
-from .logging import logs, print_path_depth
+from .logging import logs, log_warning, log_debug, log_info, print_path_depth
 
 
 class Executor:
@@ -231,7 +231,7 @@ class Executor:
                 raise Exception("Execution timed out")
 
             pre, barrier = self.loop.get_response_from_id(ffidRespId)
-            logs.debug("ProxyExec:callRespId:%s ffidRespId:%s", str(callRespId), str(ffidRespId))
+            log_debug("ProxyExec:callRespId:%s ffidRespId:%s", str(callRespId), str(ffidRespId))
             # pre, barrier = self.loop.responses[ffidRespId]
             # del self.loop.responses[ffidRespId]
 
@@ -245,16 +245,16 @@ class Executor:
                 try:
                     if hasattr(self.bridge.m[ffid], "__call__"):
                         if inspect.ismethod(self.bridge.m[ffid]):
-                            logs.info("this is a method")
+                            log_info("this is a method")
                         else:
                             setattr(self.bridge.m[ffid], "iffid", ffid)
                 except Exception as e:
-                    logs.warning("There was an in pcallalt, %s", e)
+                    log_warning("There was an in pcallalt, %s", e)
                     pass
 
             barrier.wait()
         now = time.time()
-        logs.debug(
+        log_debug(
             "ProxyExec: lock:%s,callRespId:%s ffidRespId:%s, timeout:%s",
             str(l),
             str(callRespId),
@@ -271,7 +271,7 @@ class Executor:
             ) from time_exc
 
         elapsed = time.time() - now
-        logs.debug(
+        log_debug(
             "ProxyExec: lock:%s,callRespId:%s ffidRespId:%s, timeout:%s, took: %s",
             str(l),
             str(callRespId),
@@ -328,7 +328,7 @@ class Executor:
                 raise Exception("Execution timed out")
             # pre, barrier = self.loop.responses[ffidRespId]
             pre, barrier = self.loop.get_response_from_id(ffidRespId)
-            logs.debug("ProxyExec:callRespId:%s ffidRespId:%s", str(callRespId), str(ffidRespId))
+            log_debug("ProxyExec:callRespId:%s ffidRespId:%s", str(callRespId), str(ffidRespId))
 
             # del self.loop.responses[ffidRespId]
 
@@ -342,16 +342,16 @@ class Executor:
                 try:
                     if hasattr(self.bridge.m[ffid], "__call__"):
                         if inspect.ismethod(self.bridge.m[ffid]):
-                            logs.info("this is a method")
+                            log_info("this is a method")
                         else:
                             setattr(self.bridge.m[ffid], "iffid", ffid)
                 except Exception as e:
-                    logs.warning("There was an issue in pcall, %s", e)
+                    log_warning("There was an issue in pcall, %s", e)
                     pass
 
             barrier.wait()
         now = time.time()
-        logs.debug(
+        log_debug(
             "ProxyExec: lock:%s,callRespId:%s ffidRespId:%s, timeout:%s",
             str(l),
             str(callRespId),
@@ -366,7 +366,7 @@ class Executor:
                 f"Call to '{attr}' timed out. Increase the timeout by setting the `timeout` keyword argument."
             )
         elapsed = time.time() - now
-        logs.debug(
+        log_debug(
             "ProxyExec: lock:%s,callRespId:%s ffidRespId:%s, timeout:%s, took: %s",
             str(l),
             str(callRespId),
@@ -593,7 +593,7 @@ class Proxy(object):
             es6 (bool, optional): ES6 class flag. Defaults to False.
 
         """
-        logs.debug("new Proxy: %s, %s,%s,%s,%s", exe, ffid, prop_ffid, prop_name, es6)
+        log_debug("new Proxy: %s, %s,%s,%s,%s", exe, ffid, prop_ffid, prop_name, es6)
         self.ffid = ffid
         self._exe: Executor = exe
         self._ix = 0
@@ -606,7 +606,7 @@ class Proxy(object):
         self._Keys = None
         self._asyncmode = amode
 
-        logs.debug("new Proxy init done: %s, %s,%s,%s,%s", exe, ffid, prop_ffid, prop_name, es6)
+        log_debug("new Proxy init done: %s, %s,%s,%s,%s", exe, ffid, prop_ffid, prop_name, es6)
 
     def _config(self):
         """Access the JSConfig object reference within the executor."""
@@ -647,7 +647,7 @@ class Proxy(object):
         """
         this = self
 
-        logs.debug("Proxy._call: %s, %s,%s,%s", "MT", method, methodType, val)
+        log_debug("Proxy._call: %s, %s,%s,%s", "MT", method, methodType, val)
         if methodType == "fn":
             return Proxy(self._exe, val, self.ffid, method, amode=self._asyncmode)
         if methodType == "class":
@@ -677,7 +677,7 @@ class Proxy(object):
         Returns:
             Any: The result of the call.
         """
-        logs.debug("calling call_a.  Timeout: %d, Args: %s", timeout, str(args))
+        log_debug("calling call_a.  Timeout: %d, Args: %s", timeout, str(args))
         if self._es6:
             mT, v = await self._exe.initPropAsync(self._pffid, self._pname, args)
         else:
@@ -706,7 +706,7 @@ class Proxy(object):
             mT, v = self._exe.initProp(self._pffid, self._pname, args)
         else:
             mT, v = self._exe.callProp(self._pffid, self._pname, args, timeout=timeout, forceRefs=forceRefs)
-        logs.info("call_s proxy, mT:%s,v:%s.  Timeout: %d, Args: %s", mT, v, timeout, str(args))
+        log_info("call_s proxy, mT:%s,v:%s.  Timeout: %d, Args: %s", mT, v, timeout, str(args))
         if mT == "fn":
             return Proxy(self._exe, v)
         return self._call(self._pname, mT, v)
@@ -791,7 +791,7 @@ class Proxy(object):
         Async variant of iterator.
         """
         self._ix = 0
-        logs.debug("proxy.init_iterator")
+        log_debug("proxy.init_iterator")
         length = self.get_attr("length")
         if length is None:
             self._Keys = self._exe.keys(self.ffid)
@@ -805,7 +805,7 @@ class Proxy(object):
         Returns:
             Any: The next item.
         """
-        logs.debug("proxy.next_item")
+        log_debug("proxy.next_item")
         length = await self.get_a("length")
         if self._Keys:
             if self._ix < len(self._Keys):
@@ -833,7 +833,7 @@ class Proxy(object):
             bool: True if successful.
         """
 
-        logs.debug("proxy.setattr, name:%s, value:%s", name, value)
+        log_debug("proxy.setattr, name:%s, value:%s", name, value)
         if name in INTERNAL_VARS:
             object.__setattr__(self, name, value)
         else:
@@ -853,7 +853,7 @@ class Proxy(object):
         Returns:
             bool: True if successful.
         """
-        logs.debug("proxy.setattr, name:%s, value:%s", name, value)
+        log_debug("proxy.setattr, name:%s, value:%s", name, value)
         if name in INTERNAL_VARS:
             object.__setattr__(self, name, value)
         else:
@@ -877,7 +877,7 @@ class Proxy(object):
             return NodeOp(self, op="setitem", kwargs={"name": name, "value": value})
         return self.set_item(name, value)
         return self.set_item(name, value)
-        logs.debug("proxy.setitem, name:%s, value:%s", name, value)
+        log_debug("proxy.setitem, name:%s, value:%s", name, value)
         return self._exe.setProp(self.ffid, name, value)
 
     def __contains__(self, key):
@@ -891,7 +891,7 @@ class Proxy(object):
             bool: True if the key is contained, otherwise False.
         """
         return self.contains_key(key)
-        logs.debug("proxy.contains, key:%s", key)
+        log_debug("proxy.contains, key:%s", key)
         return True if self[key] is not None else False
 
     def valueOf(self):
@@ -904,7 +904,7 @@ class Proxy(object):
         return self.get_value_of()
         ser = self._exe.ipc("serialize", self.ffid, "")
 
-        logs.debug("proxy.valueOf, %s", ser)
+        log_debug("proxy.valueOf, %s", ser)
         return ser["val"]
 
     def __str__(self):
@@ -915,7 +915,7 @@ class Proxy(object):
             str: The string representation.
         """
         return self.get_str()
-        logs.debug("proxy.str")
+        log_debug("proxy.str")
         return self._exe.inspect(self.ffid, "str")
 
     def __repr__(self):
@@ -926,7 +926,7 @@ class Proxy(object):
             str: The representation.
         """
         return self.get_repr()
-        logs.debug("proxy.repr")
+        log_debug("proxy.repr")
         return self._exe.inspect(self.ffid, "repr")
 
     def __json__(self):
@@ -937,7 +937,7 @@ class Proxy(object):
             dict: The JSON representation.
         """
         return self.get_json()
-        logs.debug("proxy.json")
+        log_debug("proxy.json")
         return {"ffid": self.ffid}
 
     def __del__(self):
@@ -945,7 +945,7 @@ class Proxy(object):
         Free the linked JavaScript object.
         """
         return self.free()
-        logs.debug("proxy.del")
+        log_debug("proxy.del")
         self._exe.free(self.ffid)
 
     def get_s(self, attr):
@@ -960,11 +960,11 @@ class Proxy(object):
         Returns:
             Any: The attribute value.
         """
-        logs.debug("proxy.get_attr start %s", attr)
+        log_debug("proxy.get_attr start %s", attr)
         if attr == "new":
             return self._call(self._pname if self._pffid == self.ffid else "", "class", self._pffid)
         methodType, val = self._exe.getProp(self._pffid, attr)
-        logs.debug("proxy.get_attr %s, methodType: %s, val %s", attr, methodType, val)
+        log_debug("proxy.get_attr %s, methodType: %s, val %s", attr, methodType, val)
         return self._call(attr, methodType, val)
 
     def get_attr(self, attr):
@@ -977,11 +977,11 @@ class Proxy(object):
         Returns:
             Any: The attribute value.
         """
-        logs.debug("proxy.get_attr start %s", attr)
+        log_debug("proxy.get_attr start %s", attr)
         if attr == "new":
             return self._call(self._pname if self._pffid == self.ffid else "", "class", self._pffid)
         methodType, val = self._exe.getProp(self._pffid, attr)
-        logs.debug("proxy.get_attr %s, methodType: %s, val %s", attr, methodType, val)
+        log_debug("proxy.get_attr %s, methodType: %s, val %s", attr, methodType, val)
         return self._call(attr, methodType, val)
 
     def set_s(self, name, value):
@@ -1009,11 +1009,11 @@ class Proxy(object):
         Returns:
             bool: True if successful.
         """
-        logs.debug("proxy.set_attr, name:%s, value:%s", name, value)
+        log_debug("proxy.set_attr, name:%s, value:%s", name, value)
         if name in INTERNAL_VARS:
             object.__setattr__(self, name, value)
         else:
-            logs.debug("proxy.set_attr, call to setProp needed, name:%s, value:%s", name, value)
+            log_debug("proxy.set_attr, call to setProp needed, name:%s, value:%s", name, value)
             return self._exe.setProp(self.ffid, name, value)
 
     async def get_a(self, attr):
@@ -1028,11 +1028,11 @@ class Proxy(object):
             Any: The attribute value.
 
         """
-        logs.debug("proxy.get_async start %s", attr)
+        log_debug("proxy.get_async start %s", attr)
         if attr == "new":
             return self._call(self._pname if self._pffid == self.ffid else "", "class", self._pffid)
         methodType, val = await self._exe.getPropAsync(self._pffid, attr)
-        logs.debug("proxy.get_async %s, methodType: %s, val %s", attr, methodType, val)
+        log_debug("proxy.get_async %s, methodType: %s, val %s", attr, methodType, val)
         return self._call(attr, methodType, val)
 
     async def set_a(self, name, value):
@@ -1049,11 +1049,11 @@ class Proxy(object):
             bool: True if successful.
 
         """
-        logs.debug("proxy.set_attr, name:%s, value:%s", name, value)
+        log_debug("proxy.set_attr, name:%s, value:%s", name, value)
         if name in INTERNAL_VARS:
             object.__setattr__(self, name, value)
         else:
-            logs.debug("proxy.set_attr, call to setProp needed, name:%s, value:%s", name, value)
+            log_debug("proxy.set_attr, call to setProp needed, name:%s, value:%s", name, value)
             return await self._exe.setPropAsync(self.ffid, name, value)
 
     def init_iterator(self):
@@ -1064,7 +1064,7 @@ class Proxy(object):
             self: The iterator object.
         """
         self._ix = 0
-        logs.debug("proxy.init_iterator")
+        log_debug("proxy.init_iterator")
         if self.length is None:
             self._Keys = self._exe.keys(self.ffid)
         return self
@@ -1076,7 +1076,7 @@ class Proxy(object):
         Returns:
             Any: The next item.
         """
-        logs.debug("proxy.next_item")
+        log_debug("proxy.next_item")
         if self._Keys:
             if self._ix < len(self._Keys):
                 result = self._Keys[self._ix]
@@ -1102,7 +1102,7 @@ class Proxy(object):
         Returns:
             Any: The item value.
         """
-        logs.debug("proxy.get_item %s", attr)
+        log_debug("proxy.get_item %s", attr)
         methodType, val = self._exe.getProp(self.ffid, attr)
         return self._call(attr, methodType, val)
 
@@ -1119,7 +1119,7 @@ class Proxy(object):
         Returns:
             bool: True if successful.
         """
-        logs.debug("proxy.set_item, name:%s, value:%s", name, value)
+        log_debug("proxy.set_item, name:%s, value:%s", name, value)
         return self._exe.setProp(self.ffid, name, value)
 
     async def get_item_a(self, attr):
@@ -1133,7 +1133,7 @@ class Proxy(object):
         Returns:
             Any: The item value.
         """
-        logs.debug("proxy.get_item %s", attr)
+        log_debug("proxy.get_item %s", attr)
         methodType, val = await self._exe.getPropAsync(self.ffid, attr)
         return self._call(attr, methodType, val)
 
@@ -1150,7 +1150,7 @@ class Proxy(object):
         Returns:
             bool: True if successful.
         """
-        logs.debug("proxy.set_item, name:%s, value:%s", name, value)
+        log_debug("proxy.set_item, name:%s, value:%s", name, value)
         return await self._exe.setPropAsync(self.ffid, name, value)
 
     def contains_key(self, key):
@@ -1163,7 +1163,7 @@ class Proxy(object):
         Returns:
             bool: True if the key is contained, otherwise False.
         """
-        logs.debug("proxy.contains_key, key:%s", key)
+        log_debug("proxy.contains_key, key:%s", key)
         return True if self[key] is not None else False
 
     def get_value_of(self):
@@ -1174,7 +1174,7 @@ class Proxy(object):
             Any: The "valueOf" value.
         """
         ser = self._exe.ipc("serialize", self.ffid, "")
-        logs.debug("proxy.get_value_of, %s", ser)
+        log_debug("proxy.get_value_of, %s", ser)
         return ser["val"]
     
     def get_dict(self)->dict:
@@ -1185,7 +1185,7 @@ class Proxy(object):
             Any: The "valueOf" value.
         """
         ser = self._exe.ipc("serialize", self.ffid, "")
-        logs.debug("proxy.get_value_of, %s", ser)
+        log_debug("proxy.get_value_of, %s", ser)
         return ser["val"]
     
     async def get_dict_a(self)->dict:
@@ -1196,7 +1196,7 @@ class Proxy(object):
             Any: The "valueOf" value.
         """
         ser = await self._exe.ipc_async("serialize", self.ffid, "")
-        logs.debug("proxy.get_value_of, %s", ser)
+        log_debug("proxy.get_value_of, %s", ser)
         print()
         return ser["val"]
 
@@ -1207,7 +1207,7 @@ class Proxy(object):
         Returns:
             str: The string representation.
         """
-        logs.debug("proxy.get_str")
+        log_debug("proxy.get_str")
         return self._exe.inspect(self.ffid, "str")
 
     def get_repr(self):
@@ -1217,7 +1217,7 @@ class Proxy(object):
         Returns:
             str: The representation.
         """
-        logs.debug("proxy.get_repr")
+        log_debug("proxy.get_repr")
         return self._exe.inspect(self.ffid, "repr")
 
     def get_json(self):
@@ -1227,15 +1227,15 @@ class Proxy(object):
         Returns:
             dict: The JSON representation.
         """
-        logs.debug("proxy.get_json")
+        log_debug("proxy.get_json")
         return {"ffid": self.ffid}
 
     def free(self):
         """
         Free the linked JavaScript object.
         """
-        logs.debug("proxy.free")
         self._exe.free(self.ffid)
+        
 
 
 class EventEmitterProxy(Proxy):
@@ -1274,7 +1274,7 @@ class EventEmitterProxy(Proxy):
         print(inspect.iscoroutinefunction(listener))
         # emitter.on(event, listener)
         self.get("on").call_s(event, listener)
-        logs.info(
+        log_info(
             "On for: emitter %s, event %s, function %s, iffid %s", "s", event, listener, getattr(listener, "iffid")
         )
 

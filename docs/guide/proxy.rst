@@ -17,14 +17,14 @@ Require NPM Packages
 
 NPM package names **must not start with '/' or include a period '.' in them!**
 
-NPM packages are stored within an internal ``node_modules`` folder. If the specified package is not found in ``node_modules``, it will be installed via NPM. This installation only occurs once.
+NPM packages are stored within a packagewide ``node_modules`` folder. If the specified package is not found in ``node_modules``, it will be installed via NPM. This installation only occurs once.
 
 To explicitly install an NPM package, you can use the following command:
 
 .. code-block:: bash
    :caption: Installing an NPM package
 
-   python3 -m javascriptasync --install <npm package>
+   python3 -m javascriptasync install <npm package>
 
 Require Local Files
 ^^^^^^^^^^^^^^^^^^^

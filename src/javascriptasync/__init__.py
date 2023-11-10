@@ -44,7 +44,9 @@ def kill_js():
 
 def require(name: str, version: Optional[str] = None) -> Proxy:
     """
-    Import an npm package, and return it as a Proxy.
+    Import an npm package, and return it as a Proxy.  
+    If the required package isn't found, then
+    javascriptasync will install it within the librarywide node_modules folder.
 
     Args:
         name (str): The name of the npm package you want to import.
@@ -80,7 +82,9 @@ def require(name: str, version: Optional[str] = None) -> Proxy:
 
 async def require_a(name: str, version: Optional[str] = None, amode: bool = False) -> Proxy:
     """
-    Asyncronously import an npm package and return it as a Proxy.
+    Asyncronously import an npm package and return it as a Proxy.  
+    If the required package isn't found, then
+    javascriptasync will install it within the librarywide node_modules folder.
 
     Args:
         name (str): The name of the npm package you want to import.

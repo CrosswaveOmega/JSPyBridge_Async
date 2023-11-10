@@ -50,7 +50,7 @@ function printError(
     failedCall, jsErrorline, jsStacktrace, pyErrorline, pyStacktrace) {
   const lines = [];
   const log = (...sections) => lines.push(sections.join(' '));
-  log('python:',
+  log('Python:',
       chalk.boldRed(' Python Error '),
       `JavaScript attempt to call '${
         failedCall.replace('~~', '') || 'some function'
@@ -62,7 +62,7 @@ function printError(
     log(' ', chalk.dim(traceline));
   }
 
-  log('\n... across the bridge ...\n');
+  log('\n... [Context: Python] ...\n');
 
   for (const [at, line] of pyStacktrace) {
     if (at.includes('javascriptasync')) continue;
@@ -73,7 +73,7 @@ function printError(
       log(' ', chalk.dim(at));
     }
   }
-  log('🌉', chalk.bold(pyErrorline));
+  log('Bridge', chalk.bold(pyErrorline));
   return lines;
 }
 
@@ -111,7 +111,7 @@ const isInternal = (file) => INTERNAL_FILES.find((k) => file.includes(k));
 /**
  * Processes a JavaScript stack trace and extracts relevant information.
  *
- * @param {string} stack - The raw JavaScript stack trace.
+ * @param {string[]} stack - The raw JavaScript stack trace.
  * @param {boolean} [allowInternal=false] - Flag to allow internal files
  * in the stack trace.
  * @return {?[string, string[]]} - A tuple containing

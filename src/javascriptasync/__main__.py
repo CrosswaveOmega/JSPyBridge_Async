@@ -1,79 +1,49 @@
-# Import necessary libraries
-import os, sys, argparse, shutil
-
-# Define the JSON package details
-PACKAGEJSON = (
-    '{\n\t"name": "js-modules",\n\t"description": "This folder holds the installed JS deps",\n\t"dependencies": {}\n}'
+import os
+import sys
+import argparse
+import shutil
+from commands import (
+    clean,
+    update,
+    install,
+    uninstall,
+    hybridize
 )
 
-# Initialize argparse object and define the arguments
-parser = argparse.ArgumentParser(
-    description="javascript (JSPyBridge) package manager. Use this to clear or update the internal package store."
-)
-parser.add_argument("--clean", default=False, action="store_true")
-parser.add_argument("--update", default=False, action="store_true")
-parser.add_argument("--install", default=False, action="store")
-parser.add_argument("--uninstall", default=False, action="store")
-parser.add_argument("--hybridize", default=False, action="store")
-args = parser.parse_args()
+def main():
+    parser = argparse.ArgumentParser(
+        description="javascriptasync (JSPyBridgeAsync) package manager. Use this to clear or update the internal package store."
+    )
 
-# Perform actions according to the provided arguments
-if args.clean:
-    d = os.path.dirname(__file__)
-    nm = d + "/js/node_modules/"
-    nl = d + "/js/package-lock.json"
-    np = d + "/js/package.json"
-    print("Deleting", nm, nl, np)
-    # Try to remove node_modules folder
-    try:
-        shutil.rmtree(nm)
-    except Exception:
-        pass
-    # Try to remove package-lock.json file
-    try:
-        os.remove(nl)
-    except Exception:
-        pass
-    # Try to remove package.json file
-    try:
-        os.remove(np)
-    except Exception:
-        pass
-elif args.update:
-    # Updating the package store
-    print("Updating package store")
-    os.chdir(os.path.dirname(__file__) + "/js")
-    os.system("npm update")
-elif args.install:
-    # Installing a package
-    os.chdir(os.path.dirname(__file__) + "/js")
-    if not os.path.exists("package.json"):
-        # Create package.json if not exists
-        with open("package.json", "w", encoding='utf8') as f:
-            f.write(PACKAGEJSON)
-    os.system(f"npm install {args.install}")
-elif args.uninstall:
-    # Uninstalling a package
-    os.chdir(os.path.dirname(__file__) + "/js")
-    if os.path.exists("package.json"):
-        os.system(f"npm uninstall {args.uninstall}")
+    subparsers = parser.add_subparsers(dest="command")
+
+    clean_parser = subparsers.add_parser("clean", help='Clean the package store')
+    clean_parser.set_defaults(func=clean)
+
+    update_parser = subparsers.add_parser("update", help='Update the package store')
+    update_parser.set_defaults(func=update)
+
+    install_parser = subparsers.add_parser("install", help='Install package(s) to the package store')
+    install_parser.add_argument("packages", nargs='+')
+    install_parser.set_defaults(func=install)
+
+    uninstall_parser = subparsers.add_parser("uninstall",help='uninstall package(s) from the package store')
+    uninstall_parser.add_argument("packages", nargs='+')
+    uninstall_parser.set_defaults(func=uninstall)
+
+    hybridize_parser = subparsers.add_parser("hybridize")
+    hybridize_parser.add_argument("action", choices=['reset', 'install', 'add'])
+
+    if "add" in hybridize_parser.parse_args().action:
+        hybridize_parser.add_argument("files", nargs='+')
+
+    hybridize_parser.set_defaults(func=hybridize)
+    args = parser.parse_args()
+
+    if hasattr(args, 'func'):
+        args.func(args)
     else:
-        # Print message if no package installed
-        print("No packages are currently installed")
-elif args.hybridize:
-    print('hybridize me, captain.')
-    if args.hybridize[0]=='reset':
-        if not os.path.isfile('package_lock.json'):
-            os.remove('package_lock.json')
-        if os.path.exists('node_modules'):
-            shutil.rmtree('node_modules')
-    if os.path.isfile('nodemodules.txt'):
-        with open("nodemodules.txt", "r",encoding='utf8') as file:
-            for line in file:
-                print(f'installing {line}')
-                os.system(f"npm install {line.strip()}")
-    else:
-        print('No nodemodules.txt was detected!')
-else:
-    # Print help message if no argument provided
-    parser.print_help(sys.stderr)
+        parser.print_help(sys.stderr)
+
+if __name__ == "__main__":
+    main()
