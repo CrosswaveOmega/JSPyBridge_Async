@@ -257,7 +257,7 @@ class ConnectionClass:
         for send in self.sendQ:
             self.proc.stdin.write(send)
         self.proc.stdin.flush()
-
+        print('startup')
         if self.notebook:
             self.stdout_thread = threading.Thread(target=self.stdout_read, args=(), daemon=True)
             self.stdout_thread.start()

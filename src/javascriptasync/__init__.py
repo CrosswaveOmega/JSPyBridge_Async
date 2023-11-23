@@ -76,8 +76,7 @@ def require(name: str, version: Optional[str] = None) -> Proxy:
         except Exception:
             # On Notebooks, the frame info above does not exist, so assume the CWD as caller
             calling_dir = os.getcwd()
-    require=conf.global_jsi.get('require')
-    return require.call_s(name, version, calling_dir, timeout=900)
+    return conf.global_jsi.require(name, version, calling_dir, timeout=900)
 
 
 async def require_a(name: str, version: Optional[str] = None, amode: bool = False) -> Proxy:

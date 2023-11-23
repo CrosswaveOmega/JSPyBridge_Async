@@ -444,6 +444,7 @@ class IPCClass {
    */
   constructor(tgprocess) {
     this.process = tgprocess;
+    this.message='';
   }
 
   /**

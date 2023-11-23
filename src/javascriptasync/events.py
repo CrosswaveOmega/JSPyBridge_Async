@@ -363,9 +363,71 @@ class EventLoop(EventLoopBase, EventLoopMixin):
         res, barrier = self.responses[request_id]
         del self.responses[request_id]
         return res, barrier
+    def process_job(self, job:str, r:int) -> int:
+        """
+        send/recieve all outbound/inbound messages to/from connection.
 
-    def process_job(self,job,r):
-        print(f"RUNNING JOB {job}")
+        First, the job will be logged for debugging purposes. Then, all outbound messages will be
+        sent via the connection. After that, the function will check each thread to see if they are
+        still alive, and remove any dead threads from the thread list. 
+        If the length of self.freeable exceeds 40,
+        a payload to free the job is added to the queue.
+
+        The last part of the process is reading the inbound data
+        and routing it to the correct handler.
+        This function ends by returning the request id.
+
+        Args:
+            job (str): A string representing the job to be processed.
+            r (int): The id of the request being processed.
+
+        Returns:
+            int: The id of the processed request.
+        """
+        # log_debug("Loop: Queue get got %s",qu)
+        # Empty the jobs & start running stuff !
+        # NOTE: self.queue.empty does not empty queue, 
+        # it just checks if the queue is empty.
+        # commented out.
+        # self.queue.empty() -
+
+        # Send the next outbound request batch
+        log_debug(f"Running job {job}, r")
+        self.conn.writeAll(self.outbound)
+
+        self.outbound = []
+
+        # Iterate over the open threads and check if any have been killed, if so
+        # remove them from self.threads
+        # log_debug("Loop: checking self.threads %s",",".join([str(s) for s in self.threads]))
+        self.threads = [x for x in self.threads if x[2].is_alive()]
+        self.tasks = [x for x in self.tasks if x[2].done() == False]
+
+        if len(self.freeable) > 40:
+            #
+            self.queue_payload({"r": r, "action": "free", "ffid": "", "args": self.freeable})
+            self.freeable = []
+
+        # Read the inbound data and route it to correct handler
+        inbounds = self.conn.readAll()
+        for inbound in inbounds:
+            log_debug("Loop: inbounds was %s", str(inbound))
+            r = inbound["r"]
+            cbid = inbound["cb"] if "cb" in inbound else None
+            if "c" in inbound and inbound["c"] == "pyi":
+                log_debug("Loop, inbound C request was %s", str(inbound))
+                # print(inbound)
+                j = inbound
+                self.callbackExecutor.add_job(r, cbid, self.pyi.inbound, inbound)
+            if r in self.requests:
+                lock, timeout = self.requests[r]
+                barrier = threading.Barrier(2, timeout=5)
+                self.responses[r] = inbound, barrier
+                del self.requests[r]
+                # print(inbound,lock)
+                lock.set()  # release, allow calling thread to resume
+                barrier.wait()
+        return r
         # log_debug("Loop: Queue get got %s",qu)
         # Empty the jobs & start running stuff !
         # NOTE: self.queue.empty does not empty queue's, it just checks if the queue
@@ -373,6 +435,7 @@ class EventLoop(EventLoopBase, EventLoopMixin):
         # self.queue.empty() -
 
         # Send the next outbound request batch
+        log_debug(f"Running job {job}, r")
         self.conn.writeAll(self.outbound)
 
         self.outbound = []
