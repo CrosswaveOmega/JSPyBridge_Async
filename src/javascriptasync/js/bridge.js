@@ -67,8 +67,8 @@ function getType(obj) {
  * @property {number} lastadd - The last added value.
  * @property {object} m - Contains a reference map
  * of FFIDs to JavaScript objects.
- * @property {object} ipc - Inter-process Communication.
- * @property {object} pyi - PyBridge.
+ * @property {IPCClass} ipc - Inter-process Communication.
+ * @property {PyBridge} pyi - PyBridge.
  * @property {object} eventMap - Object to manage events.
  *
  * @param {object} ipc - The IPC communication channel.
@@ -481,46 +481,79 @@ class IPCClass {
     handlers[data.r] = cb;
     this.send(data);
   };
-}
 
 
-const ipc = new IPCClass(process);
-const bridge = new Bridge(ipc);
-
-let message = '';
-process.stdin.on('data', (data) => {
-  const d = String(data);
-  for (let i = 0; i < d.length; i++) {
-    if (d[i] === '\n') {
-      debug('py -> js', message);
-      for (const line of message.split('\n')) {
-        try { var j = JSON.parse(line) } catch (e) { continue } // eslint-disable-line
-        if (j.c === 'pyi') {
-          handlers[j.r]?.(j);
-        } else {
-          bridge.onMessage(j);
-        }
+  /**
+   * Parses lines of a message on the bridge,
+   * identifying and actioning upon JSON-parsable lines
+   * If a line contains a JSON object with a
+   * attribute 'c' that is equal to 'pyi',
+   * it executes a function from the handlers object
+   * with the attribute 'r' of the JSON object as key
+   * If the action for 'c' is anything but 'pyi',
+   * the JSON object is handled by
+   * calling onMessage method of the bridge object
+   *
+   * @param {Bridge} bridge - An instance of the Bridge class
+   */
+  handle_message =(bridge)=>{
+    for (const line of this.message.split('\n')) {
+      try {
+        var j = JSON.parse(line);
+      } catch (e) {
+        continue;
       }
-      message = '';
-    } else {
-      message += d[i];
-    }
-  }
-});
-
-// flush last line
-process.stdin.on('end', () => {
-  if (message.length > 0) {
-    debug('py -> js', message);
-    for (const line of message.split('\n')) {
-        try { var j = JSON.parse(line) } catch (e) { continue } // eslint-disable-line
       if (j.c === 'pyi') {
         handlers[j.r]?.(j);
       } else {
         bridge.onMessage(j);
       }
     }
-  }
+  };
+  /**
+   * Handles the operation of reading a data stream.
+   *
+   * @param {string} data - The data stream to read.
+   * @param {Bridge} bridge - An instance of the Bridge class.
+   */
+  read = (data, bridge) => {
+    const d = String(data);
+    for (let i = 0; i < d.length; i++) {
+      if (d[i] === '\n') {
+        debug('py -> js', this.message);
+        this.handle_message(bridge);
+        this.message = '';
+      } else {
+        this.message += d[i];
+      }
+    }
+  };
+  /**
+   * Handles the end of data stream operations.
+   *
+   * IE, Flush the last line.
+   *
+   * @param {Bridge} bridge - An instance of the Bridge class.
+   */
+  end = (bridge)=>{
+    if (this.message.length > 0) {
+      debug('py -> js', this.message);
+      this.handle_message(bridge);
+    }
+  };
+}
+
+
+const ipc = new IPCClass(process);
+const bridge = new Bridge(ipc);
+
+process.stdin.on('data', (data) => {
+  ipc.read(data, bridge);
+});
+
+// flush last line
+process.stdin.on('end', () => {
+  ipc.end(bridge);
 });
 
 process.on('exit', () => {

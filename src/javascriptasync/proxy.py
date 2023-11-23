@@ -5,12 +5,12 @@ import time, threading, json, sys, os, traceback
 from typing import Any, Callable, Coroutine, Literal, Optional, Tuple, Union
 from . import config, json_patch
 
-from .errors import JavaScriptError, NoAsyncLoop
+from .errors import JavaScriptError, NoAsyncLoop,BridgeTimeout
 from .events import EventLoop
 
 
 from .util import generate_snowflake, SnowflakeMode
-from .logging import logs, log_warning, log_debug, log_info, print_path_depth
+from .core.jslogging import  log_warning, log_debug, log_info, print_path_depth
 
 
 class Executor:
@@ -34,7 +34,7 @@ class Executor:
         self.i = 0
         self.bridge = self.loop.pyi
 
-    def ipc(self, action, ffid, attr, args=None):
+    def ipc(self, action:str, ffid:int, attr:Any, args=None):
         """
         Interacts with JavaScript context based on specified actions.
 
@@ -66,10 +66,7 @@ class Executor:
             l = self.queue(r, {"r": r, "action": "keys", "ffid": ffid})
 
         if not l.wait(10):
-            if not self.conf.event_thread:
-                print(self.conf.dead)
-            print("Timed out", action, ffid, attr, repr(self.conf.event_thread))
-            raise Exception(f"Timed out accessing '{attr}'")
+            raise BridgeTimeout(f"Timed out accessing '{attr}'",action, ffid, attr)
         res, barrier = self.loop.get_response_from_id(r)
         barrier.wait()
         if "error" in res:
@@ -119,10 +116,8 @@ class Executor:
         try:
             await asyncio.wait_for(l.wait(), timeout)
         except asyncio.TimeoutError as time_exc:
-            if not self.conf.event_thread:
-                print(self.conf.dead)
-            print("Timed out", action, ffid, attr, repr(self.conf.event_thread))
-            raise asyncio.TimeoutError(f"Timed out accessing '{attr}'") from time_exc
+            
+            raise asyncio.TimeoutError(f"{ffid},{action}:Timed out accessing '{attr}'") from time_exc
 
         res, barrier = self.loop.get_response_from_id(r)
         barrier.wait()
@@ -156,7 +151,7 @@ class Executor:
         # in the future as an optimization we could skip the wait if not needed
         packet = {"r": callRespId, "action": action, "ffid": ffid, "key": attr, "args": args}
 
-        def ser(arg):
+        def __ser(arg):
             if hasattr(arg, "ffid"):
                 self.ctr += 1
                 return {"ffid": arg.ffid}
@@ -176,11 +171,11 @@ class Executor:
                 if (type(v) is int) or (type(v) is float) or (v is None) or (v is True) or (v is False):
                     flocals[k] = v
                 else:
-                    flocals[k] = ser(v)
+                    flocals[k] = __ser(v)
             packet["p"] = self.ctr
             payload = json.dumps(packet)
         else:
-            payload = json.dumps(packet, default=ser)
+            payload = json.dumps(packet, default=__ser)
             # A bit of a perf hack, but we need to add in the counter after we've already serialized ...
             payload = payload[:-1] + f',"p":{self.ctr}}}'
 
@@ -264,8 +259,7 @@ class Executor:
         try:
             await asyncio.wait_for(l.wait(), timeout)
         except asyncio.TimeoutError as time_exc:
-            if not self.conf.event_thread:
-                print(self.conf.dead)
+            
             raise asyncio.TimeoutError(
                 f"Call to '{attr}' timed out. Increase the timeout by setting the `timeout` keyword argument."
             ) from time_exc
@@ -360,10 +354,13 @@ class Executor:
         )
 
         if not l.wait(timeout):
-            if not self.conf.event_thread:
-                print(self.conf.dead)
-            raise Exception(
-                f"Call to '{attr}' timed out. Increase the timeout by setting the `timeout` keyword argument."
+            
+            raise BridgeTimeout(
+                f"Call to '{attr}' timed out.",
+
+                action=action,
+                ffid=ffid,
+                attr=attr
             )
         elapsed = time.time() - now
         log_debug(
@@ -608,11 +605,11 @@ class Proxy(object):
 
         log_debug("new Proxy init done: %s, %s,%s,%s,%s", exe, ffid, prop_ffid, prop_name, es6)
 
-    def _config(self):
+    def _config(self)->config.JSConfig:
         """Access the JSConfig object reference within the executor."""
         return self._exe.conf
 
-    def _loop(self):
+    def _loop(self)->EventLoop:
         """Access the EventLoop reference within the executor."""
         return self._exe.loop
 
@@ -633,7 +630,7 @@ class Proxy(object):
         """
         self._asyncmode = value
 
-    def _call(self, method, methodType, val):
+    def _call(self, method:str, methodType:str, val:Any):
         """
         Helper function for processing the result of a call.
 
@@ -960,12 +957,8 @@ class Proxy(object):
         Returns:
             Any: The attribute value.
         """
-        log_debug("proxy.get_attr start %s", attr)
-        if attr == "new":
-            return self._call(self._pname if self._pffid == self.ffid else "", "class", self._pffid)
-        methodType, val = self._exe.getProp(self._pffid, attr)
-        log_debug("proxy.get_attr %s, methodType: %s, val %s", attr, methodType, val)
-        return self._call(attr, methodType, val)
+        return self.get_attr(attr)
+
 
     def get_attr(self, attr):
         """
@@ -997,6 +990,7 @@ class Proxy(object):
         Returns:
             Any: The attribute value.
         """
+        return self.set_attr(name,value)
 
     def set_attr(self, name, value):
         """
@@ -1379,7 +1373,7 @@ class NodeOp:
         self,
         proxy: Proxy = None,
         prev=None,
-        op: Literal["get", "set", "call", "getitem", "setitem"] = None,
+        op: Literal["get", "set", "call", "getitem", "setitem","serialize"] = None,
         kwargs=None,
     ):
         self._proxy: Proxy = proxy
@@ -1414,6 +1408,8 @@ class NodeOp:
             return await proxy.get_item_a(**self._kwargs)
         if self._op == "setitem":
             return await proxy.set_item_a(**self._kwargs)
+        if self._op =="serialize":
+            return await proxy.get_dict_a(**self._kwargs)
         raise Exception(f"Invalid Operation {self._op}!")
 
     def __call__(self, *args, timeout=10, forceRefs=False, coroutine=False):

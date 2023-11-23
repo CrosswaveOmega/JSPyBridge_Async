@@ -1,8 +1,24 @@
-import os
+"""
+This module provides a command-line interface to install NPM packages 
+to the javascriptasync library as a whole or your current directory.
+
+Available commands are "clean", "update", "install", "uninstall", and "hybridize".
+The "clean" command is for clearing the package store.
+The "update" command updates the package store.
+The "install" command installs specified package(s) to the package store.
+The "uninstall" command uninstalls specified package(s) from the package store.
+
+The "hybridize" command has a mandatory argument "action" 
+which can take values 'reset', 'install', 'add', or 'update'.
+An additional argument "files" can be added if "action" is set to "add".
+
+If no function is specified in the arguments when running the script, 
+it will print the help menu to stderr.
+"""
+
 import sys
 import argparse
-import shutil
-from commands import (
+from .commands import (
     clean,
     update,
     install,
@@ -32,7 +48,7 @@ def main():
     uninstall_parser.set_defaults(func=uninstall)
 
     hybridize_parser = subparsers.add_parser("hybridize")
-    hybridize_parser.add_argument("action", choices=['reset', 'install', 'add'])
+    hybridize_parser.add_argument("action", choices=['reset', 'install', 'add','update'])
 
     if "add" in hybridize_parser.parse_args().action:
         hybridize_parser.add_argument("files", nargs='+')

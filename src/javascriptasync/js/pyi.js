@@ -143,9 +143,9 @@ const nextReq = () => generateSnowflake(nextReqId++);
  *  between JavaScript and Python.
  *
  * Properties:
- * {Object} com - an interprocess communication object.
+ * {IPCClass} com - an interprocess communication object.
  * {Object} jrefs - a ref map used so Python can call back JS APIs.
- * {Object} jsi - The main JavaScript Bridge object.
+ * {Bridge} jsi - The main JavaScript Bridge object.
  * {Array} freeable - stores items that can be garbage collected.
  * {Function} loop - creates intervals to manage tasks.
  * {FinalizationRegistry} finalizer - Registry for managing garbage collection.
@@ -157,8 +157,8 @@ class PyBridge {
    * Creates a new instance of PyBridge.
    *
    * @constructor
-   * @param {ipc} com - an interprocess communication object.
-   * @param {bridge} jsi - The main JavaScript Bridge object.
+   * @param {IPCClass} com - an interprocess communication object.
+   * @param {Bridge} jsi - The main JavaScript Bridge object.
    */
   constructor(com, jsi) {
     this.com = com;

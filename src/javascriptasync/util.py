@@ -2,8 +2,6 @@
 import enum
 import importlib.util
 
-# importing the system module
-import sys
 
 import time
 from typing import Union
@@ -13,6 +11,15 @@ MAX_SAFE_INTEGER = 0xFFFFFFFFFFFFF
 
 
 def haspackage(name: str):
+    """
+    Checks if a Python library exists.
+
+    Args:
+        name (str): The name of the Python library to check.
+
+    Returns:
+        bool: True if the library exists, False otherwise.
+    """
     # code to check if the library exists
     if (spec := importlib.util.find_spec(name)) is not None:
         return True

@@ -74,11 +74,17 @@ def add_packages_to_file(package_list, filename='nodemodules.txt'):
 def hybridize_dir():
     if os.path.isfile('nodemodules.txt'):
         with open("nodemodules.txt", "r", encoding='utf8') as file:
+            toinstall=[]
             for line in file:
-                print(f'installing {line}')
+                toinstall.append(line)
+            size=len(toinstall)
+            print(f"Installing {size} packages from {file.name}...")
+            for e, line in toinstall:
+                print(f'installing npm package {e}/{size}: {line}')
                 os.system(f"npm install {line.strip()}")
     else:
         print('No nodemodules.txt was detected!  ')
+
 def hybridize(args):
    
     if args.action == 'add':
@@ -89,7 +95,8 @@ def hybridize(args):
             os.remove('package_lock.json')
         if os.path.exists('node_modules'):
             shutil.rmtree('node_modules')
-        
+    elif args.action == 'update':
+        os.system("npm update")
     elif args.action =='install':
         print('hybridize me, captain.')
         hybridize_dir()

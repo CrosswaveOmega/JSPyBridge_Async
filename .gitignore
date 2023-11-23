@@ -4,6 +4,7 @@ __*__
 src/**/package.json
 package-lock.json
 *.egg-info
+*.puml
 ignoreme
 asyncjs.log
 dist
@@ -22,3 +23,9 @@ testevent.js
 classesCUST.dot
 .eslintrc.json
 package.json
+classes.puml
+packages.puml
+radonout.txt
+radonoutraw.txt
+out.txt
+src/metest.py

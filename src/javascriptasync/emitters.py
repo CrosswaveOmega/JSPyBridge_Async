@@ -5,7 +5,7 @@ import asyncio
 from typing import Any, Coroutine, Optional, Callable, Union
 from . import config
 from .config import Config
-from .logging import log_print, logs
+from .core.jslogging import log_print, logs
 from .proxy import EventEmitterProxy
 
 import threading, inspect, time, atexit, os, sys

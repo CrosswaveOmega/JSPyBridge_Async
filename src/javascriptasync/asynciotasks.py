@@ -1,6 +1,6 @@
 import asyncio, time, sys
-from .abc import *
-from .logging import logs
+from .core.abc import ThreadTaskStateBase
+from .core.jslogging import logs
 
 
 class TaskStateAsync(ThreadTaskStateBase):

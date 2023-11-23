@@ -1,16 +1,27 @@
 from __future__ import annotations
-import asyncio
-import threading, subprocess, json, time, signal
-import atexit, os, sys
+# import asyncio
+import threading
+import subprocess
+import json
+import time
+# import signal
+import atexit
+import os
+import sys
 from typing import Any, Dict, List, TextIO, Union
 from . import config
-from .logging import logs, log_print
+from .core.jslogging import (
+    log_print,
+    log_debug,
+    log_info,
+    log_error,
+    log_critical
+    )
 from .util import haspackage
 from .errors import InvalidNodeJS
 
 ISCLEAR = False
 ISNOTEBOOK = False
-
 try:
     if haspackage("IPython"):
         from IPython import get_ipython
@@ -18,13 +29,14 @@ try:
         if "COLAB_GPU" in os.environ:
             ISCLEAR = True
         else:
-            shell = get_ipython().__class__.__name__
-            if shell == "ZMQInteractiveShell":
+            if (get_ipython().__class__.__name__) == "ZMQInteractiveShell":
                 ISNOTEBOOK = True
     else:
         ISCLEAR = False
-except Exception as s:
+except (ImportError, KeyError, AttributeError) as pre_error:
+    log_error(pre_error)
     ISCLEAR = False
+
 # The "root" interface to JavaScript with FFID 0
 
 
@@ -89,15 +101,8 @@ class ConnectionClass:
         if self.is_notebook() or self.modified_stdout:
             self.notebook = True
             self.stdout = subprocess.PIPE
-        # I don't want to forcefully change os env settings.
-        # if self.supports_color():
-        #     os.environ["FORCE_COLOR"] = "1"
-        # else:
-        #     os.environ["FORCE_COLOR"] = "0"
-        # If child process was killed before parent.
-        self.earlyterm = False
 
-        # Make sure our child process is killed if the parent one is exiting
+        self.earlyterm = False
 
         atexit.register(self.stop)
 
@@ -112,8 +117,10 @@ class ConnectionClass:
             output = subprocess.check_output([self.NODE_BIN, "-v"])
             print("NodeJS is installed: Current Version Node.js version:", output.decode().strip())
         except OSError as e:
-            print("COULD NOT FIND A VALID NODE.JS INSTALLATION!  PLEASE INSTALL NODE.JS FROM https://nodejs.org/  ")
-            raise InvalidNodeJS("Node.js is not installed!") from e
+            errormessage="COULD NOT FIND A VALID NODE.JS INSTALLATION!"+\
+                  "PLEASE INSTALL NODE.JS FROM https://nodejs.org/  "
+            log_critical(errormessage)
+            raise InvalidNodeJS(errormessage) from e
 
     def supports_color(self) -> bool:
         """
@@ -156,7 +163,7 @@ class ConnectionClass:
                     continue
                 try:
                     d = json.loads(line)
-                    logs.debug("%s,%d,%s", "connection: [js -> py]", int(time.time() * 1000), line)
+                    log_debug("%s,%d,%s", "connection: [js -> py]", int(time.time() * 1000), line)
                     ret.append(d)
                 except ValueError as v_e:
                     print(v_e, "[JSE]", line)
@@ -176,19 +183,17 @@ class ConnectionClass:
                 j = obj + "\n"
             else:
                 j = json.dumps(obj) + "\n"
-            logs.debug("connection: %s,%d,%s", "[py -> js]", int(time.time() * 1000), j)
+            log_debug("connection: %s,%d,%s", "[py -> js]", int(time.time() * 1000), j)
 
             # log_print('procstatus',self.proc)
             if not self.proc:
                 self.sendQ.append(j.encode())
                 continue
             try:
-                # Iterate over all attributes of the instance
-                # for attribute, value in vars(self.proc).items():  log_print(f"Attribute: {attribute}, Value: {value}")
                 self.proc.stdin.write(j.encode())
                 self.proc.stdin.flush()
-            except Exception as error:
-                logs.critical(error, exc_info=True)
+            except (IOError,BrokenPipeError)  as error:
+                log_critical(error, exc_info=True)
                 self.stop()
                 break
 
@@ -205,6 +210,31 @@ class ConnectionClass:
         self.stderr_lines.clear()
         return ret
 
+    def startup_node_js(self):
+        try:
+            if os.name == "nt" and "idlelib.run" in sys.modules:
+                log_debug("subprossess mode s")
+                self.proc = subprocess.Popen(
+                    [self.NODE_BIN, self.dn + "/js/bridge.js"],
+                    stdin=subprocess.PIPE,
+                    stdout=self.stdout,
+                    stderr=subprocess.PIPE,
+                    creationflags=subprocess.CREATE_NO_WINDOW,
+                )
+            else:
+                self.proc = subprocess.Popen(
+                    [self.NODE_BIN, self.dn + "/js/bridge.js"],
+                    stdin=subprocess.PIPE,
+                    stdout=self.stdout,
+                    stderr=subprocess.PIPE,
+                )
+
+        except subprocess.SubprocessError as err:
+            log_critical(
+                "--====--\t--====--\n\nBridge failed to spawn JS process!\n\nDo you have Node.js 16 or newer installed? Get it at https://nodejs.org/\n\n--====--\t--====--"
+            )
+            self.stop()
+            raise err
     def com_io(self):
         """
         Handle communication with the node.js process.
@@ -221,31 +251,9 @@ class ConnectionClass:
             Exception: If there's an issue spawning the JS process or if any
             exceptions occur during communication.
         """
-        try:
-            if os.name == "nt" and "idlelib.run" in sys.modules:
-                logs.debug("subprossess mode s")
-                self.proc = subprocess.Popen(
-                    [self.NODE_BIN, self.dn + "/js/bridge.js"],
-                    stdin=subprocess.PIPE,
-                    stdout=self.stdout,
-                    stderr=subprocess.PIPE,
-                    creationflags=subprocess.CREATE_NO_WINDOW,
-                )
-            else:
-                self.proc = subprocess.Popen(
-                    [self.NODE_BIN, self.dn + "/js/bridge.js"],
-                    stdin=subprocess.PIPE,
-                    stdout=self.stdout,
-                    stderr=subprocess.PIPE,
-                )
-
-        except Exception as e:
-            print(
-                "--====--\t--====--\n\nBridge failed to spawn JS process!\n\nDo you have Node.js 16 or newer installed? Get it at https://nodejs.org/\n\n--====--\t--====--"
-            )
-            self.stop()
-            raise e
-
+        
+            
+        self.startup_node_js()
         for send in self.sendQ:
             self.proc.stdin.write(send)
         self.proc.stdin.flush()
@@ -279,7 +287,7 @@ class ConnectionClass:
         """
         Start the communication thread.
         """
-        logs.info("ConnectionClass.com_thread opened")
+        log_info("ConnectionClass.com_thread opened")
         self.com_thread = threading.Thread(target=self.com_io, args=(), daemon=True)
         self.com_thread.start()
 

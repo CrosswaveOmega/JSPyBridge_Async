@@ -12,7 +12,7 @@ from .util import generate_snowflake, SnowflakeMode
 from . import proxy, events, config
 from .errors import JavaScriptError, getErrorMessage, NoAsyncLoop
 from weakref import WeakValueDictionary
-from .logging import logs, log_print
+from .core.jslogging import log_print, log_debug
 
 
 def python(method: str) -> types.ModuleType:
@@ -114,7 +114,7 @@ class PyInterface:
 
     """
 
-    def __init__(self, config_obj: config.JSConfig, ipc, exe=None):
+    def __init__(self, config_obj: config.JSConfig, ipc:events.EventLoop, exe=None):
         """Initalize a new PYInterface.
 
         Args:
@@ -136,7 +136,7 @@ class PyInterface:
         self.send_inspect = True
         self.current_async_loop = None
 
-        # self.executor:proxy.Executor = exe
+        self.executor:proxy.Executor = exe
 
     def q(self, r, key, val, sig=""):
         self.ipc.queue_payload({"c": "pyi", "r": r, "key": key, "val": val, "sig": sig})
@@ -238,11 +238,11 @@ class PyInterface:
         # precedence in a dict. However if we're only getting objects, we can
         # first try bracket for dicts, then attributes.
         if invoke:
-            logs.debug("INVOKING MODE %s,%s,%s,%s", v, type(v), str(repr(keys)), str(repr(args)))
+            log_debug("INVOKING MODE %s,%s,%s,%s", v, type(v), str(repr(keys)), str(repr(args)))
             for key in keys:
                 t = getattr(v, str(key), None)
 
-                logs.debug("GET MODE %s,%s,%s,%s", v, type(v), str(key), str(args))
+                log_debug("GET MODE %s,%s,%s,%s", v, type(v), str(key), str(args))
                 if t:
                     v = t
                 elif hasattr(v, "__getitem__"):
@@ -280,7 +280,7 @@ class PyInterface:
             else:
                 if inspect.isclass(v):
                     was_class = True
-                logs.debug("INVOKING %s,%s,%s", v, type(v), was_class)
+                log_debug("INVOKING %s,%s,%s", v, type(v), was_class)
                 v = v(*args, **kwargs)
         typ = type(v)
         if typ is str:
@@ -323,8 +323,8 @@ class PyInterface:
             Any: The value of the property.
 
         """
-        o = self.call(r, ffid, keys, [], {}, invoke=False)
-        return o
+        self.call(r, ffid, keys, [], {}, invoke=False)
+        return None
 
     def inspect(self, r: int, ffid: int, keys: List, args: Tuple):
         """Inspect an object and send the representation to NodeJS.
@@ -354,14 +354,14 @@ class PyInterface:
             args (List[int]): List of foreign object reference IDs to free.
 
         """
-        logs.debug("free: %s, %s, %s, %s", r, ffid, key, args)
-        logs.debug(str(self))
+        log_debug("free: %s, %s, %s, %s", r, ffid, key, args)
+        log_debug(str(self))
         for i in args:
             if i not in self.m:
                 continue
-            logs.debug(f"purged {i}")
+            log_debug(f"purged {i}")
             del self.m[i]
-        logs.debug(str(self))
+        log_debug(str(self))
 
     def make_signature(self, what: Any) -> str:
         """Generate a signature for an object.
@@ -522,6 +522,6 @@ class PyInterface:
             j (Dict[str, Any]): The incoming data as a dictionary.
 
         """
-        logs.debug("PYI, %s", j)
+        log_debug("PYI, %s", j)
         # print(j)
         return self.onMessage(j["r"], j["action"], j["ffid"], j["key"], j["val"])

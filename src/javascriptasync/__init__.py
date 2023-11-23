@@ -1,9 +1,9 @@
 # This file contains all the exposed modules
 import asyncio
 from typing import Any, Coroutine, Optional, Callable, Union
-from . import config
+
 from .config import Config
-from .logging import log_print, logs
+from .core.jslogging import log_print, logs
 from .proxy import Proxy
 
 import threading, inspect, time, atexit, os, sys
@@ -76,8 +76,8 @@ def require(name: str, version: Optional[str] = None) -> Proxy:
         except Exception:
             # On Notebooks, the frame info above does not exist, so assume the CWD as caller
             calling_dir = os.getcwd()
-
-    return conf.global_jsi.require(name, version, calling_dir, timeout=900)
+    require=conf.global_jsi.get('require')
+    return require.call_s(name, version, calling_dir, timeout=900)
 
 
 async def require_a(name: str, version: Optional[str] = None, amode: bool = False) -> Proxy:
@@ -116,7 +116,7 @@ async def require_a(name: str, version: Optional[str] = None, amode: bool = Fals
         except Exception:
             # On Notebooks, the frame info above does not exist, so assume the CWD as caller
             calling_dir = os.getcwd()
-    coro = conf.global_jsi.require(name, version, calling_dir, timeout=900, coroutine=True)
+    coro = conf.global_jsi.get('require').call_a(name, version, calling_dir, timeout=900, coroutine=True)
     # req=conf.global_jsi.require
     module = await coro
     if amode:
@@ -201,7 +201,9 @@ def eval_js(js: str, timeout: int = 10) -> Any:
         for local in frame.f_back.f_locals:
             if not local.startswith("__"):
                 local_vars[local] = frame.f_back.f_locals[local]
-        rv = conf.global_jsi.evaluateWithContext(js, local_vars, timeout=timeout, forceRefs=True)
+        context=conf.global_jsi.get_s("evaluateWithContext")
+        
+        rv = context.call_s(js, local_vars, timeout=timeout, forceRefs=True)
     finally:
         del frame
     return rv
@@ -236,7 +238,10 @@ async def eval_js_a(js: str, timeout: int = 10, as_thread: bool = False) -> Any:
             if not local.startswith("__"):
                 local_vars[local] = frame.f_back.f_locals[local]
         if not as_thread:
-            rv = conf.global_jsi.evaluateWithContext(js, local_vars, timeout=timeout, forceRefs=True, coroutine=True)
+            context=conf.global_jsi.get_s("evaluateWithContext")
+        
+            rv = context.call_s(js, local_vars, timeout=timeout, forceRefs=True, coroutine=True)
+            #rv = conf.global_jsi.evaluateWithContext(js, local_vars, timeout=timeout, forceRefs=True, coroutine=True)
         else:
             rv = asyncio.to_thread(conf.global_jsi.evaluateWithContext, js, local_vars, timeout=timeout, forceRefs=True)
     finally:

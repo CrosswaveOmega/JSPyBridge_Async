@@ -1,8 +1,9 @@
-from .abc import *
+
 import re
 import sys
 import traceback
-from .logging import logs
+from .core.abc import BaseError
+from .core.jslogging import logs
 from typing import List, Optional, Tuple
 from .util import haspackage
 
@@ -45,6 +46,15 @@ class InvalidNodeJS(BaseError):
 
     """
 
+class BridgeTimeout(TimeoutError):
+    """
+    Raised if a request times out.
+    """
+    def __init__(self, message, action, ffid, attr):
+        self.message = message
+        self.action = action
+        self.ffid = ffid
+        self.attr = attr
 
 class Chalk:
     """

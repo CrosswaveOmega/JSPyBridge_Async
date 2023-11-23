@@ -1,42 +1,54 @@
+# Import the required libraries/modules
 import asyncio
-
 import re
-
-from javascriptasync import init_js, require_a, eval_js_a, get_globalThis
-
-init_js()
+from javascriptasync import init_js_a, require_a, eval_js_a
 
 
-async def read_article_async():
-    url = "https://en.wikipedia.org/wiki/F-Zero"
+# Define an asynchronous function to read an article
+async def read_article_async(url):
+    # Initialize the Javascript async runtime
+    await init_js_a()
 
+    # Import the @mozilla/readability library from Javascript
     readability = await require_a("@mozilla/readability")
-    read_webpage_plain = (await require_a("./readwebpage.js")).read_webpage_plain
-    jsdom = await require_a("jsdom")
-    TurndownService = await require_a("turndown")
 
+    # Import the read_webpage_plain function from a local Javascript file
+    read_webpage_plain = (await require_a("./readwebpage.js")).read_webpage_plain
+
+    # Import the jsdom library from Javascript
+    jsdom = await require_a("jsdom")
+
+    # Create a python object with variable as the provided URL
     pythonObject = {"var": url}
+
+    # Define a Javascript code snippet
     out = """
     let urla=await pythonObject.var
-    
-    const turndownService = new TurndownService({ headingStyle: 'atx' });
-    let result=await read_webpage_plain(urla,readability,jsdom,turndownService);
+    let result=await read_webpage_plain(urla,readability,jsdom);
     return [result[0],result[1]];
     """
 
-    print(out)
-
+    # Run the Javascript code snippet and catch the result, waits at most 30 seconds for the result
     rsult = await eval_js_a(out, timeout=30)
 
+    # Deconstruct the result into output and header
     output, header = rsult[0], rsult[1]
-    simplified_text = output.strip()
-    simplified_text = re.sub(r"(\n){4,}", "\n\n\n", simplified_text)
-    simplified_text = re.sub(r"\n\n", " ", simplified_text)
-    simplified_text = re.sub(r" {3,}", "  ", simplified_text)
-    simplified_text = simplified_text.replace("\t", "")
-    simplified_text = re.sub(r"\n+(\s*\n)*", "\n", simplified_text)
+
+    # Turn the header into a python dictionary
+    await header.get_dict_a()
+
+    # Cleaning the output text
+    simplified_text = output.strip()  # Removes leading/trailing white spaces
+
+    # Print the cleaned text
     print(simplified_text)
-    return [simplified_text, header]
+
+    # Return a list of the cleaned text and the article's title
+    return [simplified_text, header.get('title')]
 
 
-asyncio.run(read_article_async())
+# URL of the article to be read
+URL="https://en.wikipedia.org/wiki/Python_(programming_language)"
+
+# Running the async function to read the article from the given url
+asyncio.run(read_article_async(URL))
