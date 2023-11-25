@@ -268,7 +268,7 @@ def AsyncThread(start=False):
         fn.is_async_task = True
         t = conf.event_loop.newTaskThread(fn)
         if start:
-            t.start()
+            t.start_thread()
 
     return decor
 

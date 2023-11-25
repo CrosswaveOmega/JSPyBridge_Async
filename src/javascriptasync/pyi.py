@@ -114,13 +114,11 @@ class PyInterface:
 
     """
 
-    def __init__(self, config_obj: config.JSConfig, ipc:events.EventLoop, exe=None):
+    def __init__(self, config_obj: config.JSConfig):
         """Initalize a new PYInterface.
 
         Args:
             config_obj (config.JSConfig): Reference to the active JSConfig object.
-            ipc(EventLoop): Reference to the event loop.
-            exe: Unused.
 
         """
         self.m = {0: {"python": python, "fileImport": fileImport, "Iterate": Iterate}}
@@ -129,14 +127,14 @@ class PyInterface:
         self.cur_ffid = 10000
         self.ffid_param = 10000
         self.config = config_obj
-        self.ipc: events.EventLoop = ipc
+        self.ipc: events.EventLoop = self.config.get_event_loop()
         # This toggles if we want to send inspect data for console logging. It's auto
         # disabled when a for loop is active; use `repr` to request logging instead.
         self.m[0]["sendInspect"] = lambda x: setattr(self, "send_inspect", x)
         self.send_inspect = True
         self.current_async_loop = None
 
-        self.executor:proxy.Executor = exe
+        self.executor:proxy.Executor = None
 
     def q(self, r, key, val, sig=""):
         self.ipc.queue_payload({"c": "pyi", "r": r, "key": key, "val": val, "sig": sig})
@@ -145,15 +143,22 @@ class PyInterface:
         """Return a string representation of the PyInterface object."""
         res = str(self.m)
         return res
+    
+    def set_executor(self,exe:proxy.Executor):
+        """Set the current executor object.
 
-    @property
-    def executor(self):
-        """Get the executor object currently initalized in JSConfig."""
-        return self.config.executor
+        Args:
+            exe (proxy.Executor): The new executor object to be set.
+        """
+        self.executor=exe
+    # @property
+    # def executor(self):
+    #     """Get the executor object currently initalized in JSConfig."""
+    #     return self.config.executor
 
-    @executor.setter
-    def executor(self, executor):
-        pass
+    # @executor.setter
+    # def executor(self, executor):
+    #     pass
 
     def assign_ffid(self, what: Any):
         """Assign a new FFID (foreign object reference id) for an object.
@@ -415,6 +420,22 @@ class PyInterface:
             setattr(v, on, val)
         self.q(r, "void", self.cur_ffid)
 
+    def json_to_python(self,json_input,lookup_key):
+        '''Convert special JSON objects to Python methods'''
+        iterator=None
+        if isinstance(json_input, dict):
+            iterator=json_input.items()
+        elif isinstance(json_input, list):
+            iterator=  enumerate(json_input)
+        else: 
+            return
+        for k, v in iterator:
+            if isinstance(v, dict) and (lookup_key in v):
+                ffid = v[lookup_key]
+                json_input[k] = proxy.Proxy(self.executor, ffid)
+            else:
+                self.json_to_python(v, lookup_key)
+
     def pcall(self, r: int, ffid: int, key: str, args: Tuple, set_attr: bool = False):
         """Call a method or set a value of an object.
 
@@ -429,7 +450,20 @@ class PyInterface:
 
         # Convert special JSON objects to Python methods
         def process(json_input, lookup_key):
+            iterator=None
             if isinstance(json_input, dict):
+                iterator=json_input.items()
+            elif isinstance(json_input, list):
+                iterator=  enumerate(json_input)
+            else: 
+                return
+            for k, v in iterator:
+                if isinstance(v, dict) and (lookup_key in v):
+                    ffid = v[lookup_key]
+                    json_input[k] = proxy.Proxy(self.executor, ffid)
+                else:
+                    process(v, lookup_key)
+            '''
                 for k, v in json_input.items():
                     if isinstance(v, dict) and (lookup_key in v):
                         ffid = v[lookup_key]
@@ -443,8 +477,9 @@ class PyInterface:
                         json_input[k] = proxy.Proxy(self.executor, ffid)
                     else:
                         process(v, lookup_key)
+            '''
 
-        process(args, "ffid")
+        self.json_to_python(args, "ffid")
         pargs, kwargs = args
         if set_attr:
             self.Set(r, ffid, key, pargs)

@@ -6,6 +6,7 @@ import asyncio
 import os
 from .proxy import Proxy, Executor
 from .events import EventLoop
+from .pyi import PyInterface
 from .core.jslogging import log_print, logs, print_path
 from .errors import NoConfigInitalized
 import threading, inspect, time, atexit, sys
@@ -43,6 +44,7 @@ class JSConfig(object):
         self.event_loop: EventLoop = None
         self.event_thread: threading.Thread = None
         self.profiler=None
+        self.pyi:PyInterface=None
         self.executor: Executor = None
         self.global_jsi: Proxy = None
         self.fast_mode: bool = False
@@ -55,19 +57,30 @@ class JSConfig(object):
         This method initializes the event loop, executor, and global_jsi for JavaScript execution.
         """
         self.event_loop: EventLoop = EventLoop(self)
+        self.pyi:PyInterface=PyInterface(self)
+        self.executor: Executor = Executor(self, self.event_loop)
+        
+        self.pyi.set_executor(self.executor)
+        self.event_loop.start_connection()
         self.event_thread: threading.Thread = threading.Thread(target=self.event_loop.loop, args=(), daemon=True)
         self.event_thread.start()
 
-        self.executor: Executor = Executor(self, self.event_loop)
+        
         # # The "root" interface to JavaScript with FFID(Foreign Object Reference ID) 0
         self.global_jsi: Proxy = Proxy(self.executor, 0)
         self.fast_mode: bool = False
         self.node_emitter_patches: bool = False
         atexit.register(self.event_loop.on_exit)
 
+    def get_event_loop(self):
+        return self.event_loop
+
+    def get_pyi(self):
+        return self.pyi
+
     def set_asyncio_loop(self, loop: asyncio.AbstractEventLoop):
-        if self.event_loop:
-            self.event_loop.pyi.current_async_loop = loop
+        if self.pyi and self.event_loop:
+            self.pyi.current_async_loop = loop
 
     def check_node_patches(self):
         """

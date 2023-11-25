@@ -50,6 +50,7 @@ function printError(
     failedCall, jsErrorline, jsStacktrace, pyErrorline, pyStacktrace) {
   const lines = [];
   const log = (...sections) => lines.push(sections.join(' '));
+  console.log('FAILAT', jsErrorline, jsStacktrace, pyErrorline, pyStacktrace);
   log('Python:',
       chalk.boldRed(' Python Error '),
       `JavaScript attempt to call '${
@@ -73,7 +74,7 @@ function printError(
       log(' ', chalk.dim(at));
     }
   }
-  log('Bridge', chalk.bold(pyErrorline));
+  log('Bridge PY:', chalk.bold(pyErrorline));
   return lines;
 }
 

@@ -53,7 +53,7 @@ class ConnectionClass:
         modified_stdout (bool): True if stdout has been altered in some way, False otherwise.
         notebook (bool): True if running in a Jupyter notebook, False otherwise.
         NODE_BIN (str): The path to the Node.js binary.
-        dn (str): The directory containing this file.
+        directory_name (str): The directory containing this file.
         proc (subprocess.Popen): The subprocess for running JavaScript.
         com_thread (threading.Thread): The thread for handling communication with JavaScript.
         stdout_thread (threading.Thread): The thread for reading standard output.
@@ -87,7 +87,7 @@ class ConnectionClass:
         self.NODE_BIN = os.environ.get("NODE_BIN") if hasattr(os.environ, "NODE_BIN") else "node"
         self.check_nodejs_installed()
 
-        self.dn = os.path.dirname(__file__)
+        self.directory_name:str = os.path.dirname(__file__)
         self.proc: subprocess.Popen = None
         self.com_thread: threading.Thread = None
         self.stdout_thread: threading.Thread = None
@@ -215,7 +215,7 @@ class ConnectionClass:
             if os.name == "nt" and "idlelib.run" in sys.modules:
                 log_debug("subprossess mode s")
                 self.proc = subprocess.Popen(
-                    [self.NODE_BIN, self.dn + "/js/bridge.js"],
+                    [self.NODE_BIN, self.directory_name + "/js/bridge.js"],
                     stdin=subprocess.PIPE,
                     stdout=self.stdout,
                     stderr=subprocess.PIPE,
@@ -223,7 +223,7 @@ class ConnectionClass:
                 )
             else:
                 self.proc = subprocess.Popen(
-                    [self.NODE_BIN, self.dn + "/js/bridge.js"],
+                    [self.NODE_BIN, self.directory_name + "/js/bridge.js"],
                     stdin=subprocess.PIPE,
                     stdout=self.stdout,
                     stderr=subprocess.PIPE,

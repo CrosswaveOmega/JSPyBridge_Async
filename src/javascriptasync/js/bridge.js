@@ -357,7 +357,7 @@ class Bridge {
    * @param {integer} r - a request sender identifier
    * @param {Array} args - function arguments
    */
-  process(r, args) {
+  make_python_proxys(r, args) {
     const made = {};
     let madeCount = 0;
 
@@ -405,7 +405,7 @@ class Bridge {
     // console.log('onMessage!',  r, action, p, ffid, key, args)
     try {
       if (p) {
-        this.process(r + 1, args);
+        this.make_python_proxys(r + 1, args);
       }
       await this[action](r, ffid, key, args);
     } catch (e) {

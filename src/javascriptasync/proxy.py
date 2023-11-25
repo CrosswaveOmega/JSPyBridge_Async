@@ -8,10 +8,10 @@ from . import config, json_patch
 from .errors import JavaScriptError, NoAsyncLoop,BridgeTimeout
 from .events import EventLoop
 
-
+#from .config import JSConfig
 from .util import generate_snowflake, SnowflakeMode
 from .core.jslogging import  log_warning, log_debug, log_info, print_path_depth
-
+from .pyi import PyInterface
 
 class Executor:
     """
@@ -19,20 +19,21 @@ class Executor:
     Python to JavaScript. This is also used by the bridge to call Python from Node.js.
 
     Attributes:
-        conf (config.JSConfig): Reference to the active JSConfig object.
+        config (JSConfig): Reference to the active JSConfig object.
         loop (EventLoop): The event loop for handling JavaScript events.
         queue (callable): shortcut to EventLoop.queue_request
         i (int): A unique id for generating request ids.
-        self.bridge(PyInterface): shortcut to EventLoop.pyi
+        self.bridge(PyInterface): shortcut to Config.pyi
     """
 
     def __init__(self, config_obj: config.JSConfig, loop: EventLoop):
-        self.conf = config_obj
-        self.loop = loop
-        loop.pyi.executor = self
-        self.queue = loop.queue_request
+        self.config:config.JSConfig = config_obj
+        self.loop:EventLoop = loop
+        
+        #self.queue = loop.queue_request
         self.i = 0
-        self.bridge = self.loop.pyi
+        self.bridge:PyInterface = config_obj.get_pyi()
+    
 
     def ipc(self, action:str, ffid:int, attr:Any, args=None):
         """
@@ -53,17 +54,17 @@ class Executor:
         r = generate_snowflake(self.i, SnowflakeMode.pyrid)  # unique request ts, acts as ID for response
         l = None  # the lock
         if action == "get":  # return obj[prop]
-            l = self.queue(r, {"r": r, "action": "get", "ffid": ffid, "key": attr})
+            l = self.loop.queue_request(r, {"r": r, "action": "get", "ffid": ffid, "key": attr})
         if action == "init":  # return new obj[prop]
-            l = self.queue(r, {"r": r, "action": "init", "ffid": ffid, "key": attr, "args": args})
+            l = self.loop.queue_request(r, {"r": r, "action": "init", "ffid": ffid, "key": attr, "args": args})
         if action == "inspect":  # return require('util').inspect(obj[prop])
-            l = self.queue(r, {"r": r, "action": "inspect", "ffid": ffid, "key": attr})
+            l = self.loop.queue_request(r, {"r": r, "action": "inspect", "ffid": ffid, "key": attr})
         if action == "serialize":  # return JSON.stringify(obj[prop])
-            l = self.queue(r, {"r": r, "action": "serialize", "ffid": ffid})
+            l = self.loop.queue_request(r, {"r": r, "action": "serialize", "ffid": ffid})
         if action == "set":
-            l = self.queue(r, {"r": r, "action": "set", "ffid": ffid, "key": attr, "args": args})
+            l = self.loop.queue_request(r, {"r": r, "action": "set", "ffid": ffid, "key": attr, "args": args})
         if action == "keys":
-            l = self.queue(r, {"r": r, "action": "keys", "ffid": ffid})
+            l = self.loop.queue_request(r, {"r": r, "action": "keys", "ffid": ffid})
 
         if not l.wait(10):
             raise BridgeTimeout(f"Timed out accessing '{attr}'",action, ffid, attr)
@@ -392,6 +393,8 @@ class Executor:
         Returns:
             tuple: The response key and value.
         """
+        
+        #print("getprop","get", ffid, method)
         resp = self.ipc("get", ffid, method)
         return resp["key"], resp["val"]
 
@@ -453,6 +456,7 @@ class Executor:
         Returns:
             tuple: The response key and value.
         """
+        #print("PROP",ffid, "call", method, args, timeout, forceRefs)
         resp = self.pcall(ffid, "call", method, args, timeout=timeout, forceRefs=forceRefs)
         return resp
 
@@ -590,7 +594,7 @@ class Proxy(object):
             es6 (bool, optional): ES6 class flag. Defaults to False.
 
         """
-        log_debug("new Proxy: %s, %s,%s,%s,%s", exe, ffid, prop_ffid, prop_name, es6)
+        log_info("new Proxy: %s, %s,%s,%s,%s", exe, ffid, prop_ffid, prop_name, es6)
         self.ffid = ffid
         self._exe: Executor = exe
         self._ix = 0
@@ -607,7 +611,7 @@ class Proxy(object):
 
     def _config(self)->config.JSConfig:
         """Access the JSConfig object reference within the executor."""
-        return self._exe.conf
+        return self._exe.config
 
     def _loop(self)->EventLoop:
         """Access the EventLoop reference within the executor."""
@@ -1249,13 +1253,12 @@ class EventEmitterProxy(Proxy):
             Callable: the listener arg passed in, for the @On Decorator
 
         """
-        conf = self._config()
+        config = self._config()
 
-        print("SUPER PROXY ON")
         # Once Colab updates to Node 16, we can remove this.
         # Here we need to manually add in the `this` argument for consistency in Node versions.
         # In JS we could normally just bind `this` but there is no bind in Python.
-        if conf.node_emitter_patches:
+        if config.node_emitter_patches:
 
             def handler(*args, **kwargs):
                 listener(self, *args, **kwargs)
@@ -1269,7 +1272,7 @@ class EventEmitterProxy(Proxy):
         # emitter.on(event, listener)
         self.get("on").call_s(event, listener)
         log_info(
-            "On for: emitter %s, event %s, function %s, iffid %s", "s", event, listener, getattr(listener, "iffid")
+            "On for: emitter %s, event %s, function %s, iffid %s", self, event, listener, getattr(listener, "iffid")
         )
 
         # Persist the FFID for this callback object so it will get deregistered properly.
@@ -1278,7 +1281,7 @@ class EventEmitterProxy(Proxy):
         setattr(listener, "ffid", ffid)
 
         self._loop().callbacks[ffid] = listener
-        print("cleared on.")
+
         return listener
 
     def off(self, event: str, listener: Union[Callable, Coroutine]):
@@ -1295,7 +1298,9 @@ class EventEmitterProxy(Proxy):
 
                 off(myEmitter, 'increment', handleIncrement)
         """
-        print("SUPER PROXY OFF")
+        log_info(
+            "Off for: emitter %s, event %s, function %s", self, event, listener
+        )
         self.get("off").call_s(event, listener)
 
         del self._loop().callbacks[getattr(listener, "ffid")]
@@ -1314,7 +1319,9 @@ class EventEmitterProxy(Proxy):
 
                 off(myEmitter, 'increment', handleIncrement)
         """
-        print("SUPER PROXY OFF")
+        log_info(
+            "Async Off for: emitter %s, event %s, function %s", self, event, listener
+        )
         await self.get_a("off").call_a(event, listener)
 
         del self._loop().callbacks[getattr(listener, "ffid")]
@@ -1332,16 +1339,18 @@ class EventEmitterProxy(Proxy):
 
         """
         print("SUPER PROXY ONCE")
-        conf = self._config()
+        config = self._config()
         i = hash(listener)
 
         def handler(*args, **kwargs):
-            if conf.node_emitter_patches:
+            if config.node_emitter_patches:
                 listener(self, *args, **kwargs)
             else:
                 listener(*args, **kwargs)
-            del conf.event_loop.callbacks[i]
-
+            del config.event_loop.callbacks[i]
+        log_info(
+            "once for: emitter %s, event %s, function %s", self, event, listener
+        )
         output = self.get("once").call_s(event, listener)
 
         self._loop().callbacks[i] = handler
@@ -1361,8 +1370,8 @@ class NodeOp:
     of each returned proxy from the bottom up.
 
     Attributes:
-        _proxy (Proxy, optional): The Proxy object associated with this Node operation.
-        _prev (NodeOp, optional): The previous NodeOp in the operation stack.  None if it's the root node.
+        _proxy (Proxy): The Proxy object associated with this Node operation.
+        _prev (NodeOp): The previous NodeOp in the operation stack.  None if it's the root node.
         _op (str, optional): The type of operation, such as 'get', 'set', or 'call'.
         _depth (int): The depth of this NodeOp chain
         _kwargs (dict, optional): The keyword arguments for the operation.
@@ -1372,7 +1381,7 @@ class NodeOp:
     def __init__(
         self,
         proxy: Proxy = None,
-        prev=None,
+        prev:NodeOp=None,
         op: Literal["get", "set", "call", "getitem", "setitem","serialize"] = None,
         kwargs=None,
     ):
