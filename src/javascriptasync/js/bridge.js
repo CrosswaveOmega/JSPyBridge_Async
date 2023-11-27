@@ -131,6 +131,7 @@ class Bridge {
   ffidinc() {
     const snow_ffid = generateSnowflake(++this.lastadd, SnowflakeMode.jsffid);
     this.ffid = snow_ffid;
+    // console.log('ffid is now:', snow_ffid);
     return snow_ffid;
   }
 

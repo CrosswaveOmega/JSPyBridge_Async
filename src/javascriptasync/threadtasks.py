@@ -1,4 +1,3 @@
-
 from __future__ import annotations
 
 import time, threading, json, sys
@@ -11,10 +10,11 @@ from typing import Callable
 from .core.abc import (
     ThreadTaskStateBase,
 )
-from .core.jslogging import(
+from .core.jslogging import (
     log_debug,
     log_print,
 )
+
 
 class ThreadState(ThreadTaskStateBase):
     """
@@ -47,7 +47,8 @@ class ThreadState(ThreadTaskStateBase):
             # Will remove when I find something I consider safer.
             sys.exit(1)
 
-class ThreadGroup():
+
+class ThreadGroup:
     """
     Class which merges state, handler, and thread into one easy package.
 
@@ -56,6 +57,7 @@ class ThreadGroup():
         handler (Callable): A callable function.
         thread (Thread): Instance of threading.Thread.
     """
+
     def __init__(self, handler: Callable, *args):
         """
         Initialize the ThreadGroup object.
@@ -67,10 +69,7 @@ class ThreadGroup():
         self.state = ThreadState()
         self.handler = handler
         self.thread = threading.Thread(target=handler, args=(self.state, *args), daemon=True)
-        log_debug(
-            "EventLoop: adding Task Thread. state=%s. handler=%s, args=%s",
-             str(self.state), str(handler), args
-        )
+        log_debug("EventLoop: adding Task Thread. state=%s. handler=%s, args=%s", str(self.state), str(handler), args)
 
     def check_handler(self, handler: Callable) -> bool:
         """
@@ -108,10 +107,7 @@ class ThreadGroup():
         """
         self.state.stopping = True
         killTime = time.time() + kill_after
-        log_debug(
-            "EventLoop: aborting thread with handler %s, kill time %f",
-            str(self.handler),
-            (kill_after))
+        log_debug("EventLoop: aborting thread with handler %s, kill time %f", str(self.handler), (kill_after))
         while self.thread.is_alive():
             time.sleep(0.2)
             if time.time() < killTime:

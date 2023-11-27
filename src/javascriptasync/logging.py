@@ -1,10 +1,6 @@
-#This module only serves to expose set_log_level,setup_logging, and get_filehandler
+# This module only serves to expose set_log_level,setup_logging, and get_filehandler
 import logging
-from .core.jslogging import (
-
-    logs,console_handler,dt_fmt
-)
-
+from .core.jslogging import logs, console_handler, dt_fmt
 
 
 def set_log_level(level):
@@ -17,7 +13,8 @@ def set_log_level(level):
     logs.setLevel(level)
     console_handler.setLevel(logs.level)
 
-def setup_logging(level:int, handler:logging.Handler=None):
+
+def setup_logging(level: int, handler: logging.Handler = None):
     """
     This function sets up logging with the given level and handler. If no handler is provided, a file handler is generated.
 
@@ -31,8 +28,10 @@ def setup_logging(level:int, handler:logging.Handler=None):
     if handler is not None:
         logs.addHandler(handler)
 
-    
-def get_filehandler(filename:str="asyncjs.log",max_bytes:int=8000000,file_count:int=1, log_level:int=None):
+
+def get_filehandler(
+    filename: str = "asyncjs.log", max_bytes: int = 8000000, file_count: int = 1, log_level: int = None
+):
     """
     This function creates a file handler for logging with the specified filename, maximum number
     of bytes for each file, and the number of files to rotate through.
@@ -41,7 +40,7 @@ def get_filehandler(filename:str="asyncjs.log",max_bytes:int=8000000,file_count:
         filename (str, optional): The name of the file to write logs to. Defaults to "asyncjs.log".
         max_bytes (int, optional): The maximum size of each log file in bytes. Defaults to 8000000.
         file_count (int, optional): The number of log files to rotate through. Defaults to 1.
-        log_level (int, optional): specific Log Level you want to set the handler to.  
+        log_level (int, optional): specific Log Level you want to set the handler to.
     Returns:
         handler2: A logging handler configured to write to the specified file, with the specified
         maximum file size, and rotating through the specified number of files.

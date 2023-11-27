@@ -10,9 +10,9 @@ logs = logging.getLogger("asyncjs")
 logs.setLevel(logging.ERROR)
 
 # Create a console handler and set the level to Debug
-console_handler=logging.StreamHandler()
-#console_handler = logging.FileHandler("asyncjs.log")
-#console_handler.setLevel(logs.getLevel())
+console_handler = logging.StreamHandler()
+# console_handler = logging.FileHandler("asyncjs.log")
+# console_handler.setLevel(logs.getLevel())
 
 # Create a formatter and add it to the console handler
 dt_fmt = "%Y-%m-%d %H:%M:%S"
@@ -23,32 +23,33 @@ console_handler.setFormatter(formatter)
 logs.addHandler(console_handler)
 
 
-
-
 def log_critical(*args, **kwargs):
     if logs is not None:
         logs.critical(*args, **kwargs)
+
 
 def log_error(*args, **kwargs):
     if logs is not None:
         logs.error(*args, **kwargs)
 
+
 def log_info(*args, **kwargs):
     if logs is not None:
         logs.info(*args, **kwargs)
+
 
 def log_warning(*args, **kwargs):
     if logs is not None:
         logs.warning(*args, **kwargs)
 
+
 def log_debug(*args, **kwargs):
     if logs is not None:
         logs.debug(*args, **kwargs)
 
+
 def log_print(*msg):
     logs.info(str(msg))
-
-
 
 
 def print_path(frame):

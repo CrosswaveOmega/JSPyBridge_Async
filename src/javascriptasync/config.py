@@ -43,29 +43,30 @@ class JSConfig(object):
         self.dead = "\n** The Node process has crashed. Please restart the runtime to use JS APIs. **\n"
         self.event_loop: EventLoop = None
         self.event_thread: threading.Thread = None
-        self.profiler=None
-        self.pyi:PyInterface=None
+        self.profiler = None
+        self.pyi: PyInterface = None
         self.executor: Executor = None
         self.global_jsi: Proxy = None
         self.fast_mode: bool = False
         self.node_emitter_patches: bool = False
 
-    def startup(self,):
+    def startup(
+        self,
+    ):
         """
         Starts the JavaScript runtime environment.
 
         This method initializes the event loop, executor, and global_jsi for JavaScript execution.
         """
         self.event_loop: EventLoop = EventLoop(self)
-        self.pyi:PyInterface=PyInterface(self)
+        self.pyi: PyInterface = PyInterface(self)
         self.executor: Executor = Executor(self, self.event_loop)
-        
+
         self.pyi.set_executor(self.executor)
         self.event_loop.start_connection()
         self.event_thread: threading.Thread = threading.Thread(target=self.event_loop.loop, args=(), daemon=True)
         self.event_thread.start()
 
-        
         # # The "root" interface to JavaScript with FFID(Foreign Object Reference ID) 0
         self.global_jsi: Proxy = Proxy(self.executor, 0)
         self.fast_mode: bool = False
@@ -124,7 +125,7 @@ class Config:
 
     """
 
-    _instance:JSConfig = None
+    _instance: JSConfig = None
     _initalizing = False
     _reset = False
 
@@ -140,7 +141,7 @@ class Config:
         last_path = print_path(frame.f_back)
         logs.debug(f"attempted init:[{last_path}]")
         if (not Config._instance and not Config._initalizing) or Config._reset:
-            self._instance:JSConfig=JSConfig()
+            self._instance: JSConfig = JSConfig()
             Config._reset = False
             Config._initalizing = True
             instance = JSConfig()

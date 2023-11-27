@@ -60,9 +60,7 @@ def generate_snowflake(parameter: int, mode: Union[int, SnowflakeMode] = Snowfla
     else:
         r = mode
     timestamp = int(time.time())  # Get the current time in SECONDS.
-    snowflake = (
-        ((timestamp & 0xFFFFFFFF) << 20) | ((int(r) & 0x7) << 17) | (param & 0x1FFFF)
-    )  # Combine timestamp, mode, and parameter
+    snowflake = ((timestamp & 0xFFFFFFFF) << 20) | ((int(r) & 0x7) << 17) | (param & 0x1FFFF)
 
     # This has to be no more than 52 bits.
     if snowflake >= (2**52 - 1):

@@ -44,7 +44,7 @@ def kill_js():
 
 def require(name: str, version: Optional[str] = None) -> Proxy:
     """
-    Import an npm package, and return it as a Proxy.  
+    Import an npm package, and return it as a Proxy.
     If the required package isn't found, then
     javascriptasync will install it within the librarywide node_modules folder.
 
@@ -81,7 +81,7 @@ def require(name: str, version: Optional[str] = None) -> Proxy:
 
 async def require_a(name: str, version: Optional[str] = None, amode: bool = False) -> Proxy:
     """
-    Asyncronously import an npm package and return it as a Proxy.  
+    Asyncronously import an npm package and return it as a Proxy.
     If the required package isn't found, then
     javascriptasync will install it within the librarywide node_modules folder.
 
@@ -115,7 +115,7 @@ async def require_a(name: str, version: Optional[str] = None, amode: bool = Fals
         except Exception:
             # On Notebooks, the frame info above does not exist, so assume the CWD as caller
             calling_dir = os.getcwd()
-    coro = conf.global_jsi.get('require').call_a(name, version, calling_dir, timeout=900, coroutine=True)
+    coro = conf.global_jsi.get("require").call_a(name, version, calling_dir, timeout=900, coroutine=True)
     # req=conf.global_jsi.require
     module = await coro
     if amode:
@@ -200,8 +200,8 @@ def eval_js(js: str, timeout: int = 10) -> Any:
         for local in frame.f_back.f_locals:
             if not local.startswith("__"):
                 local_vars[local] = frame.f_back.f_locals[local]
-        context=conf.global_jsi.get_s("evaluateWithContext")
-        
+        context = conf.global_jsi.get_s("evaluateWithContext")
+
         rv = context.call_s(js, local_vars, timeout=timeout, forceRefs=True)
     finally:
         del frame
@@ -237,10 +237,9 @@ async def eval_js_a(js: str, timeout: int = 10, as_thread: bool = False) -> Any:
             if not local.startswith("__"):
                 local_vars[local] = frame.f_back.f_locals[local]
         if not as_thread:
-            context=conf.global_jsi.get_s("evaluateWithContext")
-        
+            context = conf.global_jsi.get_s("evaluateWithContext")
+
             rv = context.call_s(js, local_vars, timeout=timeout, forceRefs=True, coroutine=True)
-            #rv = conf.global_jsi.evaluateWithContext(js, local_vars, timeout=timeout, forceRefs=True, coroutine=True)
         else:
             rv = asyncio.to_thread(conf.global_jsi.evaluateWithContext, js, local_vars, timeout=timeout, forceRefs=True)
     finally:

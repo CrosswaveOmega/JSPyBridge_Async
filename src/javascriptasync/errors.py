@@ -1,4 +1,3 @@
-
 import re
 import sys
 import traceback
@@ -46,15 +45,18 @@ class InvalidNodeJS(BaseError):
 
     """
 
+
 class BridgeTimeout(TimeoutError):
     """
     Raised if a request times out.
     """
+
     def __init__(self, message, action, ffid, attr):
         self.message = message
         self.action = action
         self.ffid = ffid
         self.attr = attr
+
 
 class Chalk:
     """
@@ -171,7 +173,7 @@ def print_error(
         f"Call to '{failedCall.replace('~~', '')}' failed:",
     )
 
-    log('[Context: Python]')
+    log("[Context: Python]")
     for at, line in pyStacktrace:
         if "javascriptasync" in at or "IPython" in at:
             continue
@@ -269,8 +271,8 @@ def getErrorMessage(failed_call, jsStackTrace, pyStacktrace):
     try:
         tuple_a = processJsStacktrace(jsStackTrace)
         if tuple_a is None:
-            tuple_a=processJsStacktrace(jsStackTrace, True)
-        (jse, jsm, jss)=tuple_a
+            tuple_a = processJsStacktrace(jsStackTrace, True)
+        (jse, jsm, jss) = tuple_a
         pye, pys = processPyStacktrace(pyStacktrace)
 
         lines = print_error(failed_call, jse, jss, jsm, pye, pys)

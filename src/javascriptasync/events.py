@@ -6,12 +6,9 @@ from typing import Any, Callable, Dict, List, Tuple, Union
 from . import pyi, config
 from queue import Queue
 from weakref import WeakValueDictionary
-from .core.abc import (
-    ThreadTaskStateBase,
-    EventLoopBase
-)
+from .core.abc import ThreadTaskStateBase, EventLoopBase
 
-from .core.jslogging import(
+from .core.jslogging import (
     log_debug,
     log_print,
 )
@@ -22,13 +19,14 @@ from .asynciotasks import EventLoopMixin, TaskGroup
 
 from .threadtasks import ThreadGroup
 
+
 class CrossThreadEvent(asyncio.Event):
     """Initalize Asyncio Event and pass in a specific
     Asyncio event loop, and ensure that the event can be
     Set outside an asyncio event loop."""
 
     def __init__(self, _loop=None, *args, **kwargs):
-        self._loop=None
+        self._loop = None
         super().__init__(*args, **kwargs)
         if self._loop is None:
             self._loop = _loop
@@ -38,7 +36,6 @@ class CrossThreadEvent(asyncio.Event):
 
     def clear(self):
         self._loop.call_soon_threadsafe(super().clear)
-
 
 
 class EventExecutorThread(threading.Thread):
@@ -127,21 +124,20 @@ class EventLoop(EventLoopBase, EventLoopMixin):
         self.callbacks = WeakValueDictionary()
 
         # The threads created managed by this event loop.
-        self.threads:List[ThreadGroup] = []
-        self.tasks:List[TaskGroup]= []
-        self.outbound:List[Dict[str,Any]] = []
+        self.threads: List[ThreadGroup] = []
+        self.tasks: List[TaskGroup] = []
+        self.outbound: List[Dict[str, Any]] = []
 
         # After a socket request is made, it's ID is pushed to self.requests. Then, after a response
         # is recieved it's removed from requests and put into responses, where it should be deleted
         # by the consumer.
-        self.requests:Dict[int,Union[CrossThreadEvent,threading.Lock]] = {}
-          # Map of requestID -> threading.Lock
-        self.responses:Dict[int,Dict] = {}
-          # Map of requestID -> response payload
-        self.conn:ConnectionClass = ConnectionClass(config_container)
-        self.conf:config.JSConfig = config_container
+        self.requests: Dict[int, Union[CrossThreadEvent, threading.Lock]] = {}
+        # Map of requestID -> threading.Lock
+        self.responses: Dict[int, Tuple[Dict,threading.Barrier]] = {}
+        # Map of requestID -> response payload
+        self.conn: ConnectionClass = ConnectionClass(config_container)
+        self.conf: config.JSConfig = config_container
         # if not amode:
-        
 
     # async def add_loop(self):
     #     loop=asyncio.get_event_loop()
@@ -173,11 +169,11 @@ class EventLoop(EventLoopBase, EventLoopMixin):
         Returns:
             ThreadGroup: new threadgroup instance, which contains state, handler, and thread.
         """
-        thr=ThreadGroup(handler,*args)
-        #state = ThreadState()
-        #t = threading.Thread(target=handler, args=(state, *args), daemon=True)
+        thr = ThreadGroup(handler, *args)
+        # state = ThreadState()
+        # t = threading.Thread(target=handler, args=(state, *args), daemon=True)
         self.threads.append(thr)
-        
+
         return thr
 
     def startThread(self, method):
@@ -215,7 +211,7 @@ class EventLoop(EventLoopBase, EventLoopMixin):
             killAfter (float): Time in seconds to wait before forcefully killing the thread.
         """
         for thr in [x for x in self.threads if x.check_handler(method)]:
-            thr.abort_thread(killAfter);
+            thr.abort_thread(killAfter)
 
         self.threads = [x for x in self.threads if not x.check_handler(method)]
 
@@ -246,6 +242,7 @@ class EventLoop(EventLoopBase, EventLoopMixin):
         Returns:
             threading.Event: An event for waiting on the response.
         """
+        print("ptype", type(payload))
         self.outbound.append(payload)
         if asyncmode:
             lock = CrossThreadEvent(_loop=loop)
@@ -312,7 +309,7 @@ class EventLoop(EventLoopBase, EventLoopMixin):
 
     def get_response_from_id(self, request_id: int) -> Tuple[Any, threading.Barrier]:
         """Retrieve a response and associated barrier for a given request ID,
-         and then removes it from the internal responces dictionary
+         and then removes it from the internal responces dictionary.
 
         Args:
             request_id (int): The request ID for which the response and barrier are needed.
@@ -330,14 +327,14 @@ class EventLoop(EventLoopBase, EventLoopMixin):
         res, barrier = self.responses[request_id]
         del self.responses[request_id]
         return res, barrier
-    
-    def process_job(self, job:str, r:int) -> int:
+
+    def process_job(self, job: str, r: int) -> int:
         """
         send/recieve all outbound/inbound messages to/from connection.
 
         First, the job will be logged for debugging purposes. Then, all outbound messages will be
         sent via the connection. After that, the function will check each thread to see if they are
-        still alive, and remove any dead threads from the thread list. 
+        still alive, and remove any dead threads from the thread list.
         If the length of self.freeable exceeds 40,
         a payload to free the job is added to the queue.
 
@@ -354,7 +351,7 @@ class EventLoop(EventLoopBase, EventLoopMixin):
         """
         # log_debug("Loop: Queue get got %s",qu)
         # Empty the jobs & start running stuff !
-        # NOTE: self.queue.empty does not empty queue, 
+        # NOTE: self.queue.empty does not empty queue,
         # it just checks if the queue is empty.
         # commented out.
         # self.queue.empty() -
@@ -385,14 +382,16 @@ class EventLoop(EventLoopBase, EventLoopMixin):
             if "c" in inbound and inbound["c"] == "pyi":
                 log_debug("Loop, inbound C request was %s", str(inbound))
                 # print(inbound)
-                j = inbound
-                pyi=self.conf.get_pyi()
+                # j is never used.
+                # j = inbound
+                pyi = self.conf.get_pyi()
                 self.callbackExecutor.add_job(r, cbid, pyi.inbound, inbound)
             if r in self.requests:
-                lock, timeout = self.requests[r]
+                lock, timeout = self.requests.pop(r)
                 barrier = threading.Barrier(2, timeout=5)
                 self.responses[r] = inbound, barrier
-                del self.requests[r]
+                # why delete when you can just use .pop()?
+                #del self.requests[r]
                 # print(inbound,lock)
                 lock.set()  # release, allow calling thread to resume
                 barrier.wait()
@@ -414,5 +413,4 @@ class EventLoop(EventLoopBase, EventLoopMixin):
             if job == "exit":
                 self.active = False
                 break
-            r=self.process_job(job,r)
-            
+            r = self.process_job(job, r)

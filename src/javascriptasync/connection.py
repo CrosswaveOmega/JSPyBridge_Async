@@ -1,22 +1,18 @@
 from __future__ import annotations
+
 # import asyncio
 import threading
 import subprocess
 import json
 import time
+
 # import signal
 import atexit
 import os
 import sys
 from typing import Any, Dict, List, TextIO, Union
 from . import config
-from .core.jslogging import (
-    log_print,
-    log_debug,
-    log_info,
-    log_error,
-    log_critical
-    )
+from .core.jslogging import log_print, log_debug, log_info, log_error, log_critical
 from .util import haspackage
 from .errors import InvalidNodeJS
 
@@ -87,7 +83,7 @@ class ConnectionClass:
         self.NODE_BIN = os.environ.get("NODE_BIN") if hasattr(os.environ, "NODE_BIN") else "node"
         self.check_nodejs_installed()
 
-        self.directory_name:str = os.path.dirname(__file__)
+        self.directory_name: str = os.path.dirname(__file__)
         self.proc: subprocess.Popen = None
         self.com_thread: threading.Thread = None
         self.stdout_thread: threading.Thread = None
@@ -117,8 +113,9 @@ class ConnectionClass:
             output = subprocess.check_output([self.NODE_BIN, "-v"])
             print("NodeJS is installed: Current Version Node.js version:", output.decode().strip())
         except OSError as e:
-            errormessage="COULD NOT FIND A VALID NODE.JS INSTALLATION!"+\
-                  "PLEASE INSTALL NODE.JS FROM https://nodejs.org/  "
+            errormessage = (
+                "COULD NOT FIND A VALID NODE.JS INSTALLATION!" + "PLEASE INSTALL NODE.JS FROM https://nodejs.org/  "
+            )
             log_critical(errormessage)
             raise InvalidNodeJS(errormessage) from e
 
@@ -182,6 +179,10 @@ class ConnectionClass:
             if type(obj) == str:
                 j = obj + "\n"
             else:
+                print("decoding", type(obj))
+                if not type(obj) == dict:
+                    print(obj.ffid)
+                # print(json.dumps(obj))
                 j = json.dumps(obj) + "\n"
             log_debug("connection: %s,%d,%s", "[py -> js]", int(time.time() * 1000), j)
 
@@ -192,7 +193,7 @@ class ConnectionClass:
             try:
                 self.proc.stdin.write(j.encode())
                 self.proc.stdin.flush()
-            except (IOError,BrokenPipeError)  as error:
+            except (IOError, BrokenPipeError) as error:
                 log_critical(error, exc_info=True)
                 self.stop()
                 break
@@ -235,6 +236,7 @@ class ConnectionClass:
             )
             self.stop()
             raise err
+
     def com_io(self):
         """
         Handle communication with the node.js process.
@@ -251,13 +253,13 @@ class ConnectionClass:
             Exception: If there's an issue spawning the JS process or if any
             exceptions occur during communication.
         """
-        
-            
+
+        print("Starting Node.JS connection...!")
         self.startup_node_js()
         for send in self.sendQ:
             self.proc.stdin.write(send)
         self.proc.stdin.flush()
-        print('startup')
+        print("Connection established!")
         if self.notebook:
             self.stdout_thread = threading.Thread(target=self.stdout_read, args=(), daemon=True)
             self.stdout_thread.start()

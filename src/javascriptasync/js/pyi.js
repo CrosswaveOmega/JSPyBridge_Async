@@ -4,7 +4,7 @@
  */
 const pyObjs=require('./PyObject');
 
-const util = require('util');
+// const util = require('util');
 
 if (typeof performance === 'undefined') {
   // eslint-disable-next-line no-var
@@ -122,18 +122,22 @@ const SnowflakeMode = {
 function generateSnowflake(parameter, mode = SnowflakeMode.jsrid) {
   // Validate that parameter is within the
   // 0-131071 (0x1FFFF) range, use a modulo if it isn't.
-  let param=parameter;
-  if (!(param >= 0 && param <= 0x1FFFF)) {
-    param=param% (0x20000);
-    // throw new Error("Parameter value must be in the range [0, 131071]");
+  // I have to do this BigInt conversion for each
+  // because the bitshift operator in JavaScript
+  // automatically converts operands into 32 bits,
+  // resulting in data loss!
+  let param=BigInt(parameter);
+  if (!(param >= 0 && param <= BigInt('0x1FFFF'))) {
+    param=param% BigInt(0x20000);
   }
 
-  const timestamp = Math.floor(Date.now()/1000) & 0xFFFFFFFF;
-  // Get the current time in SECONDS, and limit it to 32 bits.
-  const snowflake = (timestamp << 20) | (
-    (mode & 0x07) << 17) | (param & 0x1FFFF
-  ); // Combine timestamp, mode, and parameter
-  return snowflake;
+  const timestamp = BigInt(Math.floor(Date.now()/1000)) & BigInt('0xFFFFFFFF');
+  // console.log('timestamp', timestamp, (timestamp << BigInt(20)));
+  const snowflake = ((timestamp << BigInt(20))) | (
+    (BigInt(mode) & BigInt('0x07')) << BigInt(17)) | (param & BigInt('0x1FFFF')
+  );
+  // console.log('Now snowflake is ', snowflake);
+  return parseInt(snowflake.toString(), 10);
 }
 
 let nextReqId = 10000;
@@ -611,39 +615,10 @@ class PyBridge {
     // since this must be sync, we need to call
     // inspect in Python along with every CALL or GET
     // operation, which does bring some small overhead.
-    /**
-       * Represents a custom logger function for
-       * synchronously logging Python objects.
-       *
-       * @class
-       * @extends Function
-       */
-    class CustomLogger extends Function {
-      /**
-       * Constructs a new instance of CustomLogger.
-       *
-       * @param {string} inspectString - The string to inspect.
-       */
-      constructor(inspectString) {
-        super();
-        this.inspectString=inspectString;
-        this.callstack = [];
-      }
 
-      /**
-           * Custom inspect method for logging Python objects.
-           *
-           * @function
-           * @return {string} - The inspectString or a default message.
-           */
-      [util.inspect.custom]() {
-        return this.inspectString || '(Some Python object)';
-      }
-    }
     const pyobj=new pyObjs.PyObject(ffid, inspectString, this);
 
-    console.log(util.inspect(pyobj));
-    return new Proxy(new CustomLogger(inspectString), pyobj);
+    return new Proxy(new pyObjs.CustomLogger(inspectString), pyobj);
   }
 }
 

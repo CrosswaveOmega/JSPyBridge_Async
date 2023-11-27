@@ -1,6 +1,6 @@
 
-const util = require('util');
-const {inspect} = require('node:util');
+// const util = require('util');
+// const {inspect} = require('node:util');
 const customInspectSymbol = Symbol.for('nodejs.util.inspect.custom');
 
 /**
@@ -166,12 +166,12 @@ class PyObject {
       const ret = this.parentBridge.inspect(ffid, [...target.callstack]);
       return ret;
     }
-    console.log('ffid', ffid,
-        'tc', target.callstack,
-        'args', args,
-        'kwargs', kwargs,
-        'boo', false,
-        'timeout', timeout);
+    // console.log('ffid', ffid,
+    //     'tc', target.callstack,
+    //     'args', args,
+    //     'kwargs', kwargs,
+    //     'boo', false,
+    //     'timeout', timeout);
     const ret = this.parentBridge.call(
         ffid,
         target.callstack,
@@ -203,5 +203,33 @@ class PyObject {
     return ret;
   };
 }
-
-module.exports= {PyObject, Intermediate};
+/**
+       * Represents a custom logger function for
+       * synchronously logging Python objects.
+       *
+       * @class
+       * @extends Function
+       */
+class CustomLogger extends Function {
+  /**
+   * Constructs a new instance of CustomLogger.
+   *
+   * @param {string} inspectString - The string to inspect.
+   */
+  constructor(inspectString) {
+    super();
+    this.inspectString=inspectString;
+    this.callstack = [];
+  }
+  // eslint-disable-next-line valid-jsdoc
+  /**
+       * Custom inspect method for logging Python objects.
+       *
+       * @function
+       * @return {string} - The inspectString or a default message.
+       */
+  [customInspectSymbol](depth, inspectOptions, inspect) {
+    return this.inspectString || '(Some Python object)';
+  }
+}
+module.exports= {PyObject, Intermediate, CustomLogger};

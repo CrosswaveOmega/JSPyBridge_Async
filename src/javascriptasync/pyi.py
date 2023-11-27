@@ -134,23 +134,24 @@ class PyInterface:
         self.send_inspect = True
         self.current_async_loop = None
 
-        self.executor:proxy.Executor = None
+        self.executor: proxy.Executor = None
 
-    def q(self, r, key, val, sig=""):
+    def queue_push(self, r, key, val, sig=""):
         self.ipc.queue_payload({"c": "pyi", "r": r, "key": key, "val": val, "sig": sig})
 
     def __str__(self):
         """Return a string representation of the PyInterface object."""
         res = str(self.m)
         return res
-    
-    def set_executor(self,exe:proxy.Executor):
+
+    def set_executor(self, exe: proxy.Executor):
         """Set the current executor object.
 
         Args:
             exe (proxy.Executor): The new executor object to be set.
         """
-        self.executor=exe
+        self.executor = exe
+
     # @property
     # def executor(self):
     #     """Get the executor object currently initalized in JSConfig."""
@@ -204,7 +205,7 @@ class PyInterface:
             else:
                 raise LookupError(f"Property '{fix_key(key)}' does not exist on {repr(v)}")
         l = len(v)
-        self.q(r, "num", l)
+        self.queue_push(r, "num", l)
 
     def init(self, r: int, ffid: int, key: str, args: Tuple):
         """Initialize an object on the Python side, assign an FFID to it, and
@@ -219,7 +220,7 @@ class PyInterface:
         """
         v = self.m[ffid](*args)
         ffid = self.assign_ffid(v)
-        self.q(r, "inst", ffid)
+        self.queue_push(r, "inst", ffid)
 
     def call(self, r: int, ffid: int, keys: List, args: Tuple, kwargs: Dict, invoke=True):
         """Call a method or access a property of an object on the python side,
@@ -289,28 +290,28 @@ class PyInterface:
                 v = v(*args, **kwargs)
         typ = type(v)
         if typ is str:
-            self.q(r, "string", v)
+            self.queue_push(r, "string", v)
             return
         if typ is int or typ is float or (v is None) or (v is True) or (v is False):
-            self.q(r, "int", v)
+            self.queue_push(r, "int", v)
             return
         if inspect.isclass(v) or isinstance(v, type):
             # generate a new ffid.
-            self.q(r, "class", self.assign_ffid(v), self.make_signature(v))
+            self.queue_push(r, "class", self.assign_ffid(v), self.make_signature(v))
             return
         if callable(v):  # anything with __call__
-            self.q(r, "fn", self.assign_ffid(v), self.make_signature(v))
+            self.queue_push(r, "fn", self.assign_ffid(v), self.make_signature(v))
             return
         if (typ is dict) or (inspect.ismodule(v)) or was_class:  # "object" in JS speak
-            self.q(r, "obj", self.assign_ffid(v), self.make_signature(v))
+            self.queue_push(r, "obj", self.assign_ffid(v), self.make_signature(v))
             return
         if typ is list:
-            self.q(r, "list", self.assign_ffid(v), self.make_signature(v))
+            self.queue_push(r, "list", self.assign_ffid(v), self.make_signature(v))
             return
         if hasattr(v, "__class__"):  # numpy generator can't be picked up without this
-            self.q(r, "class", self.assign_ffid(v), self.make_signature(v))
+            self.queue_push(r, "class", self.assign_ffid(v), self.make_signature(v))
             return
-        self.q(r, "void", self.cur_ffid)
+        self.queue_push(r, "void", self.cur_ffid)
 
     # Same as call just without invoking anything, and args
     # would be null
@@ -345,7 +346,7 @@ class PyInterface:
         for key in keys:
             v = getattr(v, key, None) or v[key]
         s = repr(v)
-        self.q(r, "", s)
+        self.queue_push(r, "", s)
 
     # no ACK needed
     def free(self, r: int, ffid: int, key: str, args: List):
@@ -418,16 +419,16 @@ class PyInterface:
             v[on] = val
         else:
             setattr(v, on, val)
-        self.q(r, "void", self.cur_ffid)
+        self.queue_push(r, "void", self.cur_ffid)
 
-    def json_to_python(self,json_input,lookup_key):
-        '''Convert special JSON objects to Python methods'''
-        iterator=None
+    def json_to_python(self, json_input, lookup_key):
+        """Convert special JSON objects to Python methods"""
+        iterator = None
         if isinstance(json_input, dict):
-            iterator=json_input.items()
+            iterator = json_input.items()
         elif isinstance(json_input, list):
-            iterator=  enumerate(json_input)
-        else: 
+            iterator = enumerate(json_input)
+        else:
             return
         for k, v in iterator:
             if isinstance(v, dict) and (lookup_key in v):
@@ -447,37 +448,6 @@ class PyInterface:
             set_attr (bool): Whether to set an attribute of the object.
 
         """
-
-        # Convert special JSON objects to Python methods
-        def process(json_input, lookup_key):
-            iterator=None
-            if isinstance(json_input, dict):
-                iterator=json_input.items()
-            elif isinstance(json_input, list):
-                iterator=  enumerate(json_input)
-            else: 
-                return
-            for k, v in iterator:
-                if isinstance(v, dict) and (lookup_key in v):
-                    ffid = v[lookup_key]
-                    json_input[k] = proxy.Proxy(self.executor, ffid)
-                else:
-                    process(v, lookup_key)
-            '''
-                for k, v in json_input.items():
-                    if isinstance(v, dict) and (lookup_key in v):
-                        ffid = v[lookup_key]
-                        json_input[k] = proxy.Proxy(self.executor, ffid)
-                    else:
-                        process(v, lookup_key)
-            elif isinstance(json_input, list):
-                for k, v in enumerate(json_input):
-                    if isinstance(v, dict) and (lookup_key in v):
-                        ffid = v[lookup_key]
-                        json_input[k] = proxy.Proxy(self.executor, ffid)
-                    else:
-                        process(v, lookup_key)
-            '''
 
         self.json_to_python(args, "ffid")
         pargs, kwargs = args
@@ -524,11 +494,7 @@ class PyInterface:
             else:
                 v = t
 
-        # TODO: do we realy want to worry about functions/classes here?
-        # we're only supposed to send primitives, probably best to ignore
-        # everything else.
-        # payload = json.dumps(v, default=lambda arg: None)
-        self.q(r, "ser", v)
+        self.queue_push(r, "ser", v)
 
     def onMessage(self, r: int, action: str, ffid: int, key: str, args: List):
         """Determine which action to preform based on the
@@ -547,7 +513,7 @@ class PyInterface:
         try:
             return getattr(self, action)(r, ffid, key, args)
         except Exception:
-            self.q(r, "error", "", traceback.format_exc())
+            self.queue_push(r, "error", "", traceback.format_exc())
             pass
 
     def inbound(self, j: Dict[str, Any]):
