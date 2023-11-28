@@ -4,13 +4,14 @@ import time, threading, json, sys
 from typing import Any, Callable, Dict, List, Tuple, Union
 
 from . import pyi, config
-from queue import Queue
+from queue import Queue, Empty
 from weakref import WeakValueDictionary
 from .core.abc import ThreadTaskStateBase, EventLoopBase
 
 from .core.jslogging import (
     log_debug,
     log_print,
+    log_warning,
 )
 
 from .connection import ConnectionClass
@@ -113,6 +114,7 @@ class EventLoop(EventLoopBase, EventLoopMixin):
         self.active: bool = True
         self.queue = Queue()
         self.freeable = []
+        self.upper_batch_limit=20
 
         self.callbackExecutor = EventExecutorThread()
 
@@ -126,7 +128,7 @@ class EventLoop(EventLoopBase, EventLoopMixin):
         # The threads created managed by this event loop.
         self.threads: List[ThreadGroup] = []
         self.tasks: List[TaskGroup] = []
-        self.outbound: List[Dict[str, Any]] = []
+        self.outbound: Queue[Dict[str, Any]] = Queue()
 
         # After a socket request is made, it's ID is pushed to self.requests. Then, after a response
         # is recieved it's removed from requests and put into responses, where it should be deleted
@@ -243,7 +245,7 @@ class EventLoop(EventLoopBase, EventLoopMixin):
             threading.Event: An event for waiting on the response.
         """
         print("ptype", type(payload))
-        self.outbound.append(payload)
+        self.outbound.put(payload)
         if asyncmode:
             lock = CrossThreadEvent(_loop=loop)
         else:
@@ -266,7 +268,7 @@ class EventLoop(EventLoopBase, EventLoopMixin):
         Args:
             payload: The payload to be sent.
         """
-        self.outbound.append(payload)
+        self.outbound.put(payload)
         log_debug("EventLoop: added %s to payload", str(payload))
         self.queue.put("send")
 
@@ -327,6 +329,82 @@ class EventLoop(EventLoopBase, EventLoopMixin):
         res, barrier = self.responses[request_id]
         del self.responses[request_id]
         return res, barrier
+    
+    def _send_outbound(self):
+        '''
+        Gather all jobs in the outbound Queue, and send to the active 
+        connection process.
+        '''
+        out=[]
+        current_iter=0
+        still_full=True
+        while (self.outbound.qsize()>0 and still_full):
+            try:
+                toadd=self.outbound.get_nowait()
+                out.append(toadd)
+                current_iter+=1
+                if current_iter>self.upper_batch_limit:
+                    self.conn.writeAll(out)
+                    out,current_iter=[],0
+            except Empty as e:
+                log_warning("EventLoop, outbound Queue is empty.")
+                still_full=False
+        self.conn.writeAll(out)
+
+    def _remove_finished_thread_tasks(self):
+        '''Remove all killed/finished threads and tasks from the
+        threads and tasks lists.'''
+        log_debug("Loop: checking self.threads %s",",".join([str(s) for s in self.threads]))
+        self.threads = [x for x in self.threads if x.is_thread_alive()]
+        log_debug("Loop: checking self.tasks %s",",".join([str(s) for s in self.tasks]))
+        self.tasks = [x for x in self.tasks if x.is_task_done() is False]
+
+    def _free_if_above_limit(self, ra:int=20,lim:int=40):
+        """Send a free request across the bridge if limit was exceeded
+
+        Args:
+            ra (int): Request ID to be assigned to request.
+            lim (int, optional): How big freeable must be to activate. Defaults to 40.
+        """
+        r=generate_snowflake(ra%131071)
+        if len(self.freeable) > lim:
+            self.queue_payload({"r": r, "action": "free", "ffid": "", "args": self.freeable})
+            self.freeable = []
+
+    def _recieve_inbound(self,oldr:int):
+        """
+        Read the inbound data from the connection, and route it
+        to the correct handler. 
+
+        Args:
+            oldr (int): Old request_id
+
+        Returns:
+            int: the latest recieved request id from outbound.
+        """        
+        r=oldr
+        inbounds = self.conn.readAll()
+        for inbound in inbounds:
+            log_debug("Loop: inbounds was %s", str(inbound))
+            r = inbound["r"]
+            cbid = inbound["cb"] if "cb" in inbound else None
+            if "c" in inbound and inbound["c"] == "pyi":
+                log_debug("Loop, inbound C request was %s", str(inbound))
+
+                pyi = self.conf.get_pyi()
+                self.callbackExecutor.add_job(r, cbid, pyi.inbound, inbound)
+            if r in self.requests:
+                lock, timeout = self.requests.pop(r)
+                barrier = threading.Barrier(2, timeout=5)
+                self.responses[r] = inbound, barrier
+                # why delete when you can just use .pop()?
+                #del self.requests[r]
+                # print(inbound,lock)
+                lock.set()  # release, allow calling thread to resume
+                barrier.wait()
+        return r
+        
+
 
     def process_job(self, job: str, r: int) -> int:
         """
@@ -344,7 +422,7 @@ class EventLoop(EventLoopBase, EventLoopMixin):
 
         Args:
             job (str): A string representing the job to be processed.
-            r (int): The id of the request being processed.
+            r (int): The id of the last request processed.
 
         Returns:
             int: The id of the processed request.
@@ -357,44 +435,17 @@ class EventLoop(EventLoopBase, EventLoopMixin):
         # self.queue.empty() -
 
         # Send the next outbound request batch
-        log_debug(f"Running job {job}, {r}.  outbound={self.outbound}")
-        self.conn.writeAll(self.outbound)
+        log_debug(f"Running job {job}, {r}.  outbound={self.outbound.qsize()}")
+        self._send_outbound()
 
-        self.outbound = []
-
-        # Iterate over the open threads and check if any have been killed, if so
-        # remove them from self.threads
-        # log_debug("Loop: checking self.threads %s",",".join([str(s) for s in self.threads]))
-        self.threads = [x for x in self.threads if x.is_thread_alive()]
-        self.tasks = [x for x in self.tasks if x.is_task_done() is False]
-
-        if len(self.freeable) > 40:
-            #
-            self.queue_payload({"r": r, "action": "free", "ffid": "", "args": self.freeable})
-            self.freeable = []
+        #remove finished tasks/threads
+        self._remove_finished_thread_tasks()
+        
+        #Request free if freeable is above the given limit.
+        self._free_if_above_limit(r)
 
         # Read the inbound data and route it to correct handler
-        inbounds = self.conn.readAll()
-        for inbound in inbounds:
-            log_debug("Loop: inbounds was %s", str(inbound))
-            r = inbound["r"]
-            cbid = inbound["cb"] if "cb" in inbound else None
-            if "c" in inbound and inbound["c"] == "pyi":
-                log_debug("Loop, inbound C request was %s", str(inbound))
-                # print(inbound)
-                # j is never used.
-                # j = inbound
-                pyi = self.conf.get_pyi()
-                self.callbackExecutor.add_job(r, cbid, pyi.inbound, inbound)
-            if r in self.requests:
-                lock, timeout = self.requests.pop(r)
-                barrier = threading.Barrier(2, timeout=5)
-                self.responses[r] = inbound, barrier
-                # why delete when you can just use .pop()?
-                #del self.requests[r]
-                # print(inbound,lock)
-                lock.set()  # release, allow calling thread to resume
-                barrier.wait()
+        r=self._recieve_inbound(r)
         return r
 
     # === LOOP ===

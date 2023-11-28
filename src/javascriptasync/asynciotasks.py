@@ -75,7 +75,7 @@ class TaskGroup:
         """
         Sets the stopping state of an asyncio task to True.
         """
-        self.state.stopping = True
+        self.state.stop()
 
     async def abort_task(self, kill_after: float):
         """

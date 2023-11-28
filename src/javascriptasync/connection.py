@@ -11,7 +11,7 @@ import atexit
 import os
 import sys
 from typing import Any, Dict, List, TextIO, Union
-from . import config
+from . import config, events
 from .core.jslogging import log_print, log_debug, log_info, log_error, log_critical
 from .util import haspackage
 from .errors import InvalidNodeJS
@@ -44,6 +44,7 @@ class ConnectionClass:
 
     Attributes:
         config (config.JSConfig): Reference to the active JSConfig object.
+        event_loop(config.JSConfig): Reference to the event_loop
         endself(bool): if the thread is ending, send nothing else.
         stdout (TextIO): The standard output.
         modified_stdout (bool): True if stdout has been altered in some way, False otherwise.
@@ -53,6 +54,7 @@ class ConnectionClass:
         proc (subprocess.Popen): The subprocess for running JavaScript.
         com_thread (threading.Thread): The thread for handling communication with JavaScript.
         stdout_thread (threading.Thread): The thread for reading standard output.
+
         sendQ (list): Queue for outgoing messages to JavaScript.
         stderr_lines (list): Lines piped from JavaScript Process
     """
@@ -90,6 +92,7 @@ class ConnectionClass:
         self.stderr_lines: List = []
         self.sendQ: list = []
         self.config: config.JSConfig = configval
+        self.event_loop: events.EventLoop = None
         # Modified stdout
         self.endself = False
         self.modified_stdout = (sys.stdout != sys.__stdout__) or (getattr(sys, "ps1", sys.flags.interactive) == ">>> ")
@@ -155,7 +158,9 @@ class ConnectionClass:
             for line in inp.split("\n"):
                 if not len(line):
                     continue
+                #this line worries me.
                 if not line.startswith('{"r"'):
+                    
                     print("[JSE]", line)
                     continue
                 try:
@@ -267,7 +272,7 @@ class ConnectionClass:
         while self.proc.poll() is None:
             readline = self.proc.stderr.readline()
             self.stderr_lines.append(readline)
-            self.config.event_loop.queue.put("stdin")
+            self.event_loop.queue.put("stdin")
 
         print("Termination condition", self.endself)
         if not self.endself:
@@ -290,6 +295,7 @@ class ConnectionClass:
         Start the communication thread.
         """
         log_info("ConnectionClass.com_thread opened")
+        self.event_loop=self.config.get_event_loop()
         self.com_thread = threading.Thread(target=self.com_io, args=(), daemon=True)
         self.com_thread.start()
 

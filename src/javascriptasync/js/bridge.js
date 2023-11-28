@@ -54,6 +54,7 @@ function getType(obj) {
   if (!isNaN(obj)) return 'num';
   if (typeof obj === 'string') return 'string';
 }
+
 /**
  * `Bridge` is a class that facilitates communications
  *  between Python and JavaScript.
@@ -71,7 +72,6 @@ function getType(obj) {
  * @property {PyBridge} pyi - PyBridge.
  * @property {object} eventMap - Object to manage events.
  *
- * @param {object} ipc - The IPC communication channel.
  */
 class Bridge {
   /**
@@ -472,18 +472,16 @@ class IPCClass {
     handlers[r] = cb;
     this.process.stderr.write(data + '\n');
   };
-
   /**
-   * write method store the callback function into the handlers
-   * object with index 'data.r' and use send method to write data to stderr.
-   * @param {any} data - The data user want to write to stderr.
-   * @param {function} cb - The callback function user want to store.
+   * The 'write' method stores the callback function into the handlers
+   * object with key 'data.r', and utilizes the 'send' method to write data to stderr.
+   * @param {any} data - Data to write to stderr.
+   * @param {function} cb - Callback function to store.
    */
   write = (data, cb) => {
     handlers[data.r] = cb;
     this.send(data);
   };
-
 
   /**
    * Parses lines of a message on the bridge,

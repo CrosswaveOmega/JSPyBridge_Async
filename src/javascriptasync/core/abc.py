@@ -6,6 +6,9 @@ class ThreadTaskStateBase:
 
     stopping = False
 
+    def stop(self):
+        self.stopping=True
+
     def wait(self, sec):
         raise Exception("NOT DEFINED.")
 
