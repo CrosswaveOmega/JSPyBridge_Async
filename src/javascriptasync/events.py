@@ -393,8 +393,8 @@ class EventLoop(EventLoopBase, EventLoopMixin):
                 log_debug("Loop, inbound C request was %s", str(inbound))
 
                 pyi = self.conf.get_pyi()
-                asyncio.create_task(pyi.inbound_a(inbound))
-                #self.callbackExecutor.add_job(r, cbid, pyi.inbound, inbound)
+                #asyncio.create_task(pyi.inbound_a(inbound))
+                self.callbackExecutor.add_job(r, cbid, pyi.inbound, inbound)
             if r in self.requests:
                 lock, timeout = self.requests.pop(r)
                 barrier = threading.Barrier(2, timeout=5)
