@@ -4,13 +4,14 @@ import asyncio
 # THe Python Interface for JavaScript
 
 import inspect, importlib, traceback
+import threading
 import os, sys, json, types
 import socket
 from typing import Any, Dict, List, Tuple
 
 from .util import generate_snowflake, SnowflakeMode
 from . import proxy, events, config
-from .errors import JavaScriptError, getErrorMessage, NoAsyncLoop
+from .errors import JavaScriptError, getErrorMessage, NoAsyncLoop, NoPyiAction
 from weakref import WeakValueDictionary
 from .core.jslogging import log_print, log_debug
 
@@ -95,6 +96,10 @@ class Iterate:
 fix_key = lambda key: key.replace("~~", "") if type(key) is str else key
 
 
+
+class PyInterfaceActions:
+    """Mixin which defines actions for PyInterface"""
+
 class PyInterface:
     """
     Python Interface for JavaScript.
@@ -133,8 +138,23 @@ class PyInterface:
         self.m[0]["sendInspect"] = lambda x: setattr(self, "send_inspect", x)
         self.send_inspect = True
         self.current_async_loop = None
-
+        self.my_actions={}
         self.executor: proxy.Executor = None
+        self.define_actions()
+
+    def define_actions(self):
+        for name, method in inspect.getmembers(self, predicate=inspect.ismethod):
+            if name!='action_selector':
+                signature = inspect.signature(method)
+                parameters = [k for k in signature.parameters.keys()]
+                print(name,signature,parameters)
+                if set(["r", "ffid", "key", "args"]).issubset(parameters):
+                    print("is_subset")
+                    self.my_actions[name] = method
+                if set(["r", "ffid", "keys", "args"]).issubset(parameters):
+                    print("is_subset2")
+                    self.my_actions[name] = method
+        
 
     def queue_push(self, r, key, val, sig=""):
         self.ipc.queue_payload({"c": "pyi", "r": r, "key": key, "val": val, "sig": sig})
@@ -160,6 +180,27 @@ class PyInterface:
     # @executor.setter
     # def executor(self, executor):
     #     pass
+
+    def action_selector(self, action: str, r: int, ffid: int, key: str, args: List):
+        """Selects and calls a method based on the given action name.
+
+        Args:
+            action (str): The name of the action corresponding to the method to be called.
+            r (int): An integer argument for the selected method.
+            ffid (int): An integer argument for the selected method.
+            key (str): A string argument for the selected method.
+            args (List): A list of arguments for the selected method.
+
+        Returns:
+            The result of calling the selected method with the given arguments.
+
+        Raises:
+            NoPyiAction: If the given action is not defined in the my_actions dictionary.
+        """
+        if action in self.my_actions:
+            return self.my_actions[action](r, ffid, key, args)
+        raise NoPyiAction(f"There's no method in PYI for action {action}. {r},{ffid},{key},{args}.")
+        
 
     def assign_ffid(self, what: Any):
         """Assign a new FFID (foreign object reference id) for an object.
@@ -511,7 +552,8 @@ class PyInterface:
         # current valid acts:
         # length, get, setval,pcall, inspect, value, free
         try:
-            return getattr(self, action)(r, ffid, key, args)
+            return self.action_selector(action,r,ffid,key,args)
+            #return getattr(self, action)(r, ffid, key, args)
         except Exception:
             self.queue_push(r, "error", "", traceback.format_exc())
             pass
@@ -524,5 +566,19 @@ class PyInterface:
 
         """
         log_debug("PYI, %s", j)
+        
         # print(j)
+        thread_id = threading.current_thread().ident
+        print('threadid',thread_id,"INBOUND PYI: ",j)
         return self.onMessage(j["r"], j["action"], j["ffid"], j["key"], j["val"])
+    
+    async def inbound_a(self, j:Dict[str,Any]):
+        """Extract the message arguments from J, and call onMessage.  asyncronous.
+
+        Args:
+            j (Dict[str, Any]): The incoming data as a dictionary.
+
+        """
+        await asyncio.to_thread(self.inbound,j)
+    
+

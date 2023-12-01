@@ -13,7 +13,7 @@ from .core.jslogging import (
     log_print,
     log_warning,
 )
-
+from .core.pumlprofiler import CodeProfiler
 from .connection import ConnectionClass
 from .util import generate_snowflake
 from .asynciotasks import EventLoopMixin, TaskGroup
@@ -74,12 +74,13 @@ class EventExecutorThread(threading.Thread):
         """
         Run the event executor thread.
         """
-        while self.running:
-            request_id, cb_id, job, args = self.jobs.get()
-            log_debug("EVT %s, %s,%s,%s", request_id, cb_id, job, args)
-            ok = job(args)
-            if self.jobs.empty():
-                self.doing = []
+        with CodeProfiler("PYITHREAD",ignore_private=False) as profiler:
+            while self.running:
+                request_id, cb_id, job, args = self.jobs.get()
+                log_debug("EVT %s, %s,%s,%s", request_id, cb_id, job, args)
+                ok = job(args)
+                if self.jobs.empty():
+                    self.doing = []
 
 
 # The event loop here is shared across all threads. All of the IO between the
@@ -151,7 +152,7 @@ class EventLoop(EventLoopBase, EventLoopMixin):
         and the connection to Node.JS.
         """
         self.conn.start()
-        self.callbackExecutor.start()
+        #self.callbackExecutor.start()
 
     def stop(self):
         """
@@ -305,7 +306,7 @@ class EventLoop(EventLoopBase, EventLoopMixin):
         while len(self.callbacks) and self.conn.is_alive():
             time.sleep(0.4)
         time.sleep(0.8)  # Allow final IO
-        self.callbackExecutor.running = False
+        #self.callbackExecutor.running = False
         self.queue_payload({"r": generate_snowflake(4092, 0), "action": "shutdown"})
         self.queue.put("exit")
 
@@ -330,7 +331,7 @@ class EventLoop(EventLoopBase, EventLoopMixin):
         del self.responses[request_id]
         return res, barrier
     
-    def _send_outbound(self):
+    async def _send_outbound(self):
         '''
         Gather all jobs in the outbound Queue, and send to the active 
         connection process.
@@ -347,11 +348,11 @@ class EventLoop(EventLoopBase, EventLoopMixin):
                     self.conn.writeAll(out)
                     out,current_iter=[],0
             except Empty as e:
-                log_warning("EventLoop, outbound Queue is empty.")
+                log_warning("EventLoop, outbound Queue is empty.", exc_info=e)
                 still_full=False
         self.conn.writeAll(out)
 
-    def _remove_finished_thread_tasks(self):
+    async def _remove_finished_thread_tasks(self):
         '''Remove all killed/finished threads and tasks from the
         threads and tasks lists.'''
         log_debug("Loop: checking self.threads %s",",".join([str(s) for s in self.threads]))
@@ -359,7 +360,7 @@ class EventLoop(EventLoopBase, EventLoopMixin):
         log_debug("Loop: checking self.tasks %s",",".join([str(s) for s in self.tasks]))
         self.tasks = [x for x in self.tasks if x.is_task_done() is False]
 
-    def _free_if_above_limit(self, ra:int=20,lim:int=40):
+    async def _free_if_above_limit(self, ra:int=20,lim:int=40):
         """Send a free request across the bridge if limit was exceeded
 
         Args:
@@ -371,7 +372,7 @@ class EventLoop(EventLoopBase, EventLoopMixin):
             self.queue_payload({"r": r, "action": "free", "ffid": "", "args": self.freeable})
             self.freeable = []
 
-    def _recieve_inbound(self,oldr:int):
+    async def _recieve_inbound(self,oldr:int):
         """
         Read the inbound data from the connection, and route it
         to the correct handler. 
@@ -392,7 +393,8 @@ class EventLoop(EventLoopBase, EventLoopMixin):
                 log_debug("Loop, inbound C request was %s", str(inbound))
 
                 pyi = self.conf.get_pyi()
-                self.callbackExecutor.add_job(r, cbid, pyi.inbound, inbound)
+                asyncio.create_task(pyi.inbound_a(inbound))
+                #self.callbackExecutor.add_job(r, cbid, pyi.inbound, inbound)
             if r in self.requests:
                 lock, timeout = self.requests.pop(r)
                 barrier = threading.Barrier(2, timeout=5)
@@ -406,7 +408,7 @@ class EventLoop(EventLoopBase, EventLoopMixin):
         
 
 
-    def process_job(self, job: str, r: int) -> int:
+    async def process_job(self, job: str, r: int) -> int:
         """
         send/recieve all outbound/inbound messages to/from connection.
 
@@ -435,17 +437,19 @@ class EventLoop(EventLoopBase, EventLoopMixin):
         # self.queue.empty() -
 
         # Send the next outbound request batch
+
+
         log_debug(f"Running job {job}, {r}.  outbound={self.outbound.qsize()}")
-        self._send_outbound()
+        await self._send_outbound()
 
         #remove finished tasks/threads
-        self._remove_finished_thread_tasks()
+        await self._remove_finished_thread_tasks()
         
         #Request free if freeable is above the given limit.
-        self._free_if_above_limit(r)
+        await self._free_if_above_limit(r)
 
         # Read the inbound data and route it to correct handler
-        r=self._recieve_inbound(r)
+        r=await self._recieve_inbound(r)
         return r
 
     # === LOOP ===
@@ -453,6 +457,7 @@ class EventLoop(EventLoopBase, EventLoopMixin):
         """
         Main loop for processing events and managing IO.
         """
+    
         r = 0
         while self.active:
             # Wait until we have jobs
@@ -460,8 +465,9 @@ class EventLoop(EventLoopBase, EventLoopMixin):
             #     log_print('not empty')
             #     time.sleep(0.4)
             #     continue
+            
             job = self.queue.get(block=True)
             if job == "exit":
                 self.active = False
                 break
-            r = self.process_job(job, r)
+            r = asyncio.run(self.process_job(job, r))

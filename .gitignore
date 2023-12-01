@@ -34,3 +34,5 @@ plantumlcurrent2.png
 *.log
 profilered.png
 profilered.svg
+*.png
+*.svg

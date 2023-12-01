@@ -19,7 +19,8 @@ const {once} = require('events');
 const debug = process.env.DEBUG?.includes(
     'jspybridge',
 ) ? console.debug : () => { };
-const supportsColors = process.env.FORCE_COLOR !== '0';
+
+const supportsColors = false;
 /**
  * Determines the "type" of the provided object
  * according to a custom series of checks.
@@ -415,7 +416,7 @@ class Bridge {
   }
 }
 
-Object.assign(util.inspect.styles, {
+/* Object.assign(util.inspect.styles, {
   bigint: 'yellow',
   boolean: 'yellow',
   date: 'magenta',
@@ -428,7 +429,7 @@ Object.assign(util.inspect.styles, {
   string: 'green',
   symbol: 'blue',
   undefined: 'grey',
-});
+}); */
 
 const handlers = {};
 /**
@@ -474,7 +475,8 @@ class IPCClass {
   };
   /**
    * The 'write' method stores the callback function into the handlers
-   * object with key 'data.r', and utilizes the 'send' method to write data to stderr.
+   * object with key 'data.r', and utilizes the 'send' method
+   * to write data to stderr.
    * @param {any} data - Data to write to stderr.
    * @param {function} cb - Callback function to store.
    */

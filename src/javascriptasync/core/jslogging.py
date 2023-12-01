@@ -23,29 +23,29 @@ console_handler.setFormatter(formatter)
 logs.addHandler(console_handler)
 
 
-def log_critical(*args, **kwargs):
+def log_critical(msg,*args, **kwargs):
     if logs is not None:
-        logs.critical(*args, **kwargs)
+        logs.critical(msg,*args, **kwargs)
 
 
-def log_error(*args, **kwargs):
+def log_error(msg,*args, **kwargs):
     if logs is not None:
-        logs.error(*args, **kwargs)
+        logs.error(msg,*args, **kwargs)
 
 
-def log_info(*args, **kwargs):
+def log_info(msg,*args, **kwargs):
     if logs is not None:
-        logs.info(*args, **kwargs)
+        logs.info(msg,*args, **kwargs)
 
 
-def log_warning(*args, **kwargs):
+def log_warning(msg,*args, **kwargs):
     if logs is not None:
-        logs.warning(*args, **kwargs)
+        logs.warning(msg,*args, **kwargs)
 
 
-def log_debug(*args, **kwargs):
+def log_debug(msg,*args, **kwargs):
     if logs is not None:
-        logs.debug(*args, **kwargs)
+        logs.debug(msg,*args, **kwargs)
 
 
 def log_print(*msg):

@@ -1,4 +1,5 @@
 from __future__ import annotations
+from queue import Empty, Queue
 
 # import asyncio
 import threading
@@ -12,10 +13,12 @@ import os
 import sys
 from typing import Any, Dict, List, TextIO, Union
 from . import config, events
-from .core.jslogging import log_print, log_debug, log_info, log_error, log_critical
+from .core.jslogging import log_print, log_debug, log_info, log_error, log_critical, log_warning
 from .util import haspackage
 from .errors import InvalidNodeJS
 
+
+from .core.pumlprofiler import CodeProfiler
 ISCLEAR = False
 ISNOTEBOOK = False
 try:
@@ -89,7 +92,8 @@ class ConnectionClass:
         self.proc: subprocess.Popen = None
         self.com_thread: threading.Thread = None
         self.stdout_thread: threading.Thread = None
-        self.stderr_lines: List = []
+        #self.stderr_lines: List[str] = []
+        self.stderr_lines: Queue[str] = Queue()
         self.sendQ: list = []
         self.config: config.JSConfig = configval
         self.event_loop: events.EventLoop = None
@@ -140,36 +144,63 @@ class ConnectionClass:
     # Currently this uses process standard input & standard error pipes
     # to communicate with JS, but this can be turned to a socket later on
     # ^^ Looks like custom FDs don't work on Windows, so let's keep using STDIO.
+    def read_output_line(self, out_line:str):
+        """
+        Process an output line from the JavaScript process, returning a list of JSON-decoded
+        data objects. The line is decoded using UTF-8, then split into individual lines based
+        on newline characters. Empty lines are skipped.
 
-    def read_stderr(self, stderrs: List[str]) -> List[Dict]:
+
+        In case of a ValueError during JSON decoding, the error and offending line are printed.
+
+        Args:
+            out_line (str): The output line to be processed.
+
+        Returns:
+            list: A list of JSON-decoded data objects derived from the input line.
+
+        Raises:
+            ValueError: If a line cannot be JSON-decoded.
+        """
+        inp = out_line.decode("utf-8")
+        ret=[]
+        for line in inp.split("\n"):
+            if not len(line):
+                continue
+            #this line worries me.
+            if not line.startswith('{"r"'):
+
+                print("[JSE]", line)
+                continue
+            try:
+                d = json.loads(line)
+                log_debug("%s,%d,%s", "connection: [js -> py]", int(time.time() * 1000), line)
+                ret.append(d)
+            except ValueError as v_e:
+                print(v_e, "[JSE]", line)
+                #log_error()
+        return ret
+    def read_stderr(self) -> List[Dict]:
         """
         Read and process stderr messages from the node.js process, transforming them
         into Dictionaries via json.loads
 
-        Args:
-            stderrs (List[str]): List of error messages.
 
         Returns:
-            List[Dict]: Processed error messages.
+            List[Dict]: Processed outbound_messages
         """
-        ret = []
-        for stderr in stderrs:
-            inp = stderr.decode("utf-8")
-            for line in inp.split("\n"):
-                if not len(line):
-                    continue
-                #this line worries me.
-                if not line.startswith('{"r"'):
-                    
-                    print("[JSE]", line)
-                    continue
-                try:
-                    d = json.loads(line)
-                    log_debug("%s,%d,%s", "connection: [js -> py]", int(time.time() * 1000), line)
-                    ret.append(d)
-                except ValueError as v_e:
-                    print(v_e, "[JSE]", line)
-        return ret
+        out=[]
+        current_iter=0
+        still_full=True
+        while (self.stderr_lines.qsize()>0 and still_full):
+            try:
+                toadd=self.stderr_lines.get_nowait()
+                out.extend(self.read_output_line(toadd))
+                current_iter+=1
+            except Empty as e:
+                log_warning("EventLoop, inbound Queue is empty.",exc_info=e)
+                still_full=False
+        return out
 
     # Write a message to a remote socket, in this case it's standard input
     # but it could be a websocket (slower) or other generic pipe.
@@ -184,10 +215,9 @@ class ConnectionClass:
             if type(obj) == str:
                 j = obj + "\n"
             else:
-                print("decoding", type(obj))
-                if not type(obj) == dict:
-                    print(obj.ffid)
-                # print(json.dumps(obj))
+                
+                if not type(obj) == dict:  print(obj.ffid)
+                print(json.dumps(obj))
                 j = json.dumps(obj) + "\n"
             log_debug("connection: %s,%d,%s", "[py -> js]", int(time.time() * 1000), j)
 
@@ -212,8 +242,8 @@ class ConnectionClass:
         Returns:
             list: Processed messages.
         """
-        ret = self.read_stderr(self.stderr_lines)
-        self.stderr_lines.clear()
+        ret = self.read_stderr()
+        # self.stderr_lines.clear()
         return ret
 
     def startup_node_js(self):
@@ -241,6 +271,20 @@ class ConnectionClass:
             )
             self.stop()
             raise err
+        
+    def recieve_stdio(self,line_read):
+        """
+        Receives standard input from a subprocess pipe and adds it to a
+        queue for further processing. It also raises a 'stdin' event.
+
+        Args:
+            stderr(subprocess.PIPE): A subprocess pipe from which to read.
+        """
+        readline = line_read
+        if readline:
+            self.stderr_lines.put(readline)
+            self.event_loop.queue.put("stdin")
+
 
     def com_io(self):
         """
@@ -258,7 +302,7 @@ class ConnectionClass:
             Exception: If there's an issue spawning the JS process or if any
             exceptions occur during communication.
         """
-
+        #with CodeProfiler('com_thread') as profiler:
         print("Starting Node.JS connection...!")
         self.startup_node_js()
         for send in self.sendQ:
@@ -270,9 +314,8 @@ class ConnectionClass:
             self.stdout_thread.start()
 
         while self.proc.poll() is None:
-            readline = self.proc.stderr.readline()
-            self.stderr_lines.append(readline)
-            self.event_loop.queue.put("stdin")
+            self.recieve_stdio(self.proc.stderr.readline())
+            
 
         print("Termination condition", self.endself)
         if not self.endself:

@@ -2,28 +2,39 @@ import re
 import sys
 import traceback
 from .core.abc import BaseError
-from .core.jslogging import logs
+from .core.jslogging import logs, log_error
 from typing import List, Optional, Tuple
 from .util import haspackage
 
 
-class JavaScriptError(BaseError):
+class JavaScriptError(Exception):
     """
     Custom exception class for JavaScript errors.
     """
 
-    def __init__(self, call: str, jsStackTrace: List[str], pyStacktrace: Optional[List[str]] = None):
+    def __init__(self, call: str, jsStackTrace: List[str], *args, **kwargs):
         """
         Initialize a JavaScriptError object.
 
         Args:
             call (str): The failed JavaScript call.
             jsStackTrace (List[str]): JavaScript stack trace.
-            pyStacktrace (Optional[List[str]]): Python stack trace (optional).
         """
+        
+        super().__init__(*args, **kwargs)  # Assuming BaseError is the base class of JavaScriptError
         self.call = call
         self.js = jsStackTrace
-        self.py = pyStacktrace
+
+
+    def get_error_message(self):
+        return getErrorMessage(self.call, self.js, traceback.format_tb( self.__traceback__))
+    
+    def __str__(self):
+        return self.get_error_message()
+    
+    def __repr__(self):
+        return str(self)
+    
 
 
 class NoAsyncLoop(BaseError):
@@ -31,6 +42,13 @@ class NoAsyncLoop(BaseError):
     Raised when calling @On when the passed in handler is an async function
     And no event loop was passed into the args
     """
+    
+class NoPyiAction(BaseError):
+    """
+    Raised when PYI does not have a given set action in PYI.
+    
+    """
+
 
 
 class NoConfigInitalized(BaseError):
@@ -291,42 +309,38 @@ def getErrorMessage(failed_call, jsStackTrace, pyStacktrace):
 
 # Fix for IPython as it blocks the exception hook
 # https://stackoverflow.com/a/28758396/11173996
-try:
-    # __IPYTHON__
-    if haspackage("IPython"):
-        import IPython
+# try:
+#     # __IPYTHON__
+#     if haspackage("IPython"):
+#         import IPython
 
-        oldLogger = IPython.core.interactiveshell.InteractiveShell.showtraceback
+#         oldLogger = IPython.core.interactiveshell.InteractiveShell.showtraceback
 
-        def newLogger(*a, **kw):
-            ex_type, ex_inst, tb = sys.exc_info()
-            if ex_type is JavaScriptError:
-                pyStacktrace = traceback.format_tb(tb)
-                # The Python part of the stack trace is already printed by IPython
-                print(getErrorMessage(ex_inst.call, ex_inst.js, pyStacktrace))
-            else:
-                oldLogger(*a, **kw)
+#         def newLogger(*a, **kw):
+#             ex_type, ex_inst, tb = sys.exc_info()
+#             if ex_type is JavaScriptError:
+#                 pyStacktrace = traceback.format_tb(tb)
+#                 # The Python part of the stack trace is already printed by IPython
+#                 print(getErrorMessage(ex_inst.call, ex_inst.js, pyStacktrace))
+#             else:
+#                 oldLogger(*a, **kw)
 
-        IPython.core.interactiveshell.InteractiveShell.showtraceback = newLogger
-except ImportError:
-    pass
+#         IPython.core.interactiveshell.InteractiveShell.showtraceback = newLogger
+# except ImportError:
+#     pass
 
-orig_excepthook = sys.excepthook
-
-
-def error_catcher(error_type, error, error_traceback):
-    """
-    Catches JavaScript exceptions and prints them to the console.
-    """
-    logs.error("ERROR.")
-    if error_type is JavaScriptError:
-        pyStacktrace = traceback.format_tb(error_traceback)
-        jsStacktrace = error.js
-        message = getErrorMessage(error.call, jsStacktrace, pyStacktrace)
-        print(message, file=sys.stderr)
-    else:
-        orig_excepthook(error_type, error, error_traceback)
+# orig_excepthook = sys.excepthook
 
 
-sys.excepthook = error_catcher
+# def error_catcher(error_type, error, error_traceback):
+#     """
+#     Catches JavaScript exceptions and prints them to the console.
+#     """
+#     logs.error("ERROR.")
+#     #print("TRACE:", traceback.format_exc())
+#     #if error_type is JavaScriptError:        error.py=error_traceback
+#     orig_excepthook(error_type, error, error_traceback)
+
+
+#sys.excepthook = error_catcher
 # ====

@@ -65,18 +65,8 @@ class Executor:
 
         r = generate_snowflake(self.i, SnowflakeMode.pyrid)  # unique request ts, acts as ID for response
         l = None  # the lock
-        if action == "get":  # return obj[prop]
-            l = self.loop.queue_request(r, Request(**{"r": r, "action": "get", "ffid": ffid, "key": attr}))
-        if action == "init":  # return new obj[prop]
-            l = self.loop.queue_request(r, {"r": r, "action": "init", "ffid": ffid, "key": attr, "args": args})
-        if action == "inspect":  # return require('util').inspect(obj[prop])
-            l = self.loop.queue_request(r, {"r": r, "action": "inspect", "ffid": ffid, "key": attr})
-        if action == "serialize":  # return JSON.stringify(obj[prop])
-            l = self.loop.queue_request(r, {"r": r, "action": "serialize", "ffid": ffid})
-        if action == "set":
-            l = self.loop.queue_request(r, {"r": r, "action": "set", "ffid": ffid, "key": attr, "args": args})
-        if action == "keys":
-            l = self.loop.queue_request(r, {"r": r, "action": "keys", "ffid": ffid})
+        req:Request=Request.create_by_action(r,action,ffid,attr,args)
+        l = self.loop.queue_request(r,req)
 
         if not l.wait(10):
             raise BridgeTimeout(f"Timed out accessing '{attr}'", action, ffid, attr)
@@ -106,26 +96,8 @@ class Executor:
         l = None  # the lock
         amode = True
         aloop = asyncio.get_event_loop()
-        if action == "get":  # return obj[prop]
-            l = self.loop.queue_request(
-                r, {"r": r, "action": "get", "ffid": ffid, "key": attr}, asyncmode=amode, loop=aloop
-            )
-        if action == "init":  # return new obj[prop]
-            l = self.loop.queue_request(
-                r, {"r": r, "action": "init", "ffid": ffid, "key": attr, "args": args}, asyncmode=amode, loop=aloop
-            )
-        if action == "inspect":  # return require('util').inspect(obj[prop])
-            l = self.loop.queue_request(
-                r, {"r": r, "action": "inspect", "ffid": ffid, "key": attr}, asyncmode=amode, loop=aloop
-            )
-        if action == "serialize":  # return JSON.stringify(obj[prop])
-            l = self.loop.queue_request(r, {"r": r, "action": "serialize", "ffid": ffid}, asyncmode=amode, loop=aloop)
-        if action == "set":
-            l = self.loop.queue_request(
-                r, {"r": r, "action": "set", "ffid": ffid, "key": attr, "args": args}, asyncmode=amode, loop=aloop
-            )
-        if action == "keys":
-            l = self.loop.queue_request(r, {"r": r, "action": "keys", "ffid": ffid}, asyncmode=amode, loop=aloop)
+        req:Request=Request.create_by_action(r,action,ffid,attr,args)
+        l = self.loop.queue_request(r,req,asyncmode=amode, loop=aloop)
         try:
             await asyncio.wait_for(l.wait(), timeout)
         except asyncio.TimeoutError as time_exc:

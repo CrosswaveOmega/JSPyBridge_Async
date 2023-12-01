@@ -448,7 +448,6 @@ class PyBridge {
    * with a custom handler.
    */
   makePyObject(ffid, inspectString) {
-
     const pyobj=new pyObjs.PyObject(ffid, inspectString, this);
 
     return new Proxy(new pyObjs.CustomLogger(inspectString), pyobj);

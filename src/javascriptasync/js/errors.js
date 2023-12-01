@@ -1,4 +1,4 @@
-const supportsColors = true;
+const supportsColors = false;
 const chalk = {
   boldRed: (text) => supportsColors ? `\x1b[1m\x1b[91m${text}\x1b[0m` : text,
   blueBright: (text) => supportsColors ? `\x1b[91m${text}\x1b[0m` : text,

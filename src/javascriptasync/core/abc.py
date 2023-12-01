@@ -61,3 +61,26 @@ class Request(Dict[str, Any]):
                 if v is not None
             }
         )
+    @classmethod
+    def create_by_action(cls, r: int, action: str, ffid: int, key: Any, args: Any=None) -> 'Request':
+        """
+        Class method that creates a Request object based on the given parameters.
+
+        Parameters:
+        r (int): The ID of the request.
+        action (str): The action to be taken ("serialize", "keys", "get", "inspect", "set", "init").
+        ffid (int): The ID of the function.
+        key (Any): The key for the request, used in "get", "inspect", "set", "init" actions.
+        args (Any): The arguments for the request, used in "set", "init" actions.
+
+        Returns:
+        Request: The Request object created using the parameters.
+        """
+        if action in ['serialize','keys']:
+            return Request(r=r,action=action,ffid=ffid)
+        elif action in ['get','inspect']:
+            return Request(r=r,action=action,ffid=ffid,key=key)
+        elif action in ['set','init']:
+            return Request(r=r,action=action,ffid=ffid,key=key,args=args)
+
+
