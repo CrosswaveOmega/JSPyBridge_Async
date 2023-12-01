@@ -217,7 +217,6 @@ class ConnectionClass:
             else:
                 
                 if not type(obj) == dict:  print(obj.ffid)
-                print(json.dumps(obj))
                 j = json.dumps(obj) + "\n"
             log_debug("connection: %s,%d,%s", "[py -> js]", int(time.time() * 1000), j)
 

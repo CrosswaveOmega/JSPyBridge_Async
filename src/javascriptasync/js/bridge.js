@@ -416,7 +416,7 @@ class Bridge {
   }
 }
 
-/* Object.assign(util.inspect.styles, {
+Object.assign(util.inspect.styles, {
   bigint: 'yellow',
   boolean: 'yellow',
   date: 'magenta',
@@ -429,7 +429,7 @@ class Bridge {
   string: 'green',
   symbol: 'blue',
   undefined: 'grey',
-}); */
+});
 
 const handlers = {};
 /**

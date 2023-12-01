@@ -74,13 +74,12 @@ class EventExecutorThread(threading.Thread):
         """
         Run the event executor thread.
         """
-        with CodeProfiler("PYITHREAD",ignore_private=False) as profiler:
-            while self.running:
-                request_id, cb_id, job, args = self.jobs.get()
-                log_debug("EVT %s, %s,%s,%s", request_id, cb_id, job, args)
-                ok = job(args)
-                if self.jobs.empty():
-                    self.doing = []
+        while self.running:
+            request_id, cb_id, job, args = self.jobs.get()
+            log_debug("EVT %s, %s,%s,%s", request_id, cb_id, job, args)
+            ok = job(args)
+            if self.jobs.empty():
+                self.doing = []
 
 
 # The event loop here is shared across all threads. All of the IO between the
@@ -152,7 +151,7 @@ class EventLoop(EventLoopBase, EventLoopMixin):
         and the connection to Node.JS.
         """
         self.conn.start()
-        #self.callbackExecutor.start()
+        self.callbackExecutor.start()
 
     def stop(self):
         """
@@ -245,7 +244,7 @@ class EventLoop(EventLoopBase, EventLoopMixin):
         Returns:
             threading.Event: An event for waiting on the response.
         """
-        print("ptype", type(payload))
+
         self.outbound.put(payload)
         if asyncmode:
             lock = CrossThreadEvent(_loop=loop)
@@ -393,7 +392,7 @@ class EventLoop(EventLoopBase, EventLoopMixin):
                 log_debug("Loop, inbound C request was %s", str(inbound))
 
                 pyi = self.conf.get_pyi()
-                #asyncio.create_task(pyi.inbound_a(inbound))
+                #syncio.create_task(asyncio.to_thread(pyi.inbound,inbound))
                 self.callbackExecutor.add_job(r, cbid, pyi.inbound, inbound)
             if r in self.requests:
                 lock, timeout = self.requests.pop(r)
