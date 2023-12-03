@@ -121,14 +121,12 @@ There's also nothing stopping you from using the original wrappers.
             this.emit('increment', this.counter);
         }
     }
-
-    // Export the custom emitter class
     module.exports = MyEmitter;
 
 
 
 .. code-block:: python
-    :caption: eventemitter.py
+    :caption: using decorators with eventemitters
 
     from javascriptasync import init_js, require
     from javascriptasync.emitters import On, Once, off, once
@@ -140,10 +138,33 @@ There's also nothing stopping you from using the original wrappers.
     @On(myEmitter, 'increment')
     def handleIncrement(this, counter):
         print("Incremented", counter)
-        # Stop listening. `this` is the this variable in JS.
+        # Stop listening. 
         off(myEmitter, 'increment', handleIncrement)
     # Trigger the event handler
     myEmitter.inc()
+
+
+It's preferred if 
+
+.. code-block:: python
+    :caption: using built in on/off methods EventEmitters
+
+    from javascriptasync import init_js, require
+    init_js()
+    MyEmitter = require('./emitter.js')
+    # New class instance
+    myEmitter = MyEmitter()
+    # define callback function.
+    def handleIncrement(this, counter):
+        print("Incremented", counter)
+        # Stop listening. 
+        myEmitter.off( 'increment', handleIncrement)
+    
+    #assign callback handler.
+    myEmitter.on('increment',handleIncrement)
+    # Trigger the event handler
+    myEmitter.inc()
+
 
 Async/Coroutine Event Handling
 ------------------------------

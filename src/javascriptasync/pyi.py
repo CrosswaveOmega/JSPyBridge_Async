@@ -147,12 +147,12 @@ class PyInterface:
             if name!='action_selector':
                 signature = inspect.signature(method)
                 parameters = [k for k in signature.parameters.keys()]
-                print(name,signature,parameters)
+                #log_debug(name,signature,parameters)
                 if set(["r", "ffid", "key", "args"]).issubset(parameters):
-                    print("is_subset")
+                    #log_debug("is_subset")
                     self.my_actions[name] = method
                 if set(["r", "ffid", "keys", "args"]).issubset(parameters):
-                    print("is_subset2")
+                    #log_debug("is_subset2")
                     self.my_actions[name] = method
         
 
@@ -569,7 +569,7 @@ class PyInterface:
         
         # print(j)
         thread_id = threading.current_thread().ident
-        print('threadid',thread_id,"INBOUND PYI: ",j)
+        # print('threadid',thread_id,"INBOUND PYI: ",j)
         return self.onMessage(j["r"], j["action"], j["ffid"], j["key"], j["val"])
     
     async def inbound_a(self, j:Dict[str,Any]):

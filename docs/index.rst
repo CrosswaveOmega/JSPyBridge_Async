@@ -55,6 +55,7 @@ Guide
    :caption: Guide
 
    guide/introduction
+   guide/require
    guide/proxy
    guide/eventemitters
    guide/threadtasks

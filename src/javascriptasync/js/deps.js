@@ -195,10 +195,7 @@ const pm = new PackageManager();
  * @return {Object|null} The required module.
  */
 async function $require(name, version, relativeTo) {
-  console.log(name);
   if (relativeTo) {
-    console.log('relto', relativeTo);
-    console.log('file://' + join(relativeTo, name));
     // process.env.NODE_PATH= MOD_PATH;
     const mod = await import('file://' + join(relativeTo, name));
     return mod.default ?? mod;

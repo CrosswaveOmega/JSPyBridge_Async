@@ -42,7 +42,7 @@ an almost "psuedo async" manner.  There is a equivalent wrapper for actual Async
 
 The first parameter to all "AsyncThread" methods should be a `ThreadState` object:
 
-.. autoclass:: javascriptasync.events.ThreadState
+.. autoclass:: javascriptasync.threadtasks.ThreadState
    :members:
    :undoc-members:
    :no-index:

@@ -31,7 +31,7 @@ Requires Node.js 14 and Python 3.8 or newer.
 * Iteration and exception handling support
 * Object inspection allows you to easily `console.log` or `print()` any foreign objects
 
-* (Bridge to call JS from Python) Native decorator-based event emitter support
+* (Bridge to call JS from Python) Specialized object oriented support for event-emitter functions.
 
 ### New Javascript from Python usage:
 ```py

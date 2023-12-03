@@ -5,11 +5,11 @@ build-backend = "setuptools.build_meta"
 name = 'javascriptasync'
 license = {file = "LICENSE"}
 authors = [{name="Crosswave Omega",email= "xtream2pro@gmail.com"}]
-description = "fork of JSPyBridge which allows for enhansed asyncio compatibility "
+description = "fork of JSPyBridge overhauled to allow for asyncio compatibility and more control."
 readme = 'README.md'
 
 keywords = ['node', 'javascript', 'bridge', 'development','fork']
-version = '0.2.1.5'
+version = '0.2.2.0'
 
 [project.urls]
 "Homepage"= "https://github.com/CrosswaveOmega/JSPyBridge_Async"

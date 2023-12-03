@@ -18,7 +18,6 @@ from .util import haspackage
 from .errors import InvalidNodeJS
 
 
-from .core.pumlprofiler import CodeProfiler
 ISCLEAR = False
 ISNOTEBOOK = False
 try:
@@ -216,7 +215,7 @@ class ConnectionClass:
                 j = obj + "\n"
             else:
                 
-                if not type(obj) == dict:  print(obj.ffid)
+                #if not type(obj) == dict:  print(obj.ffid)
                 j = json.dumps(obj) + "\n"
             log_debug("connection: %s,%d,%s", "[py -> js]", int(time.time() * 1000), j)
 

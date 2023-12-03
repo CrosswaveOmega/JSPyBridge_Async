@@ -29,6 +29,7 @@ radonout.txt
 radonoutraw.txt
 out.txt
 src/metest.py
+src/new_events.py
 plantumlcurrent.png
 plantumlcurrent2.png
 *.log

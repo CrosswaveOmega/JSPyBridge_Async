@@ -106,12 +106,10 @@ However, `javascriptasync` offers a shortcut command to install NPM packages rel
 ``hybridize add`` will add each file to a text file called 'nodemodules.txt', and ``hybridize install`` will install each package in this text file to your local directory.
 
 .. code-block:: bash
-   :caption: 
 
    python3 -m javascriptasync hybridize add lodash
 
 
 .. code-block:: bash
-   :caption: 
 
-   python3 -m javascriptasync install
+   python3 -m javascriptasync hybridize install

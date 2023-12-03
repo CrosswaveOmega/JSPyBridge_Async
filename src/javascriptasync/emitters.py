@@ -12,8 +12,7 @@ import threading, inspect, time, atexit, os, sys
 from .errors import NoAsyncLoop
 
 
-# You must use this Once decorator for an EventEmitterProxy in Node.js, otherwise
-# you will not be able to off an emitter.
+
 def On(emitter: EventEmitterProxy, event: str) -> Callable:
     """
     Decorator for registering a python function or coroutine as a listener for an EventEmitterProxy.

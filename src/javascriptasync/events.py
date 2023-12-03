@@ -1,3 +1,9 @@
+'''
+Core module which contains the EventLoop class.
+
+'''
+
+
 from __future__ import annotations
 import asyncio
 import time, threading, json, sys
@@ -13,7 +19,7 @@ from .core.jslogging import (
     log_print,
     log_warning,
 )
-from .core.pumlprofiler import CodeProfiler
+
 from .connection import ConnectionClass
 from .util import generate_snowflake
 from .asynciotasks import EventLoopMixin, TaskGroup

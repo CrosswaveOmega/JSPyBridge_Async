@@ -100,6 +100,25 @@ javascriptasync.emitters module
    :undoc-members:
    :show-inheritance:
 
+
+javascriptasync.threadtasks module
+-------------------------------
+
+.. automodule:: javascriptasync.threadtasks
+   :members:
+   :undoc-members:
+   :show-inheritance:
+
+
+
+javascriptasync.util module
+-------------------------------
+
+.. automodule:: javascriptasync.util
+   :members:
+   :undoc-members:
+   :show-inheritance:
+
 Module contents
 ---------------
 

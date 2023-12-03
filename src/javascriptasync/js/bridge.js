@@ -152,6 +152,35 @@ class Bridge {
       },
     });
   }
+  /**
+   * This function selects a request to send across the bridge
+   * based on the type of object specified by the type parameter.
+   *
+   * @async
+   * @param {int} r -  Request identifier.
+   * @param {object} v - Identifier of the object on the FFID map.
+   * @param {string} type - type of object
+   * @throws Will return ipc.send error message if any exception occurs.
+   *  @return {void} nothing.
+   */
+  switchType(r, v, type) {
+    switch (type) {
+      case 'string': return this.ipc.send({r, key: 'string', val: v});
+      case 'big': return this.ipc.send({r, key: 'big', val: Number(v)});
+      case 'num': return this.ipc.send({r, key: 'num', val: v});
+      case 'py': return this.ipc.send({r, key: 'py', val: v.ffid});
+      case 'class':
+        this.m[this.ffidinc()] = v;
+        return this.ipc.send({r, key: 'class', val: this.ffid});
+      case 'fn':
+        this.m[this.ffidinc()] = v;
+        return this.ipc.send({r, key: 'fn', val: this.ffid});
+      case 'obj':
+        this.m[this.ffidinc()] = v;
+        return this.ipc.send({r, key: 'obj', val: this.ffid});
+      default: return this.ipc.send({r, key: 'void', val: this.ffid});
+    }
+  }
 
   /**
    * Asynchronously retrieves the value of a specific attribute for
@@ -172,7 +201,7 @@ class Bridge {
     } catch (e) {
       return this.ipc.send({r, key: 'void', val: this.ffid});
     }
-
+    return this.switchType(r, v, type);
     switch (type) {
       case 'string': return this.ipc.send({r, key: 'string', val: v});
       case 'big': return this.ipc.send({r, key: 'big', val: Number(v)});
@@ -261,6 +290,7 @@ class Bridge {
     }
     const type = getType(v);
     // console.log('GetType', type, v)
+    return this.switchType(r, v, type);
     switch (type) {
       case 'string': return this.ipc.send({r, key: 'string', val: v});
       case 'big': return this.ipc.send({r, key: 'big', val: Number(v)});
