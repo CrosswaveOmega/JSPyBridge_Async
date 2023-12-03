@@ -102,7 +102,7 @@ javascriptasync.emitters module
 
 
 javascriptasync.threadtasks module
--------------------------------
+----------------------------------
 
 .. automodule:: javascriptasync.threadtasks
    :members:
@@ -112,7 +112,7 @@ javascriptasync.threadtasks module
 
 
 javascriptasync.util module
--------------------------------
+---------------------------
 
 .. automodule:: javascriptasync.util
    :members:
