@@ -76,7 +76,7 @@ class Request(Dict[str, Any]):
         Returns:
         Request: The Request object created using the parameters.
         """
-        if action in ['serialize','keys']:
+        if action in ['serialize','keys','getdeep']:
             return Request(r=r,action=action,ffid=ffid)
         elif action in ['get','inspect']:
             return Request(r=r,action=action,ffid=ffid,key=key)

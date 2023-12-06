@@ -121,6 +121,7 @@ async def require_a(name: str, version: Optional[str] = None, amode: bool = Fals
     module = await coro
     if amode:
         module._asyncmode = True
+        await module.getdeep()
     return module
 
 
@@ -242,6 +243,7 @@ async def eval_js_a(js: str, timeout: int = 10, as_thread: bool = False) -> Any:
 
             rv = context.call_s(js, local_vars, timeout=timeout, forceRefs=True, coroutine=True)
         else:
+            print(local_vars)
             rv = asyncio.to_thread(conf.global_jsi.evaluateWithContext, js, local_vars, timeout=timeout, forceRefs=True)
     finally:
         del frame

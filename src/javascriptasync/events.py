@@ -305,7 +305,7 @@ class EventLoop(EventLoopBase, EventLoopMixin):
         log_print("calling self.exit")
         log_print(str(self.responses))
         log_print(str(self.requests))
-
+        log_print(str(",".join([f"{k,v}" for k, v in self.callbacks.items()])))
         if len(self.callbacks):
             log_debug("%s,%s", "cannot exit because active callback", self.callbacks)
         while len(self.callbacks) and self.conn.is_alive():

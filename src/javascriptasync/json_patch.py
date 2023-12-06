@@ -3,8 +3,10 @@ Module that contains a special Encoder variant to assist
 with the serialization of PCall requests.
 
 """
-from json import JSONEncoder
+from json import JSONEncoder, JSONDecoder
 
+from javascriptasync.core.jslogging import log_warning
+from .errors import InvalidNodeOp
 from typing import Any, Tuple
 
 
@@ -23,6 +25,16 @@ from typing import Any, Tuple
 
 # You're better off just using a custom Decoder.
 
+class JSONRequestDecoder(JSONDecoder):
+    def decode(self, s:str):
+        """Return the Python representation of ``s`` (a ``str`` instance
+        containing a JSON document).
+
+        """
+        decoded_obj = super().decode(s)
+        if isinstance(decoded_obj, dict) and 'r' in decoded_obj:
+            return decoded_obj, True
+        return s, False
 
 class CustomJSONCountEncoder(JSONEncoder):
     """
@@ -50,7 +62,7 @@ class CustomJSONCountEncoder(JSONEncoder):
             self.append_p = kwargs.pop("append_p")
         super().__init__(*args, **kwargs)
         self.ctr = 0
-
+        self.problem=0
         self.expect_reply = False
         self.wanted = {}
 
@@ -92,11 +104,18 @@ class CustomJSONCountEncoder(JSONEncoder):
             dict: If 'ffid' exists returns ffid, else returns 'r', 'ffid' and updates wanted dict.
         """
         self.ctr += 1
-        if hasattr(o, "ffid"):
-            return {"ffid": o.ffid}
+        pro=o
+        if hasattr(pro, "node_op"):
+            if pro.node_op:
+                log_warning(f"passed in arg {pro} is an unprocessed chain! ")
+                self.ctr-=1
+                self.problem+=1
+                return {"no": "UNPROCESSED CHAIN."}
+        if hasattr(pro, "ffid"):
+            return {"ffid": pro.ffid}
         else:
             self.expect_reply = True
-            self.wanted[self.ctr] = o
+            self.wanted[self.ctr] = pro
             return {"r": self.ctr, "ffid": ""}
 
     def encode_refs(self, o: Any, args: Tuple[Any]) -> str:
@@ -140,6 +159,8 @@ class CustomJSONCountEncoder(JSONEncoder):
             chunks = list(chunks)
         # cl = len(chunks) - 1
         chunk_append = []
+        if self.ctr<=0 and self.problem>=1:
+            raise InvalidNodeOp("please check your code...")
         doappend = self.append_p
         for c in chunks:
             chunk_append.append(c)

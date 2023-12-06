@@ -29,7 +29,7 @@ class ThreadState(ThreadTaskStateBase):
 
     def __init__(self):
         self.stopping: bool = False
-        self.sleep: Callable = self.wait
+        
 
     def wait(self, sec: float):
         """
@@ -46,6 +46,8 @@ class ThreadState(ThreadTaskStateBase):
             # This feels unsafe, but it works for threads.
             # Will remove when I find something I consider safer.
             sys.exit(1)
+    def sleep(self,sec):
+         self.wait(sec)
 
 
 class ThreadGroup:

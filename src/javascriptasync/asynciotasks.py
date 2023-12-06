@@ -15,7 +15,7 @@ class TaskStateAsync(ThreadTaskStateBase):
 
     def __init__(self):
         self.stopping = False
-        self.sleep = self.wait
+        #self.sleep = self.wait
 
     async def wait(self, sec):
         """
@@ -31,6 +31,9 @@ class TaskStateAsync(ThreadTaskStateBase):
             pass
             # print('STOP IN WAIT!')
             # sys.exit(1)
+            
+    async def sleep(self, sec):
+        return await self.wait(sec)
 
 
 class TaskGroup:

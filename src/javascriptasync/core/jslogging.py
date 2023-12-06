@@ -7,7 +7,7 @@ a simple logger.
 """
 
 logs = logging.getLogger("asyncjs")
-logs.setLevel(logging.ERROR)
+logs.setLevel(logging.INFO)
 
 # Create a console handler and set the level to Debug
 console_handler = logging.StreamHandler()

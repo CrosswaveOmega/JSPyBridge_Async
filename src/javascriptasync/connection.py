@@ -16,7 +16,7 @@ from . import config, events
 from .core.jslogging import log_print, log_debug, log_info, log_error, log_critical, log_warning
 from .util import haspackage
 from .errors import InvalidNodeJS
-
+from .json_patch import JSONRequestDecoder
 
 ISCLEAR = False
 ISNOTEBOOK = False
@@ -167,16 +167,20 @@ class ConnectionClass:
             if not len(line):
                 continue
             #this line worries me.
-            if not line.startswith('{"r"'):
-
-                print("[JSE]", line)
-                continue
+            decoder=JSONRequestDecoder()
             try:
-                d = json.loads(line)
+                d,decodeok=decoder.decode(line)
+                if not decodeok:
+                    print("[JSE]", line)
+                    continue
+                
                 log_debug("%s,%d,%s", "connection: [js -> py]", int(time.time() * 1000), line)
                 ret.append(d)
+            except json.JSONDecodeError as jde:
+                print(jde, "[JSE]", line)
             except ValueError as v_e:
                 print(v_e, "[JSE]", line)
+            
                 #log_error()
         return ret
     def read_stderr(self) -> List[Dict]:
@@ -215,18 +219,21 @@ class ConnectionClass:
                 j = obj + "\n"
             else:
                 
-                #if not type(obj) == dict:  print(obj.ffid)
+                if not type(obj) == dict:  
+                    pass
+                    # print(obj.ffid)
                 j = json.dumps(obj) + "\n"
             log_debug("connection: %s,%d,%s", "[py -> js]", int(time.time() * 1000), j)
-
+            encoded=j.encode()
             # log_print('procstatus',self.proc)
             if not self.proc:
                 self.sendQ.append(j.encode())
                 continue
             try:
-                self.proc.stdin.write(j.encode())
+                self.proc.stdin.write(encoded)
                 self.proc.stdin.flush()
             except (IOError, BrokenPipeError) as error:
+                log_critical(encoded)
                 log_critical(error, exc_info=True)
                 self.stop()
                 break
@@ -300,7 +307,7 @@ class ConnectionClass:
             Exception: If there's an issue spawning the JS process or if any
             exceptions occur during communication.
         """
-        #with CodeProfiler('com_thread') as profiler:
+
         print("Starting Node.JS connection...!")
         self.startup_node_js()
         for send in self.sendQ:

@@ -116,7 +116,7 @@ executionEnvironments = [
 ]
 
 [tool.pytest.ini_options]
-asyncio_mode = "strict"
+asyncio_mode = "auto"
 pythonpath = [
   "src"
 ]

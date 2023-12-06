@@ -13,7 +13,7 @@ from .util import generate_snowflake, SnowflakeMode
 from . import proxy, events, config
 from .errors import JavaScriptError, getErrorMessage, NoAsyncLoop, NoPyiAction
 from weakref import WeakValueDictionary
-from .core.jslogging import log_print, log_debug
+from .core.jslogging import log_info, log_print, log_debug
 
 
 def python(method: str) -> types.ModuleType:
@@ -41,8 +41,8 @@ def fileImport(moduleName: str, absolutePath: str, folderPath: str) -> types.Mod
         module: The imported Python module.
 
     """
-    if folderPath not in sys.path:
-        sys.path.append(folderPath)
+    #ABSOLUTELY NOT.
+    #if folderPath not in sys.path:    sys.path.append(folderPath)
     spec = importlib.util.spec_from_file_location(moduleName, absolutePath)
     foo = importlib.util.module_from_spec(spec)
     spec.loader.exec_module(foo)
@@ -565,7 +565,7 @@ class PyInterface:
             j (Dict[str, Any]): The incoming data as a dictionary.
 
         """
-        log_debug("PYI, %s", j)
+        log_info("PYI, %s", j)
         
         # print(j)
         thread_id = threading.current_thread().ident

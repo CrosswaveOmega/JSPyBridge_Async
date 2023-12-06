@@ -17,7 +17,7 @@ class Null:
         raise Exception("The JavaScript process has crashed. Please restart the runtime to access JS APIs.")
 
 
-class JSConfig(object):
+class JSConfig():
     """The configuration class for the JavaScript Bridge.
 
     This class is used to configure, manage, and facilitatie communication to an EventLoop, which filters data in/out to an active node subprocess.

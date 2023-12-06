@@ -82,7 +82,7 @@ def off(emitter: EventEmitterProxy, event: str, handler: Union[Callable, Corouti
         handler (Callable or Coroutine): The event handler function to unregister.  Works with Coroutines too.
 
     """
-    return emitter.off(event, handler)
+    return emitter.off_s(event, handler)
 
 
 def once(emitter: EventEmitterProxy, event: str) -> Any:

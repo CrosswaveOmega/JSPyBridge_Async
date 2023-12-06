@@ -165,6 +165,73 @@ class Bridge {
    */
   switchType(r, v, type) {
     switch (type) {
+      case 'string': return {r, key: 'string', val: v};
+      case 'big': return {r, key: 'big', val: Number(v)};
+      case 'num': return {r, key: 'num', val: v};
+      case 'py': return {r, key: 'py', val: v.ffid};
+      case 'class':
+        this.m[this.ffidinc()] = v;
+        return {r, key: 'class', val: this.ffid};
+      case 'fn':
+        this.m[this.ffidinc()] = v;
+        return {r, key: 'fn', val: this.ffid};
+      case 'obj':
+        this.m[this.ffidinc()] = v;
+        return {r, key: 'obj', val: this.ffid};
+      default: return {r, key: 'void', val: this.ffid};
+    }
+  }
+  /**
+   * Asynchronously retrieves every single value from the
+   * specified object in the FFID map and sends it back across
+   * the bridge.
+   *
+   * @async
+   * @param {int} r - The request identifier.
+   * @param {int} ffid - The identifier of the object on the FFID map.
+   * @param {string} attr - The attribute to retrieve from the object.
+   * @throws Will return ipc.send void message with ffid if an error occurs.
+   *  @return {void} nothing.
+   */
+  async getdeep(r, ffid) {
+    try {
+      /**
+log_debug("Proxy._call: %s, %s,%s,%s", "MT", method, methodType, val)
+        if methodType == "fn":
+            return Proxy(self._exe, val, self.ffid, method, 
+              amode=self._asyncmode)
+        if methodType == "class":
+            return Proxy(self._exe, val, es6=True, amode=self._asyncmode)
+        if methodType == "obj":
+            return Proxy(self._exe, val, amode=self._asyncmode)
+        if methodType == "inst":
+            return Proxy(self._exe, val, amode=self._asyncmode)
+        if methodType == "inste":
+            return EventEmitterProxy(self._exe, val, amode=self._asyncmode)
+        if methodType == "void":
+            return None
+        if methodType == "py":
+            return self._exe.get(val)
+        else:
+            return val
+      */
+      var to_return=[];
+      for (const attribute in this.m[ffid]) {
+        if (this.m[ffid][attribute] !=null) {
+          console.log(attribute + ': ' + obj[attribute]);
+          var v = await this.m[ffid][attribute];
+          var type = v.ffid ? 'py' : getType(v);
+          var attObj=this.switchType(r, v, type);
+          attObj['attr']=attribute;
+          to_return.push(attObj);
+        }
+      }
+      this.ipc.send({r, key: 'deepobj', val: to_return});
+    } catch (e) {
+      return this.ipc.send({r, key: 'void', val: this.ffid});
+    }
+    return this.switchType(r, v, type);
+    switch (type) {
       case 'string': return this.ipc.send({r, key: 'string', val: v});
       case 'big': return this.ipc.send({r, key: 'big', val: Number(v)});
       case 'num': return this.ipc.send({r, key: 'num', val: v});
@@ -181,7 +248,6 @@ class Bridge {
       default: return this.ipc.send({r, key: 'void', val: this.ffid});
     }
   }
-
   /**
    * Asynchronously retrieves the value of a specific attribute for
    * a specified object in the FFID map and sends it back across
@@ -201,7 +267,7 @@ class Bridge {
     } catch (e) {
       return this.ipc.send({r, key: 'void', val: this.ffid});
     }
-    return this.switchType(r, v, type);
+    return this.ipc.send(this.switchType(r, v, type));
     switch (type) {
       case 'string': return this.ipc.send({r, key: 'string', val: v});
       case 'big': return this.ipc.send({r, key: 'big', val: Number(v)});
@@ -289,8 +355,8 @@ class Bridge {
       return this.ipc.send({r, key: 'error', error: e.stack});
     }
     const type = getType(v);
-    // console.log('GetType', type, v)
-    return this.switchType(r, v, type);
+    console.log('GetType', type, v);
+    return this.ipc.send(this.switchType(r, v, type));
     switch (type) {
       case 'string': return this.ipc.send({r, key: 'string', val: v});
       case 'big': return this.ipc.send({r, key: 'big', val: Number(v)});

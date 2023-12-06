@@ -1,6 +1,7 @@
 import re
 import sys
 import traceback
+import asyncio
 from .core.abc import BaseError
 from .core.jslogging import logs, log_error
 from typing import List, Optional, Tuple
@@ -63,6 +64,17 @@ class InvalidNodeJS(BaseError):
 
     """
 
+class InvalidNodeOp(BaseError):
+    """
+    Raised if a NodeOp is invalid
+
+    """
+class AsyncReminder(BaseError):
+    """
+    Raised if an syncrounous magic method was called in amode
+
+    """
+
 
 class BridgeTimeout(TimeoutError):
     """
@@ -75,7 +87,17 @@ class BridgeTimeout(TimeoutError):
         self.ffid = ffid
         self.attr = attr
 
+class BridgeTimeoutAsync(asyncio.TimeoutError):
+    """
+    Raised if a request times out in async mode
+    """
 
+    def __init__(self, message, action, ffid, attr, *args, **kwargs):
+        super.__init__(*args,**kwargs)
+        self.message = message
+        self.action = action
+        self.ffid = ffid
+        self.attr = attr
 class Chalk:
     """
     Chalk class for text coloring.
