@@ -2,3 +2,4 @@ include src/javascriptasync/js/bridge.js
 include src/javascriptasync/js/pyi.js
 include src/javascriptasync/js/deps.js
 include src/javascriptasync/js/errors.js
+include src/javascriptasync/js/PyObject.js
