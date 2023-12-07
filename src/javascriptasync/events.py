@@ -336,7 +336,7 @@ class EventLoop(EventLoopBase, EventLoopMixin):
         del self.responses[request_id]
         return res, barrier
     
-    async def _send_outbound(self):
+    def _send_outbound(self):
         '''
         Gather all jobs in the outbound Queue, and send to the active 
         connection process.
@@ -357,7 +357,7 @@ class EventLoop(EventLoopBase, EventLoopMixin):
                 still_full=False
         self.conn.writeAll(out)
 
-    async def _remove_finished_thread_tasks(self):
+    def _remove_finished_thread_tasks(self):
         '''Remove all killed/finished threads and tasks from the
         threads and tasks lists.'''
         log_debug("Loop: checking self.threads %s",",".join([str(s) for s in self.threads]))
@@ -365,7 +365,7 @@ class EventLoop(EventLoopBase, EventLoopMixin):
         log_debug("Loop: checking self.tasks %s",",".join([str(s) for s in self.tasks]))
         self.tasks = [x for x in self.tasks if x.is_task_done() is False]
 
-    async def _free_if_above_limit(self, ra:int=20,lim:int=40):
+    def _free_if_above_limit(self, ra:int=20,lim:int=40):
         """Send a free request across the bridge if limit was exceeded
 
         Args:
@@ -377,7 +377,7 @@ class EventLoop(EventLoopBase, EventLoopMixin):
             self.queue_payload({"r": r, "action": "free", "ffid": "", "args": self.freeable})
             self.freeable = []
 
-    async def _recieve_inbound(self,oldr:int):
+    def _recieve_inbound(self,oldr:int):
         """
         Read the inbound data from the connection, and route it
         to the correct handler. 
@@ -413,7 +413,7 @@ class EventLoop(EventLoopBase, EventLoopMixin):
         
 
 
-    async def process_job(self, job: str, r: int) -> int:
+    def process_job(self, job: str, r: int) -> int:
         """
         send/recieve all outbound/inbound messages to/from connection.
 
@@ -445,16 +445,16 @@ class EventLoop(EventLoopBase, EventLoopMixin):
 
 
         log_debug(f"Running job {job}, {r}.  outbound={self.outbound.qsize()}")
-        await self._send_outbound()
+        self._send_outbound()
 
         #remove finished tasks/threads
-        await self._remove_finished_thread_tasks()
+        self._remove_finished_thread_tasks()
         
         #Request free if freeable is above the given limit.
-        await self._free_if_above_limit(r)
+        self._free_if_above_limit(r)
 
         # Read the inbound data and route it to correct handler
-        r=await self._recieve_inbound(r)
+        r=self._recieve_inbound(r)
         return r
 
     # === LOOP ===
@@ -475,4 +475,4 @@ class EventLoop(EventLoopBase, EventLoopMixin):
             if job == "exit":
                 self.active = False
                 break
-            r = asyncio.run(self.process_job(job, r))
+            r = self.process_job(job, r)
