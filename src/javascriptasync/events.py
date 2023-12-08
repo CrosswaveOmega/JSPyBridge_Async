@@ -1,21 +1,26 @@
-'''
+"""
 Core module which contains the EventLoop class.
 
-'''
+"""
 
 
 from __future__ import annotations
 import asyncio
+import random
 import time, threading, json, sys
 from typing import Any, Callable, Dict, List, Tuple, Union
 
-from . import pyi, config
+
+from . import pyi, config, errors
 from queue import Queue, Empty
 from weakref import WeakValueDictionary
 from .core.abc import ThreadTaskStateBase, EventLoopBase
 
 from .core.jslogging import (
+    log_critical,
     log_debug,
+    log_error,
+    log_info,
     log_print,
     log_warning,
 )
@@ -25,6 +30,9 @@ from .util import generate_snowflake
 from .asynciotasks import EventLoopMixin, TaskGroup
 
 from .threadtasks import ThreadGroup
+
+
+EVENT_EMITTER_CALLBACK_MAX_HOLDUP = 20
 
 
 class CrossThreadEvent(asyncio.Event):
@@ -120,7 +128,7 @@ class EventLoop(EventLoopBase, EventLoopMixin):
         self.active: bool = True
         self.queue = Queue()
         self.freeable = []
-        self.upper_batch_limit=20
+        self.upper_batch_limit = 20
 
         self.callbackExecutor = EventExecutorThread()
 
@@ -141,7 +149,7 @@ class EventLoop(EventLoopBase, EventLoopMixin):
         # by the consumer.
         self.requests: Dict[int, Union[CrossThreadEvent, threading.Lock]] = {}
         # Map of requestID -> threading.Lock
-        self.responses: Dict[int, Tuple[Dict,threading.Barrier]] = {}
+        self.responses: Dict[int, Tuple[Dict, threading.Barrier]] = {}
         # Map of requestID -> response payload
         self.conn: ConnectionClass = ConnectionClass(config_container)
         self.conf: config.JSConfig = config_container
@@ -302,18 +310,30 @@ class EventLoop(EventLoopBase, EventLoopMixin):
         """
         Handle the exit of the event loop.
         """
-        log_print("calling self.exit")
-        log_print(str(self.responses))
-        log_print(str(self.requests))
-        log_print(str(",".join([f"{k,v}" for k, v in self.callbacks.items()])))
+        log_info("calling self.on_exit")
+        log_info("requests:[%s],responses:[%s]", str(self.requests), str(self.responses))
+        log_info("callbacks: [%s]", str(",".join([f"{k,v}" for k, v in self.callbacks.items()])))
         if len(self.callbacks):
             log_debug("%s,%s", "cannot exit because active callback", self.callbacks)
         while len(self.callbacks) and self.conn.is_alive():
-            time.sleep(0.4)
+            callback_end_counter = 0
+            while self.conn.is_alive() and callback_end_counter < EVENT_EMITTER_CALLBACK_MAX_HOLDUP:
+                time.sleep(0.4)
+                callback_end_counter += 1
+            if len(self.callbacks) and self.conn.is_alive():
+                log_error("couldn't exit because of callback...")
+                choose = random.choice(list(self.callbacks.keys())) if self.callbacks else None
+                if choose:
+                    del self.callbacks[choose]
+
         time.sleep(0.8)  # Allow final IO
-        #self.callbackExecutor.running = False
+        # self.callbackExecutor.running = False
+        log_info("Sending shutdown command.")
         self.queue_payload({"r": generate_snowflake(4092, 0), "action": "shutdown"})
         self.queue.put("exit")
+
+        time.sleep(0.8)  # Allow final IO
+        self.conn.stop()
 
     def get_response_from_id(self, request_id: int) -> Tuple[Any, threading.Barrier]:
         """Retrieve a response and associated barrier for a given request ID,
@@ -335,61 +355,92 @@ class EventLoop(EventLoopBase, EventLoopMixin):
         res, barrier = self.responses[request_id]
         del self.responses[request_id]
         return res, barrier
-    
+
+    def _publish_inbound(self, r, inbound):
+        lock, timeout = self.requests.pop(r)
+        barrier = threading.Barrier(2, timeout=5)
+
+        self.responses[r] = inbound, barrier
+        # why delete when you can just use .pop()?
+        # del self.requests[r]
+        # print(inbound,lock)
+        lock.set()  # release, allow calling thread to resume
+        barrier.wait()
+
     def _send_outbound(self):
-        '''
-        Gather all jobs in the outbound Queue, and send to the active 
+        """
+        Gather all jobs in the outbound Queue, and send to the active
         connection process.
-        '''
-        out=[]
-        current_iter=0
-        still_full=True
-        while (self.outbound.qsize()>0 and still_full):
-            try:
-                toadd=self.outbound.get_nowait()
-                out.append(toadd)
-                current_iter+=1
-                if current_iter>self.upper_batch_limit:
-                    self.conn.writeAll(out)
-                    out,current_iter=[],0
-            except Empty as e:
-                log_warning("EventLoop, outbound Queue is empty.", exc_info=e)
-                still_full=False
-        self.conn.writeAll(out)
+        """
+        out = []
+        current_iter = 0
+        still_full = True
+        try:
+            while self.outbound.qsize() > 0 and still_full:
+                try:
+                    toadd = self.outbound.get_nowait()
+                    out.append(toadd)
+                    current_iter += 1
+                    if current_iter > self.upper_batch_limit:
+                        self.conn.writeAll(out)
+                        out, current_iter = [], 0
+                except Empty as e:
+                    log_warning("EventLoop, outbound Queue is empty.", exc_info=e)
+                    still_full = False
+            self.conn.writeAll(out)
+        except errors.NodeTerminated as e:
+            log_critical("Attempted to write to a terminated process! %s", e)
 
     def _remove_finished_thread_tasks(self):
-        '''Remove all killed/finished threads and tasks from the
-        threads and tasks lists.'''
-        log_debug("Loop: checking self.threads %s",",".join([str(s) for s in self.threads]))
+        """Remove all killed/finished threads and tasks from the
+        threads and tasks lists."""
+        log_debug("Loop: checking self.threads %s", ",".join([str(s) for s in self.threads]))
         self.threads = [x for x in self.threads if x.is_thread_alive()]
-        log_debug("Loop: checking self.tasks %s",",".join([str(s) for s in self.tasks]))
+        log_debug("Loop: checking self.tasks %s", ",".join([str(s) for s in self.tasks]))
         self.tasks = [x for x in self.tasks if x.is_task_done() is False]
 
-    def _free_if_above_limit(self, ra:int=20,lim:int=40):
+    def _free_if_above_limit(self, ra: int = 20, lim: int = 40):
         """Send a free request across the bridge if limit was exceeded
 
         Args:
             ra (int): Request ID to be assigned to request.
             lim (int, optional): How big freeable must be to activate. Defaults to 40.
         """
-        r=generate_snowflake(ra%131071)
+        r = generate_snowflake(ra % 131071)
         if len(self.freeable) > lim:
             self.queue_payload({"r": r, "action": "free", "ffid": "", "args": self.freeable})
             self.freeable = []
 
-    def _recieve_inbound(self,oldr:int):
+    def _fatal_error(self):
+        """Called when notified of JS error."""
+        errorst = self.conn.kill_error["error_severe"]
+        allkeys = list(self.requests.keys())
+        log_critical("JS killed by error: Terminating keys %s", allkeys)
+        for r in allkeys:
+            inbound = {"r": r, "key": "error", "error": errorst}
+            self._publish_inbound(r, inbound)
+        self.active = False
+        self.conf.throw_error_state(errorst)
+
+    def _recieve_inbound(self, oldr: int):
         """
         Read the inbound data from the connection, and route it
-        to the correct handler. 
+        to the correct handler.
 
         Args:
             oldr (int): Old request_id
 
         Returns:
             int: the latest recieved request id from outbound.
-        """        
-        r=oldr
+        """
+        r = oldr
+        # It's going to learn about the error here first.
         inbounds = self.conn.readAll()
+
+        if self.conn.kill_error:
+            log_critical("FATAL.")
+            self._fatal_error()
+            return
         for inbound in inbounds:
             log_debug("Loop: inbounds was %s", str(inbound))
             r = inbound["r"]
@@ -397,21 +448,13 @@ class EventLoop(EventLoopBase, EventLoopMixin):
             if "c" in inbound and inbound["c"] == "pyi":
                 log_debug("Loop, inbound C request was %s", str(inbound))
 
-                pyi = self.conf.get_pyi()
-                #syncio.create_task(asyncio.to_thread(pyi.inbound,inbound))
-                self.callbackExecutor.add_job(r, cbid, pyi.inbound, inbound)
+                mypyi = self.conf.get_pyi()
+                # syncio.create_task(asyncio.to_thread(pyi.inbound,inbound))
+                self.callbackExecutor.add_job(r, cbid, mypyi.inbound, inbound)
             if r in self.requests:
-                lock, timeout = self.requests.pop(r)
-                barrier = threading.Barrier(2, timeout=5)
-                self.responses[r] = inbound, barrier
-                # why delete when you can just use .pop()?
-                #del self.requests[r]
-                # print(inbound,lock)
-                lock.set()  # release, allow calling thread to resume
-                barrier.wait()
-        return r
-        
+                self._publish_inbound(r, inbound)
 
+        return r
 
     def process_job(self, job: str, r: int) -> int:
         """
@@ -443,18 +486,17 @@ class EventLoop(EventLoopBase, EventLoopMixin):
 
         # Send the next outbound request batch
 
-
         log_debug(f"Running job {job}, {r}.  outbound={self.outbound.qsize()}")
         self._send_outbound()
 
-        #remove finished tasks/threads
+        # remove finished tasks/threads
         self._remove_finished_thread_tasks()
-        
-        #Request free if freeable is above the given limit.
+
+        # Request free if freeable is above the given limit.
         self._free_if_above_limit(r)
 
         # Read the inbound data and route it to correct handler
-        r=self._recieve_inbound(r)
+        r = self._recieve_inbound(r)
         return r
 
     # === LOOP ===
@@ -462,7 +504,7 @@ class EventLoop(EventLoopBase, EventLoopMixin):
         """
         Main loop for processing events and managing IO.
         """
-    
+
         r = 0
         while self.active:
             # Wait until we have jobs
@@ -470,7 +512,7 @@ class EventLoop(EventLoopBase, EventLoopMixin):
             #     log_print('not empty')
             #     time.sleep(0.4)
             #     continue
-            
+
             job = self.queue.get(block=True)
             if job == "exit":
                 self.active = False

@@ -36,7 +36,10 @@ class JavaScriptError(Exception):
     def __repr__(self):
         return str(self)
     
-
+class FatalJavaScriptError(JavaScriptError):
+    """ 
+    Raised when something caused the Javascript runtime to crash.
+    """
 
 class NoAsyncLoop(BaseError):
     """
@@ -74,7 +77,11 @@ class AsyncReminder(BaseError):
     Raised if an syncrounous magic method was called in amode
 
     """
+class NodeTerminated(BaseError):
+    """
+    Raised if the Node process terminated during a write.
 
+    """
 
 class BridgeTimeout(TimeoutError):
     """
@@ -179,10 +186,10 @@ def format_line(line: str) -> str:
     secondary = ["{", "}", "'", " true", " false"]
     for statement in statements:
         exp = re.compile(statement, re.DOTALL)
-        line = re.sub(exp, chalk.red(statement.replace("\\", "")) + "", line)
+        line = re.sub(exp, statement.replace("\\", "") + "", line)
     for second in secondary:
         exp = re.compile(second, re.DOTALL)
-        line = re.sub(exp, chalk.blue(second) + "", line)
+        line = re.sub(exp, second + "", line)
     return line
 
 
@@ -207,31 +214,36 @@ def print_error(
     """
     lines = []
     log = lambda *s: lines.append(" ".join(s))
-    log(
-        "NodeJS",
-        chalk.bold(chalk.bgred(" JavaScript Error ")),
-        f"Call to '{failedCall.replace('~~', '')}' failed:",
-    )
+    if failedCall=='FatalError':
+        log(
+            "NODEJS RAISED A FATAL ERROR."
+        )
+    else:
+        log(
+            "NodeJS",
+            " JavaScript Error ",
+            f"Call to '{failedCall.replace('~~', '')}' failed:",
+        )
 
     log("[Context: Python]")
     for at, line in pyStacktrace:
         if "javascriptasync" in at or "IPython" in at:
             continue
         if not line:
-            log(" ", chalk.gray(at))
+            log(" ", at)
         else:
-            log(chalk.gray(">"), format_line(line))
-            log(" ", chalk.gray(at))
+            log(">", format_line(line))
+            log(" ", at)
 
-    log(chalk.gray(">"), format_line(pyErrorline))
+    log(">", format_line(pyErrorline))
 
     log("\n[Context: NodeJS]\n")
 
     for traceline in reversed(jsStackTrace):
-        log(" ", chalk.gray(traceline))
+        log(" ", traceline)
 
-    log(chalk.gray(">"), format_line(jsErrorline))
-    log("Bridge", chalk.bold(jsErrorMessage))
+    log(">", format_line(jsErrorline))
+    log("Bridge",jsErrorMessage)
 
     return lines
 
@@ -246,7 +258,7 @@ def processPyStacktrace(stack):
         if lin.startswith("  File"):
             tokens = lin.split("\n")
             lin = tokens[0]
-            Code = tokens[1] if len(tokens) > 1 else chalk.italic("<via standard input>")
+            Code = tokens[1] if len(tokens) > 1 else "<via standard input>"
             fname = lin.split('"')[1]
             line = re.search(r"\, line (\d+)", lin).group(1)
             at = re.search(r"\, in (.*)", lin)

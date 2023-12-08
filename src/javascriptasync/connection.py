@@ -15,7 +15,7 @@ from typing import Any, Dict, List, TextIO, Union
 from . import config, events
 from .core.jslogging import log_print, log_debug, log_info, log_error, log_critical, log_warning
 from .util import haspackage
-from .errors import InvalidNodeJS
+from .errors import FatalJavaScriptError, InvalidNodeJS, JavaScriptError, NodeTerminated
 from .json_patch import JSONRequestDecoder
 
 ISCLEAR = False
@@ -105,9 +105,11 @@ class ConnectionClass:
             self.stdout = subprocess.PIPE
 
         self.earlyterm = False
-
-        atexit.register(self.stop)
-
+        self.kill_error=None
+        #atexit.register(self.stopwrapper)
+    def stopwrapper(self):
+        log_critical('called wrapper')
+        self.stop()
     def check_nodejs_installed(self):
         """Check if node.js is installed.
 
@@ -171,16 +173,24 @@ class ConnectionClass:
             try:
                 d,decodeok=decoder.decode(line)
                 if not decodeok:
+                    log_error("[JSE] %s",line)
                     print("[JSE]", line)
                     continue
-                
+                if 'error_severe' in d:
+                    self.kill_error=d
+                    raise FatalJavaScriptError("FATAL ERROR",d['error_severe'])
                 log_debug("%s,%d,%s", "connection: [js -> py]", int(time.time() * 1000), line)
                 ret.append(d)
             except json.JSONDecodeError as jde:
                 print(jde, "[JSE]", line)
+                log_error("Decode err: %s, [JSE] %s",jde,line)
             except ValueError as v_e:
                 print(v_e, "[JSE]", line)
-            
+                log_error("%s, [JSE] %s",v_e,line)
+            except FatalJavaScriptError as v_e:
+                #print(v_e, "[JSE]", line)
+                log_error("FATAL ERROR.  TERMINATING.")
+                return ret
                 #log_error()
         return ret
     def read_stderr(self) -> List[Dict]:
@@ -214,6 +224,11 @@ class ConnectionClass:
         Args:
             objs (List[Union[str,Any]]): List of messages to be transformed and sent.
         """
+        print(self.endself)
+        if self.endself or self.earlyterm:
+            if self.kill_error:
+                raise NodeTerminated("attempted to write while the node.js process was terminated with error state.")
+            raise NodeTerminated("attempted to write while the node.js process was terminated.")
         for obj in objs:
             if type(obj) == str:
                 j = obj + "\n"
@@ -322,11 +337,13 @@ class ConnectionClass:
             self.recieve_stdio(self.proc.stderr.readline())
             
 
-        print("Termination condition", self.endself)
+        #print("Termination condition", self.endself)
         if not self.endself:
-            print("early terminate")
+            print("JS Process terminated on it's own.")
             self.earlyterm = True
             self.stop()
+        else:
+            print("JSProcess was terminated by parent.")
 
     def stdout_read(self):
         """
@@ -352,7 +369,8 @@ class ConnectionClass:
         Terminate the node.js process.
         """
         if self.earlyterm:
-            print("Early Termination, stopping.")
+            print("The JS Process terminated already.", self.is_alive())
+            
             return
         self.endself = True
         time.sleep(2)

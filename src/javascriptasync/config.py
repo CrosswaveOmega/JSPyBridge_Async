@@ -4,11 +4,12 @@ The core config class.
 from __future__ import annotations
 import asyncio
 import os
+from typing import List
 from .proxy import Proxy, Executor
 from .events import EventLoop
 from .pyi import PyInterface
-from .core.jslogging import log_print, logs, print_path
-from .errors import NoConfigInitalized
+from .core.jslogging import log_print, logs, print_path ,log_warning
+from .errors import FatalJavaScriptError, NoConfigInitalized
 import threading, inspect, time, atexit, sys
 
 
@@ -49,7 +50,29 @@ class JSConfig():
         self.global_jsi: Proxy = None
         self.fast_mode: bool = False
         self.node_emitter_patches: bool = False
+        self.error_state=False
+        self.error_stack=None
+        self.state:int=0
 
+
+    def _startup_internal(self):
+            self.error_state=False
+            self.error_stack=None
+
+            self.event_loop: EventLoop = EventLoop(self)
+            self.pyi: PyInterface = PyInterface(self)
+            self.executor: Executor = Executor(self, self.event_loop)
+
+            self.pyi.set_executor(self.executor)
+            self.event_loop.start_connection()
+            self.event_thread: threading.Thread = threading.Thread(target=self.event_loop.loop, args=(), daemon=True)
+            self.event_thread.start()
+
+            # # The "root" interface to JavaScript with FFID(Foreign Object Reference ID) 0
+            self.global_jsi: Proxy = Proxy(self.executor, 0)
+            self.fast_mode: bool = False
+            self.node_emitter_patches: bool = False
+            atexit.register(self.terminate)
     def startup(
         self,
     ):
@@ -58,20 +81,33 @@ class JSConfig():
 
         This method initializes the event loop, executor, and global_jsi for JavaScript execution.
         """
-        self.event_loop: EventLoop = EventLoop(self)
-        self.pyi: PyInterface = PyInterface(self)
-        self.executor: Executor = Executor(self, self.event_loop)
+        if self.state==0:
+            self.state=1
+            self._startup_internal()
+            #Give threads some time to run.  
+            time.sleep(0.2)
+            self.state=2
+    async def startup_async(
+        self,
+    ):
+        """
+        Starts the JavaScript runtime environment in a non blocking manner.
 
-        self.pyi.set_executor(self.executor)
-        self.event_loop.start_connection()
-        self.event_thread: threading.Thread = threading.Thread(target=self.event_loop.loop, args=(), daemon=True)
-        self.event_thread.start()
+        This method initializes the event loop, executor, and global_jsi for JavaScript execution.
+        """
+        if self.state==0:
+            self.state=1
+            self._startup_internal()
+            #Give threads some time to run.  
+            await asyncio.sleep(0.2)
+            self.state=2
+    def terminate(self):
+        self.event_loop.on_exit()
 
-        # # The "root" interface to JavaScript with FFID(Foreign Object Reference ID) 0
-        self.global_jsi: Proxy = Proxy(self.executor, 0)
-        self.fast_mode: bool = False
-        self.node_emitter_patches: bool = False
-        atexit.register(self.event_loop.on_exit)
+    def throw_error_state(self, errorst:List[str]):
+        self.error_state=True
+        self.error_stack=errorst
+        self.terminate()
 
     def get_event_loop(self):
         return self.event_loop
@@ -97,8 +133,10 @@ class JSConfig():
         self.event_loop = None
         self.event_thread = None
         self.executor = None
+        self.pyi=None
         self.global_jsi = Null()
         self.fast_mode = False
+        self.state=0
 
     def is_main_loop_active(self):
         """
@@ -146,12 +184,13 @@ class Config:
             Config._initalizing = True
             instance = JSConfig()
             Config._instance = instance
-            Config._instance.startup()
+            if arg != "NoStartup":
+                Config._instance.startup()
             Config._initalizing = False
         elif Config._initalizing:
             frame = inspect.currentframe()
             lp = print_path(frame)
-            logs.warning(lp)
+            log_warning(lp)
             log_print(f"attempted init during initalization:[{lp}]")
 
     def kill(self):
@@ -167,8 +206,8 @@ class Config:
             )
         elif Config._initalizing:
             raise NoConfigInitalized("Still initalizing JSConfig, please wait!")
-        Config._instance.event_loop.on_exit()
-        Config._instance.reset_self
+        Config._instance.terminate()
+        Config._instance.reset_self()
         Config._reset = True
 
     @classmethod
@@ -199,13 +238,16 @@ class Config:
             )
         elif Config._initalizing:
             raise NoConfigInitalized("Still initalizing JSConfig, please wait!")
+        if Config._instance.error_state:
+            raise FatalJavaScriptError('FatalError',Config._instance.error_stack)
         return Config._instance
 
     @classmethod
-    def assign_asyncio_loop(cls):
+    def assign_asyncio_loop(cls,asyncio_loop:asyncio.AbstractEventLoop):
         """
         Checks if JSConfig is initialized, and ensure PYI has a coroutine event loop to utilize.
-
+        Args:
+            asyncio_loop: the event loop to set up
         Returns:
             JSConfig: The JSConfig instance.
 
@@ -218,7 +260,7 @@ class Config:
             )
         elif Config._initalizing:
             raise NoConfigInitalized("Still initalizing JSConfig, please wait!")
-        Config._instance.set_asyncio_loop(asyncio)
+        Config._instance.set_asyncio_loop(asyncio_loop)
 
     def __getattr__(self, attr):
         if hasattr(Config, attr):
