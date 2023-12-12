@@ -413,7 +413,7 @@ def test_context():
     import os
     import time
     import logging
-    from javascriptasync.jscontext import JSContext
+    from javascriptasync import JSContext
     from javascriptasync.emitters import On, off, Once, once
     from javascriptasync.logging import setup_logging, get_filehandler
     context=JSContext()
