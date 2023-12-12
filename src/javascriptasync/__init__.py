@@ -6,6 +6,7 @@ from .config import Config
 from .core.jslogging import log_print, logs
 from .proxy import Proxy
 
+from .jscontext import JSContext
 import threading, inspect, time, atexit, os, sys
 from .errors import NoAsyncLoop
 
@@ -243,7 +244,6 @@ async def eval_js_a(js: str, timeout: int = 10, as_thread: bool = False) -> Any:
 
             rv = context.call_s(js, local_vars, timeout=timeout, forceRefs=True, coroutine=True)
         else:
-            print(local_vars)
             rv = asyncio.to_thread(conf.global_jsi.evaluateWithContext, js, local_vars, timeout=timeout, forceRefs=True)
     finally:
         del frame
@@ -403,4 +403,3 @@ class ThreadUtils:
         conf.event_loop.abortThread(method, kill_after)
 
 
-# from javascriptasync.emitters import On, Once, off,once,off_a,once_a

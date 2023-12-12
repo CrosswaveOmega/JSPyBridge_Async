@@ -8,8 +8,6 @@ from .config import Config
 from .core.jslogging import log_print, logs
 from .proxy import EventEmitterProxy
 
-import threading, inspect, time, atexit, os, sys
-from .errors import NoAsyncLoop
 
 
 
@@ -98,7 +96,7 @@ def once(emitter: EventEmitterProxy, event: str) -> Any:
 
     """
     conf = Config.get_inst()
-    val = conf.global_jsi.once(emitter, event, timeout=1000)
+    val = emitter._exe.config.global_jsi.once(emitter, event, timeout=1000)
     return val
 
 
@@ -128,5 +126,5 @@ async def once_a(emitter: EventEmitterProxy, event: str) -> Any:
 
     """
     conf = Config.get_inst()
-    val = await conf.global_jsi.once(emitter, event, timeout=1000, coroutine=True)
+    val = await emitter._exe.config.global_jsi.once(emitter, event, timeout=1000, coroutine=True)
     return val

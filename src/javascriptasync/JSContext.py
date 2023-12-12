@@ -5,7 +5,7 @@ import inspect
 
 from typing import Any, Optional
 
-from .config import Config, JSConfig
+from .config import JSConfig
 from .core.jslogging import log_print
 from .proxy import Proxy
 from .errors import NoAsyncLoop
@@ -15,10 +15,33 @@ class JSContext:
     '''
     
     '''
+    __slots__=['config','_imported','_known_packages']
     def __init__(self):
         """Initialize the JSContext and retrieve the Config instance."""
-        Config("NoStartup")
-        self.config: JSConfig = Config.get_inst()
+        #Config("NoStartup")
+        self.config: JSConfig = JSConfig(manual_terminate=True)
+        self._imported ={}
+        self._known_packages={}
+
+    def __getattr__(self, __name: str) -> Any:
+        if __name in self._imported:
+            return self._imported[__name]
+        raise AttributeError(f"No known package {__name}")
+
+
+    def __getitem__(self, __name: str) -> Any:
+        if __name in self._imported:
+            return self._imported[__name]
+        raise AttributeError(f"No known package {__name}")
+    
+    def __del__(self):
+        
+        keys=list(self._imported.keys())
+        for k in keys:
+            log_print('purging key ',k)
+            del self._imported[k]
+        self.kill_js()
+
 
     def init_js(self):
         """Initialize a new bridge to node.js if it does not already exist."""
@@ -30,7 +53,7 @@ class JSContext:
         """Initialize a new node.js bridge if it does not already exist,
         and set the callback event loop to the current asyncio loop."""
         # self.config = Config("")
-        self.config = Config.get_inst()
+
         await self.config.startup_async()
 
         self.config.set_asyncio_loop(asyncio.get_event_loop())
@@ -45,6 +68,7 @@ class JSContext:
         self.config.set_asyncio_loop(asyncio.get_event_loop())
 
     def kill_js(self):
+        '''Shut down the active NodeJS context.W'''
         if self.config.state != 2:
             return
 
@@ -52,7 +76,7 @@ class JSContext:
         self.config.reset_self()
         print("killed js")
 
-    def require(self, name: str, version: Optional[str] = None) -> Proxy:
+    def require(self, name: str, version: Optional[str] = None,store_as:Optional[str]=None) -> Proxy:
         """
         Import an npm package, and return it as a Proxy.
         If the required package isn't found, then
@@ -72,6 +96,9 @@ class JSContext:
             NoConfigInitialized: If `init_js` or `init_js_a` was not called prior,  or if the bridge is still being initialization is in progress.
 
         """
+        if name in self._known_packages:
+            proxyname=self._known_packages[name]
+            return self._imported[proxyname]
         calling_dir = None
         if name.startswith("."):
             # Some code to extract the caller's file path, needed for relative imports
@@ -85,9 +112,13 @@ class JSContext:
                 # On Notebooks, the frame info above does not exist, so assume the CWD as caller
                 calling_dir = os.getcwd()
         require = self.config.global_jsi.get("require")
-        return require(name, version, calling_dir, timeout=900)
+        proxy=require(name, version, calling_dir, timeout=900)
+        if store_as:
+            self._imported[store_as]=proxy
+            self._known_packages[name]=store_as
+        return proxy
 
-    async def require_a(self, name: str, version: Optional[str] = None, amode: bool = False) -> Proxy:
+    async def require_a(self, name: str, version: Optional[str] = None, amode: bool = False,store_as:Optional[str]=None) -> Proxy:
         """
         Asynchronously import an npm package and return it as a Proxy.
         If the required package isn't found, then
@@ -101,6 +132,7 @@ class JSContext:
                                      Default is None.
             amode(bool, optional): If the Proxy's async call stacking mode should be enabled.
                 Default false.
+            store_as(str,optional): Name to store this required module as within the context.  can be retrieved via context.[store_as]
 
         Returns:
             Proxy: The imported package or module, as a Proxy.
@@ -109,6 +141,9 @@ class JSContext:
             NoConfigInitialized: If `init_js` or `init_js_a` was not called prior,  or if the bridge is still being initialization is in progress.
 
         """
+        if name in self._known_packages:
+            proxyname=self._known_packages[name]
+            return self._imported[proxyname]
         calling_dir = None
         if name.startswith("."):
             # Some code to extract the caller's file path, needed for relative imports
@@ -126,7 +161,11 @@ class JSContext:
         if amode:
             module.toggle_async_chain(True)
             await module.getdeep()
+        if store_as:
+            self._imported[store_as]=module
+            self._known_packages[name]=store_as
         return module
+
 
     def get_console(self) -> Proxy:
         """
@@ -142,7 +181,7 @@ class JSContext:
             NoConfigInitialized: If `init_js` or `init_js_a` was not called prior,  or if the bridge is still being initialization is in progress.
 
         """
-        return self.config.get_inst().global_jsi.console
+        return self.config.global_jsi.console
 
     def get_globalThis(self) -> Proxy:
         """
@@ -161,7 +200,7 @@ class JSContext:
             NoConfigInitialized: If `init_js` or `init_js_a` was not called prior,  or if the bridge is still being initialization is in progress.
 
         """
-        globalThis = self.config.get_inst().global_jsi.globalThis
+        globalThis = self.config.global_jsi.globalThis
         return globalThis
 
     def get_RegExp(self) -> Proxy:
@@ -180,7 +219,7 @@ class JSContext:
             NoConfigInitialized: If `init_js` or `init_js_a` was not called prior,  or if the bridge is still being initialization is in progress.
 
         """
-        return self.config.get_inst().global_jsi.RegExp
+        return self.config.global_jsi.RegExp
 
     def eval_js(self, js: str, timeout: int = 10) -> Any:
         """
@@ -252,3 +291,7 @@ class JSContext:
         finally:
             del frame
         return await rv
+    
+    def once(self, emitter,event):
+        val = self.config.global_jsi.once(emitter, event, timeout=1000)
+        return val

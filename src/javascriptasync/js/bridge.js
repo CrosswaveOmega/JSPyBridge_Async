@@ -7,7 +7,7 @@ if (
   console.error('Please update it to a version >= 14.x.x from https://nodejs.org/');
   process.exit(1);
 }
-/**
+/*
  * The JavaScript Interface for Python
  */
 try {
@@ -19,8 +19,7 @@ try {
 
   const debug = process.env.DEBUG?.includes(
       'jspybridge',
-  ) ? console.debug : () => { };
-
+  ) ? (...args) => console.debug(`[${args}]`) : () => { };
   const supportsColors = false;
   /**
  * Determines the "type" of the provided object
@@ -196,30 +195,10 @@ try {
    */
     async getdeep(r, ffid) {
       try {
-      /**
-log_debug("Proxy._call: %s, %s,%s,%s", "MT", method, methodType, val)
-        if methodType == "fn":
-            return Proxy(self._exe, val, self.ffid, method,
-              amode=self._asyncmode)
-        if methodType == "class":
-            return Proxy(self._exe, val, es6=True, amode=self._asyncmode)
-        if methodType == "obj":
-            return Proxy(self._exe, val, amode=self._asyncmode)
-        if methodType == "inst":
-            return Proxy(self._exe, val, amode=self._asyncmode)
-        if methodType == "inste":
-            return EventEmitterProxy(self._exe, val, amode=self._asyncmode)
-        if methodType == "void":
-            return None
-        if methodType == "py":
-            return self._exe.get(val)
-        else:
-            return val
-      */
         var to_return=[];
         for (const attribute in this.m[ffid]) {
           if (this.m[ffid][attribute] !=null) {
-            console.log(attribute + ': ' + obj[attribute]);
+            // console.log(attribute + ': ' + obj[attribute]);
             var v = await this.m[ffid][attribute];
             var type = v.ffid ? 'py' : getType(v);
             var attObj=this.switchType(r, v, type);
@@ -356,7 +335,7 @@ log_debug("Proxy._call: %s, %s,%s,%s", "MT", method, methodType, val)
         return this.ipc.send({r, key: 'error', error: e.stack});
       }
       const type = getType(v);
-      console.log('GetType', type, v);
+      // console.log('GetType', type, v);
       return this.ipc.send(this.switchType(r, v, type));
       switch (type) {
         case 'string': return this.ipc.send({r, key: 'string', val: v});

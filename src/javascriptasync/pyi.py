@@ -197,7 +197,9 @@ class PyInterface:
         Raises:
             NoPyiAction: If the given action is not defined in the my_actions dictionary.
         """
+        print(action,r,ffid,key,args)
         if action in self.my_actions:
+            print('found',action,r,ffid,key,args)
             return self.my_actions[action](r, ffid, key, args)
         raise NoPyiAction(f"There's no method in PYI for action {action}. {r},{ffid},{key},{args}.")
         
@@ -327,7 +329,7 @@ class PyInterface:
             else:
                 if inspect.isclass(v):
                     was_class = True
-                log_debug("INVOKING %s,%s,%s", v, type(v), was_class)
+                log_info("INVOKING %s,%s,%s", v, type(v), was_class)
                 v = v(*args, **kwargs)
         typ = type(v)
         if typ is str:

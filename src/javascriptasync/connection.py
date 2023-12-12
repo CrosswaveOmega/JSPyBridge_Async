@@ -28,6 +28,7 @@ try:
             ISCLEAR = True
         else:
             if (get_ipython().__class__.__name__) == "ZMQInteractiveShell":
+                print("Notebook?")
                 ISNOTEBOOK = True
     else:
         ISCLEAR = False
@@ -100,9 +101,9 @@ class ConnectionClass:
         self.endself = False
         self.modified_stdout = (sys.stdout != sys.__stdout__) or (getattr(sys, "ps1", sys.flags.interactive) == ">>> ")
 
-        if self.is_notebook() or self.modified_stdout:
-            self.notebook = True
-            self.stdout = subprocess.PIPE
+        self.status = (self.is_notebook() << 1) | self.modified_stdout
+        self.notebook = (self.status & 2) != 0
+        self.stdout = subprocess.PIPE if (self.status & 1) != 0 else self.stdout
 
         self.earlyterm = False
         self.kill_error=None
@@ -224,7 +225,7 @@ class ConnectionClass:
         Args:
             objs (List[Union[str,Any]]): List of messages to be transformed and sent.
         """
-        print(self.endself)
+        
         if self.endself or self.earlyterm:
             if self.kill_error:
                 raise NodeTerminated("attempted to write while the node.js process was terminated with error state.")
@@ -234,13 +235,10 @@ class ConnectionClass:
                 j = obj + "\n"
             else:
                 
-                if not type(obj) == dict:  
-                    pass
-                    # print(obj.ffid)
+                #if not type(obj) == dict:   pass
                 j = json.dumps(obj) + "\n"
             log_debug("connection: %s,%d,%s", "[py -> js]", int(time.time() * 1000), j)
             encoded=j.encode()
-            # log_print('procstatus',self.proc)
             if not self.proc:
                 self.sendQ.append(j.encode())
                 continue
@@ -329,7 +327,11 @@ class ConnectionClass:
             self.proc.stdin.write(send)
         self.proc.stdin.flush()
         print("Connection established!")
-        if self.notebook:
+        if self.status!=0:
+            s1="a notebook" if self.status & 0b10 else ""
+            s2=("a modified stdout") if self.status & 0b01 else ""
+            out=f"This is {s1}{' and ' if self.status==3 else ''}{s2}."
+            print(out)
             self.stdout_thread = threading.Thread(target=self.stdout_read, args=(), daemon=True)
             self.stdout_thread.start()
 
@@ -353,7 +355,9 @@ class ConnectionClass:
         while self.proc.poll() is None:
             if not self.endself:
                 # log_print('kill')
-                print(self.proc.stdout.readline().decode("utf-8"))
+                output=self.proc.stdout.readline().decode("utf-8")
+                if len(output)>0:
+                    print(output)
 
     def start(self):
         """

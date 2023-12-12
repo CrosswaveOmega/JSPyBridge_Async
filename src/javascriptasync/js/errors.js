@@ -172,7 +172,7 @@ function getErrorMessage(failedCall, jsStacktrace, pyStacktrace) {
     const tracea=`** JavaScript Stacktrace **\n${jsStacktrace}\n**`;
     const traceb=`Python Stacktrace **\n${pyStacktrace}`;
     console.log(
-        `${tracea}\n${traceb}`,
+        `fal ${tracea}\n${traceb}`,
     );
     return '';
   }

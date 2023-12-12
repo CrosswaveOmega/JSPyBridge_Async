@@ -17,7 +17,7 @@ class TestJavaScriptLibraryASYNC:
         loop = asyncio.get_running_loop()
         Config.get_inst().set_asyncio_loop(loop)
         module = await require_a("./test.js",amode=True)
-        DemoClass = await module.DemoClass
+        DemoClass = module.DemoClass
         self.demo = await DemoClass("blue", {"a": 3}, lambda v: self.assertEquals(v, 3))
 
         yield
@@ -52,7 +52,7 @@ class TestJavaScriptLibraryASYNC:
 
     @pytest.mark.asyncio
     async def test_a_iter(self):
-        DemoClass = await (await require_a("./test.js",amode=True)).DemoClass
+        DemoClass = (await require_a("./test.js",amode=True)).get_s('DemoClass')
         demo = await DemoClass("blue", {"a": 3}, lambda v: print("Should be 3", v))
 
         f = None
@@ -74,7 +74,7 @@ class TestJavaScriptLibraryASYNC:
     @pytest.mark.asyncio
     async def test_a_events(self):
         module = await require_a("./test.js",amode=True)
-        DemoClass = await module.DemoClass
+        DemoClass = module.DemoClass
         self.demo = await DemoClass("blue", {"a": 3}, lambda v: self.assertEquals(v, 3))
         print("events start")
         #@On(self.demo,"increment")

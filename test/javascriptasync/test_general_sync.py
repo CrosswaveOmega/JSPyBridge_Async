@@ -16,6 +16,13 @@ class TestJavaScriptLibrary:
 
         yield
         print("done.")
+        
+    def assertEquals(self, cond, val):
+        assert cond == val
+        
+    def some_method(self, text):
+        print("Callback called with", text)
+        assert text == "It works !"
 
     def test_require(self):
         chalk = require("chalk")
@@ -47,10 +54,6 @@ class TestJavaScriptLibrary:
         expect = ["x", "y", "z"]
         for key in demo.object():
             assert key == expect.pop(0)
-
-    def some_method(self, text):
-        print("Callback called with", text)
-        assert text == "It works !"
 
     def test_events(self):
         @On(self.demo, "increment")
@@ -124,7 +127,7 @@ class TestJavaScriptLibrary:
 
 
 if __name__ == "__main__":
-    asyncio.run(test_my_coroutine())
+    print("NA")
 
     # Run all test methods in the specified order
     # pytest.main()

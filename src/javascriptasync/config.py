@@ -35,7 +35,7 @@ class JSConfig():
         dead (str): message for when the node.js process crashes.
     """
 
-    def __init__(self):
+    def __init__(self,manual_terminate=False):
         """
         Initializes a new instance of JSConfig.
 
@@ -53,6 +53,7 @@ class JSConfig():
         self.error_state=False
         self.error_stack=None
         self.state:int=0
+        self.manual_terminate=manual_terminate
 
 
     def _startup_internal(self):
@@ -72,7 +73,8 @@ class JSConfig():
             self.global_jsi: Proxy = Proxy(self.executor, 0)
             self.fast_mode: bool = False
             self.node_emitter_patches: bool = False
-            atexit.register(self.terminate)
+            if not self.manual_terminate:
+                atexit.register(self.terminate)
     def startup(
         self,
     ):
@@ -206,8 +208,10 @@ class Config:
             )
         elif Config._initalizing:
             raise NoConfigInitalized("Still initalizing JSConfig, please wait!")
-        Config._instance.terminate()
-        Config._instance.reset_self()
+        if Config._instance.state==2:
+            Config._instance.terminate()
+            Config._instance.reset_self()
+        
         Config._reset = True
 
     @classmethod

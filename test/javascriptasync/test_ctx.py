@@ -408,17 +408,21 @@ async def test_my_coroutine():
 """
 
 
-@pytest.mark.usefixtures
-def testpy():
+
+def test_context():
     import os
     import time
-    from javascriptasync import require, On, Once, off, once, eval_js, init_js, get_console
+    import logging
+    from javascriptasync.jscontext import JSContext
+    from javascriptasync.emitters import On, off, Once, once
+    from javascriptasync.logging import setup_logging, get_filehandler
+    context=JSContext()
+    context.init_js()
+    console = context.get_console()  # TODO: Remove this in 1.0
+    testmodule = context.require("./test.js",store_as='NEW')
+    DemoClass=context.NEW.DemoClass
 
-    init_js()
-    console = get_console()  # TODO: Remove this in 1.0
-    DemoClass = require("./test.js").DemoClass
-
-    chalk, fs = require("chalk"), require("fs")
+    chalk, fs = context.require("chalk"), context.require("fs")
 
     console.log("Hello", chalk.red("world!"))
     fs.writeFileSync("HelloWorld.txt", "hi!")
@@ -477,7 +481,7 @@ def testpy():
     pythonObject = {"var": 3}
 
     # fmt: off
-    print(eval_js('''
+    print(context.eval_js('''
         for (let i = 0; i < 10; i++) {
             await pythonArray.append(i);
             pythonObject[i] = i;
@@ -492,7 +496,9 @@ def testpy():
     print("My var", pythonObject)
 
     print("OK, we can now exit")
+    del context
+    
 
 
 if __name__ == "__main__":
-    testpy()
+    test_context()
