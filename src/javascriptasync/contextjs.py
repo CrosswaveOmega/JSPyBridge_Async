@@ -13,7 +13,7 @@ from .errors import NoAsyncLoop
 
 class JSContext:
     '''
-    
+    experimental mode
     '''
     __slots__=['config','_imported','_known_packages']
     def __init__(self):
@@ -291,7 +291,3 @@ class JSContext:
         finally:
             del frame
         return await rv
-    
-    def once(self, emitter,event):
-        val = self.config.global_jsi.once(emitter, event, timeout=1000)
-        return val

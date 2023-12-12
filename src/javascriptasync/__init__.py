@@ -3,13 +3,14 @@ import asyncio
 from typing import Any, Coroutine, Optional, Callable, Union
 
 from .config import Config
+from .contextjs import JSContext
 from .core.jslogging import log_print, logs
 from .proxy import Proxy
 
-from .jscontext import JSContext
 import threading, inspect, time, atexit, os, sys
 from .errors import NoAsyncLoop
 
+from . import context
 
 def init_js():
     """Initalize a new bridge to node.js if it does not already exist."""
