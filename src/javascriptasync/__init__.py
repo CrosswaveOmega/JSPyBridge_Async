@@ -10,7 +10,6 @@ from .proxy import Proxy
 import threading, inspect, time, atexit, os, sys
 from .errors import NoAsyncLoop
 
-from . import context
 
 def init_js():
     """Initalize a new bridge to node.js if it does not already exist."""
