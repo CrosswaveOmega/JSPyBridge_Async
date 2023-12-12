@@ -68,7 +68,7 @@ class JSContext:
         self.config.set_asyncio_loop(asyncio.get_event_loop())
 
     def kill_js(self):
-        '''Shut down the active NodeJS context.W'''
+        '''Shut down the active NodeJS context.'''
         if self.config.state != 2:
             return
 
