@@ -13,7 +13,7 @@ from .util import generate_snowflake, SnowflakeMode
 from . import proxy, events, config
 from .errors import JavaScriptError, getErrorMessage, NoAsyncLoop, NoPyiAction
 from weakref import WeakValueDictionary
-from .core.jslogging import log_info, log_print, log_debug
+from .core.jslogging import log_info, log_print, log_debug, log_warning
 
 
 def python(method: str) -> types.ModuleType:
@@ -538,6 +538,22 @@ class PyInterface:
                 v = t
 
         self.queue_push(r, "ser", v)
+
+    def process_and_assign_reply_values(self,jsresponse:Dict[str,Any],wanted:Dict[str,Any]):
+        '''Assign FFIDs to any non-primitive objects within the wanted dictionary.'''
+        for request_id in jsresponse["val"]:
+            ffid = jsresponse["val"][request_id]
+            self.m[ffid] = wanted["wanted"][int(request_id)]
+            # This logic just for Event Emitters
+            try:
+                if hasattr(self.m[ffid], "__call__"):
+                    if inspect.ismethod(self.m[ffid]):
+                        log_info("this is a method")
+                    else:
+                        setattr(self.m[ffid], "iffid", ffid)
+            except Exception as e:
+                log_warning("There was an issue with , %s", e)
+                
 
     def onMessage(self, r: int, action: str, ffid: int, key: str, args: List):
         """Determine which action to preform based on the

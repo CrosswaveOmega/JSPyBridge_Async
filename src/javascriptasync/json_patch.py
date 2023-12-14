@@ -45,6 +45,7 @@ class CustomJSONCountEncoder(JSONEncoder):
     Attributes:
         append_p (bool): Determines whether to append the value of ctr.
         ctr (int): Counter value.
+        problem (int): Issues found when encoding.
         expect_reply (bool): Defines if a reply is expected.
         wanted (dict) : Holds wanted objects.
     """
@@ -96,6 +97,7 @@ class CustomJSONCountEncoder(JSONEncoder):
     def default(self, o):
         """
         Increments the counter and checks if object has 'ffid' attribute.
+        Will also assign any non-primitive objects to the self.wanted dictionary.
 
         Args:
             o (object): The object to be checked.

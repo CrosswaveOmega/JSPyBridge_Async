@@ -11,7 +11,7 @@ import time, threading, json, sys
 from typing import Any, Callable, Dict, List, Tuple, Union
 
 
-from . import pyi, config, errors
+from . import config, errors
 from queue import Queue, Empty
 from weakref import WeakValueDictionary
 from .core.abc import ThreadTaskStateBase, EventLoopBase
@@ -518,3 +518,5 @@ class EventLoop(EventLoopBase, EventLoopMixin):
                 self.active = False
                 break
             r = self.process_job(job, r)
+
+

@@ -3,7 +3,6 @@ from __future__ import annotations
 # This file contains all the exposed modules
 import asyncio
 from typing import Any, Coroutine, Optional, Callable, Union
-from . import config
 from .config import Config
 from .core.jslogging import log_print, logs
 from .proxy import EventEmitterProxy
@@ -85,7 +84,17 @@ def off(emitter: EventEmitterProxy, event: str, handler: Union[Callable, Corouti
 
 def once(emitter: EventEmitterProxy, event: str) -> Any:
     """
-    Listens for an event emitted once and returns a value when it occurs.
+
+    Not to be confused with the similarly named `EventEmitterProxy.once` method.
+
+    Wrapper for the `events.once` function in Node.JS:
+
+    In NodeJS, events.once creates a `Promise` that is fulfilled when the `EventEmitter`
+    emits the given event or that is rejected if the `EventEmitter` emits `'error'` while waiting.
+    The `Promise` will resolve with an array of all the arguments emitted to the
+    given event.
+
+    In Python, this will block the main thread until this promise is recieved.
 
     Args:
         emitter (EventEmitterProxy): The EventEmitterProxy instance.
@@ -94,6 +103,18 @@ def once(emitter: EventEmitterProxy, event: str) -> Any:
     Returns:
         Any: The value emitted when the event occurs.
 
+        
+    Example:
+        .. code-block:: python
+            wait() {
+                setTimeout(() => {
+                this.emit('done');
+                }, 400);
+            }
+            @Once(myEmitter, 'increment', asyncloop)
+            async def handleIncrementOnce(this, counter):
+                pass
+            val= once(myEmitter, "done")
     """
     conf = Config.get_inst()
     val = emitter._exe.config.global_jsi.once(emitter, event, timeout=1000)
@@ -110,12 +131,22 @@ async def off_a(emitter: EventEmitterProxy, event: str, handler: Union[Callable,
         handler (Callable or Coroutine): The event handler function to unregister.
 
     """
-    await emitter.off_a(event, handler, coroutine=True)
+    await emitter.off_a(event, handler)
 
 
 async def once_a(emitter: EventEmitterProxy, event: str) -> Any:
     """
-    Asynchronously listens for an event emitted once and returns a value when it occurs.
+
+    Not to be confused with the similarly named `EventEmitterProxy.once` method.
+
+    Asyncronous wrapper for the `events.once` function in Node.JS:
+
+    In NodeJS, events.once creates a `Promise` that is fulfilled when the `EventEmitter`
+    emits the given event or that is rejected if the `EventEmitter` emits `'error'` while waiting.
+    The `Promise` will resolve with an array of all the arguments emitted to the
+    given event.
+
+    In Python, this will just wait until the promise is recieved.
 
     Args:
         emitter (EventEmitterProxy): The EventEmitterProxy instance.
@@ -124,6 +155,13 @@ async def once_a(emitter: EventEmitterProxy, event: str) -> Any:
     Returns:
         Any: The value emitted when the event occurs.
 
+        
+    Example:
+        .. code-block:: python
+
+            #defined on nodejs side:
+            #wait() {setTimeout(() => {this.emit('done');}, 400);}            
+            val= once(myEmitter, "done")
     """
     conf = Config.get_inst()
     val = await emitter._exe.config.global_jsi.once(emitter, event, timeout=1000, coroutine=True)

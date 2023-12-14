@@ -156,7 +156,7 @@ class JSContext:
             except Exception:
                 # On Notebooks, the frame info above does not exist, so assume the CWD as caller
                 calling_dir = os.getcwd()
-        coro = self.config.global_jsi.get("require").call_a(name, version, calling_dir, timeout=900, coroutine=True)
+        coro = self.config.global_jsi.get("require").call_a(name, version, calling_dir, timeout=900)
         module = await coro
         if amode:
             module.toggle_async_chain(True)

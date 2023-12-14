@@ -77,7 +77,7 @@ class TestJavaScriptLibraryASYNC:
         DemoClass = module.DemoClass
         self.demo = await DemoClass("blue", {"a": 3}, lambda v: self.assertEquals(v, 3))
         print("events start")
-        #@On(self.demo,"increment")
+
         async def handler(this, fn, num, obj):
             print("Handler called", fn, num, obj)
             if num == 7:
@@ -87,10 +87,9 @@ class TestJavaScriptLibraryASYNC:
 
         await self.demo.on_a("increment",handler)
 
-        @Once(self.demo, "increment")
         async def onceIncrement(this, *args):
             print("Hey, I'm only called once !")
-
+        self.demo.once("increment",onceIncrement)
         await self.demo.increment()
         await asyncio.sleep(2)
 

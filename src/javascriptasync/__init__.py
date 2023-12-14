@@ -117,7 +117,7 @@ async def require_a(name: str, version: Optional[str] = None, amode: bool = Fals
         except Exception:
             # On Notebooks, the frame info above does not exist, so assume the CWD as caller
             calling_dir = os.getcwd()
-    coro = conf.global_jsi.get("require").call_a(name, version, calling_dir, timeout=900, coroutine=True)
+    coro = conf.global_jsi.get("require").call_a(name, version, calling_dir, timeout=900)
     # req=conf.global_jsi.require
     module = await coro
     if amode:

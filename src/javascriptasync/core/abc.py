@@ -61,6 +61,27 @@ class Request(Dict[str, Any]):
                 if v is not None
             }
         )
+    def __setattr__(self, key, value):
+        self[key] = value
+        super().__setattr__(key, value)
+    
+    def __dict__(self):
+        return {
+                k: v
+                for k, v in {
+                    "r": self.r,
+                    "action": self.action,
+                    "ffid": self.ffid,
+                    "key": self.key,
+                    "args": self.args,
+                    "val": self.val,
+                    "error": self.error,
+                    "sig": self.sig,
+                    "c": self.c,
+                }.items()
+                if v is not None
+            }
+
     @classmethod
     def create_by_action(cls, r: int, action: str, ffid: int, key: Any, args: Any=None) -> 'Request':
         """
@@ -82,5 +103,21 @@ class Request(Dict[str, Any]):
             return Request(r=r,action=action,ffid=ffid,key=key)
         elif action in ['set','init']:
             return Request(r=r,action=action,ffid=ffid,key=key,args=args)
+    @classmethod
+    def create_for_pcall(cls, ffid: int, action: str, key: Any, args: Any=None) -> 'Request':
+        """
+        Class method that creates a Request object based on the given parameters.
+
+        Parameters:
+        ffid (int): The ID of the function.
+        action (str): The action to be taken ("serialize", "keys", "get", "inspect", "set", "init").
+        
+        key (Any): The key for the request, used in "get", "inspect", "set", "init" actions.
+        args (Any): The arguments for the request, used in "set", "init" actions.
+
+        Returns:
+        Request: The Request object created using the parameters.
+        """
+        return Request(action=action,ffid=ffid,key=key,args=args)
 
 

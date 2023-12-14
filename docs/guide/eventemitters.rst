@@ -69,9 +69,10 @@ that should be noted.
 Utilizing EventEmitters From Python
 -----------------------------------
 
-To interact with EventEmitter on the python side, this library
-primarily utilized a special set of functions that allow for the assignment of 
-python functions as listeners for NodeJS EventEmitters, found within ``javascriptasync.emitters``.
+To interact with EventEmitter on the python side, this library provides two methods.
+
+Method one is the functions defined within ``javascriptasync.emitters``, although you'll
+have to pass in the relevant Proxy object as an argument for each.
 
 .. automodule:: javascriptasync.emitters
    :members:
@@ -79,13 +80,9 @@ python functions as listeners for NodeJS EventEmitters, found within ``javascrip
    :show-inheritance:
    :no-index:
 
-These wrappers originally had to be used over the built-in `.on`, `.off` and `.once` 
-methods of NodeJS's EventEmitters. 
 
-...or at least, in the earlier versions.
-
-Now, javascriptasync automatically wraps up EventEmitters into it's own type of proxy,
-called the `EventEmitterProxy`.  It handles all the extra logic on it's own. 
+Method two is javascriptasync's built in EventEmitterProxy.
+It handles all the extra logic on it's own. 
 
 EventEmitterProxy
 ^^^^^^^^^^^^^^^^^
@@ -144,7 +141,7 @@ There's also nothing stopping you from using the original wrappers.
     myEmitter.inc()
 
 
-It's preferred if 
+It's preferred if the event emitter methods are used, as they provide a more natural feel.
 
 .. code-block:: python
     :caption: using built in on/off methods EventEmitters
@@ -176,7 +173,7 @@ you can either use `init_js_a`, or `set_async_loop` as of this update.
 
 
 .. code-block:: python
-    :caption: Async EventEmitter Example
+    :caption: Async EventEmitter Example:Decorator
 
     from javascriptasync import init_js, require_a, set_async_loop
     from javascriptasync.emitters import On, Once, off, once
@@ -199,3 +196,35 @@ you can either use `init_js_a`, or `set_async_loop` as of this update.
         myEmitter.inc()
 
     asyncio.run(main())
+
+When using the built in EventEmitterProxy methods, it's recommended you use the async variant of 
+`EventEmitterProxy.on` and `EventEmitterProxy.once`,
+named `EventEmitterProxy.on_a` and `EventEmitterProxy.once_a`.
+
+.. code-block:: python
+    :caption: Async EventEmitter Example:Decorator
+
+    from javascriptasync import init_js, require_a, set_async_loop
+    from javascriptasync.emitters import On, Once, off, once
+    from javascriptasync.proxy import EventEmitterProxy
+    import asyncio
+    init_js()
+    async def main():
+        await set_async_loop()
+        MyEmitter = await require_a('./emitter.js')
+        # New class instance
+        myEmitter:EventEmitterProxy = MyEmitter()
+
+        async def handleIncrement(this, counter):
+            print("Incremented", counter)
+            # Stop listening. `this` is the this variable in JS.
+            await myEmitter.off_a('increment', handleIncrement)
+        
+        await myEmitter.on_a('increment',handleIncrement)
+        # Trigger the event handler
+        myEmitter.inc()
+
+    asyncio.run(main())
+
+
+
