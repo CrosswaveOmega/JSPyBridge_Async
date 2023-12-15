@@ -69,9 +69,12 @@ class Executor:
         l = self.loop.queue_request(r, req)
 
         if not l.wait(10):
+            l.timeout_flag()
             raise BridgeTimeout(f"Timed out accessing '{attr}'", action, ffid, attr)
-        res, barrier = self.loop.get_response_from_id(r)
-        barrier.wait()
+        res=l.get_data()
+
+        #res, barrier = self.loop.get_response_from_id(r)
+        #barrier.wait()
         if "error" in res:
             raise JavaScriptError(attr, res["error"])
         return res
@@ -101,10 +104,11 @@ class Executor:
         try:
             await asyncio.wait_for(l.wait(), timeout)
         except asyncio.TimeoutError as time_exc:
+            l.timeout_flag()
             raise asyncio.TimeoutError(f"{ffid},{action}:Timed out accessing '{attr}'") from time_exc
-
-        res, barrier = self.loop.get_response_from_id(r)
-        barrier.wait()
+        res=l.get_data()
+        #res, barrier = self.loop.get_response_from_id(r)
+        #barrier.wait()
         if "error" in res:
             raise JavaScriptError(attr, res["error"])
         return res
@@ -153,19 +157,20 @@ class Executor:
 
         return request, payload, wanted, ffid_resp_id
 
-    def _process_expected_reply(self, attr: Any, wanted: Dict[str, Any], call_resp_id: int, ffid_resp_id: int):
+    def _process_expected_reply(self, packet:Request, wanted: Dict[str, Any], lock, ffid_resp_id: int):
         """ """
-        pre, barrier = self.loop.get_response_from_id(ffid_resp_id)
+        #pre, barrier = self.loop.get_response_from_id(ffid_resp_id)
+        pre=lock.get_data()
         log_info(
-            "ProxyExec got response: call_resp_id:%s ffid_resp_id:%s, %s", str(call_resp_id), str(ffid_resp_id), pre
+            "ProxyExec got response: call_resp_id:%s ffid_resp_id:%s, %s", str(packet.r), str(ffid_resp_id), pre
         )
 
         if "error" in pre:
-            raise JavaScriptError(attr, pre["error"])
+            raise JavaScriptError(packet.key, pre["error"])
 
         self.bridge.process_and_assign_reply_values(pre, wanted)
 
-        barrier.wait()
+        #barrier.wait()
 
     # forceRefs=True means that the non-primitives in the second parameter will not be recursively
     # parsed for references. It's specifcally for eval_js.
@@ -203,7 +208,7 @@ class Executor:
 
         # call_resp_id = packet["r"]
 
-        l = self.loop.queue_request(packet.r, payload, asyncmode=True, loop=asyncio.get_event_loop())
+        l = await self.loop.queue_request_a(packet.r, payload, asyncmode=True)
 
         if wanted["exp_reply"]:
             # If any non-primitives were sent, then
@@ -214,19 +219,24 @@ class Executor:
             try:
                 await asyncio.wait_for(l2.wait(), timeout)
             except asyncio.TimeoutError as e:
+                l2.timeout_flag()
                 raise BridgeTimeoutAsync(
                     f"Expected reply with ffid '{ffid_resp_id}' on '{request.key}' timed out.",
                     action=request.action,
                     ffid=request.ffid,
                     attr=request.key,
                 ) from e
-            self._process_expected_reply(request.key, wanted, packet.r, ffid_resp_id)
+            self._process_expected_reply(packet, wanted, l2, ffid_resp_id)
 
         now = time.time()
 
         try:
+            #print(timeout)
             await asyncio.wait_for(l.wait(), timeout)
         except asyncio.TimeoutError as time_exc:
+            l.timeout_flag()
+            
+            print('elapsed is',time.time() - now)
             raise BridgeTimeoutAsync(
                 f"Call to '{request.key}' timed out.",
                 action=request.action,
@@ -242,12 +252,12 @@ class Executor:
             timeout,
             time.time() - now,
         )
-
-        res, barrier = self.loop.get_response_from_id(packet.r)
+        #res, barrier = self.loop.get_response_from_id(packet.r)
         # res, barrier = self.loop.responses[call_resp_id]
         # del self.loop.responses[call_resp_id]
 
-        barrier.wait()
+        #barrier.wait()
+        res=l.get_data()
 
         if "error" in res:
             raise JavaScriptError(request.key, res["error"])
@@ -292,12 +302,15 @@ class Executor:
         # we actually sent any non-primitives, otherwise skip
         if wanted["exp_reply"]:
             l2 = self.loop.await_response(ffid_resp_id)
+            
             if not l2.wait(timeout):
+                l2.timeout_flag()
                 raise BridgeTimeout(
                     f"Call to '{request.key}' timed out.", action=request.action, ffid=request.ffid, attr=request.key
                 )
             # pre, barrier = self.loop.responses[ffid_resp_id]
-            self._process_expected_reply(request.key, wanted, packet.r, ffid_resp_id)
+            #self._process_expected_reply(l2.get_data(), wanted, packet.r, ffid_resp_id)
+            self._process_expected_reply(packet, wanted, l2, ffid_resp_id)
 
         now = time.time()
 
@@ -308,8 +321,9 @@ class Executor:
             str(ffid_resp_id),
             timeout,
         )
-
         if not l.wait(timeout):
+            l.timeout_flag()
+            print('elapsed is',time.time() - now)
             raise BridgeTimeout(
                 f"Call to '{request.key}' timed out.", action=request.action, ffid=request.ffid, attr=request.key
             )
@@ -322,9 +336,11 @@ class Executor:
             timeout,
             elapsed,
         )
-        res, barrier = self.loop.get_response_from_id(packet.r)
+        res=l.get_data()
 
-        barrier.wait()
+        #res, barrier = self.loop.get_response_from_id(packet.r)
+
+        #barrier.wait()
 
         if "error" in res:
             raise JavaScriptError(request.key, res["error"])

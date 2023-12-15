@@ -99,8 +99,7 @@ class BridgeTimeoutAsync(asyncio.TimeoutError):
     Raised if a request times out in async mode
     """
 
-    def __init__(self, message, action, ffid, attr, *args, **kwargs):
-        super.__init__(*args,**kwargs)
+    def __init__(self, message, action, ffid, attr):
         self.message = message
         self.action = action
         self.ffid = ffid

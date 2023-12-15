@@ -1,7 +1,9 @@
+import random
 from javascriptasync import require, require_a, eval_js, eval_js_a, init_js, init_js_a
 import javascriptasync
 from javascriptasync.emitters import On, Once, off, once, once_a
 from javascriptasync import AsyncTaskA, AsyncTaskUtils
+from javascriptasync.errors import BridgeTimeoutAsync
 from javascriptasync.logging import set_log_level
 from javascriptasync.config import Config
 import logging
@@ -217,3 +219,57 @@ class TestJavaScriptLibraryASYNC:
             print("MAIN LOOP")
             await asyncio.sleep(1)
         await asyncio.sleep(1)
+        
+    @pytest.mark.asyncio
+    async def test_timeout_async(self):
+        module=await require_a("./test.js",amode=True)
+        demo = await module.DemoClass("blue", {"a": 3}, lambda v: print("Should be 3", v))
+        await demo.getdeep()
+        try:
+            await self.demo.this_times_out(3000,timeout=2)
+            print("Failed to error")
+            exit(1)
+        except BridgeTimeoutAsync as e:
+            print("timedout!",e)
+            await asyncio.sleep(4)
+
+
+
+    @pytest.mark.asyncio
+    async def test_many_timeout(self):
+        '''Preform a stress test involving 256 separate coroutines.'''
+        module=await require_a("./test.js",amode=True)
+        demo = await module.DemoClass("blue", {"a": 3}, lambda v: print("Should be 3", v))
+        await demo.getdeep()
+        async def corocall(task_name, demo, waitfor, timeou,delay=0):
+            await asyncio.sleep(delay)
+            print('starting ',task_name)
+            try:
+                coro=demo.this_times_out(waitfor*1000,timeout=timeou)
+                await coro
+                print(f"{task_name} - return!")
+                assert waitfor<=timeou
+            except BridgeTimeoutAsync as e:
+                print(f"{task_name} - timedout! {e}")
+                assert waitfor>=timeou
+                await asyncio.sleep(1+waitfor-timeou)
+            await asyncio.sleep(2)
+
+        # Call multiple separate asyncio tasks for the timeout function corocall
+        cors=[]
+        random.seed(9532014)
+        #stress test
+        for i in range(0,256):
+            number1=random.randint(1,9)
+            number2=random.randint(1,9)
+            cors.append((demo,number1,number2,i%5))
+        cor=[]
+        async with asyncio.TaskGroup() as tg:
+            for e, c in enumerate(cors):
+                a,b,g,d=c
+                tg.create_task(name=f"Task {e}",coro=corocall(f"Task {e}",a,b,g,d))
+
+        # Call them all at the same time with asyncio.gather
+        #await asyncio.gather(*cor)
+        print('done, cleaning up.')
+        await asyncio.sleep(2)

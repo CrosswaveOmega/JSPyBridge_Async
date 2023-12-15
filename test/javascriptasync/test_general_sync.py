@@ -1,6 +1,8 @@
+import time
 from javascriptasync import require, require_a, eval_js, eval_js_a, init_js, init_js_a
 from javascriptasync.emitters import On, Once, off, once
 from javascriptasync import AsyncTaskA, AsyncTaskUtils
+from javascriptasync.errors import BridgeTimeout
 from javascriptasync.logging import set_log_level
 from javascriptasync.config import Config
 import logging
@@ -125,6 +127,17 @@ class TestJavaScriptLibrary:
     def test_nullFromJsReturnsNone(self):
         assert self.demo.returnNull() is None
 
+    def test_timeout(self):
+        DemoClass = require("./test.js").DemoClass
+        self.demo = DemoClass("blue", {"a": 3}, lambda v: print("Should be 3", v))
+
+        try:
+            self.demo.this_times_out(4000,timeout=2)
+            print("Failed to error")
+            assert False
+        except BridgeTimeout as e:
+            print("timedout!",e)
+            time.sleep(4)
 
 if __name__ == "__main__":
     print("NA")

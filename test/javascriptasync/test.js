@@ -18,6 +18,17 @@ class DemoClass extends EventEmitter {
     }, 20);
   }
 
+  this_times_out(milliseconds) {
+    let time = milliseconds / 1000;
+    console.log("Wait for " + time + " seconds...");
+    return new Promise((resolve, reject) => {
+      setTimeout(() => {
+        console.log(time + " seconds have passed!");
+        resolve();
+      }, time * 1000);
+    });
+  }
+
   get() {
     return this.y;
   }

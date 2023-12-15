@@ -124,3 +124,75 @@ class ThreadGroup:
 
     def is_thread_alive(self):
         return self.thread.is_alive()
+
+
+class ThreadManagerMixin():
+        # === THREADING ===
+    def newTaskThread(self, handler, *args):
+        """
+        Create a new task thread.
+
+        Args:
+            handler: The handler function for the thread.
+            *args: Additional arguments for the handler function.
+
+        Returns:
+            ThreadGroup: new threadgroup instance, which contains state, handler, and thread.
+        """
+        thr = ThreadGroup(handler, *args)
+        # state = ThreadState()
+        # t = threading.Thread(target=handler, args=(state, *args), daemon=True)
+        self.threads.append(thr)
+
+        return thr
+
+    def startThread(self, method):
+        """
+        Start a thread.
+
+        Args:
+            method: The method associated with the thread.
+        """
+
+        for thr in [x for x in self.threads if x.check_handler(method)]:
+            thr.start_thread()
+            return
+        t = self.newTaskThread(method)
+        t.start_thread()
+
+    # Signal to the thread that it should stop. No forcing.
+    def stopThread(self, method):
+        """
+        Stop a thread.
+
+        Args:
+            method: The method associated with the thread.
+        """
+        for thr in [x for x in self.threads if x.check_handler(method)]:
+            thr.stop_thread()
+
+    # Force the thread to stop -- if it doesn't kill after a set amount of time.
+    def abortThread(self, method, killAfter=0.5):
+        """
+        Abort a thread.
+
+        Args:
+            method: The method associated with the thread.
+            killAfter (float): Time in seconds to wait before forcefully killing the thread.
+        """
+        for thr in [x for x in self.threads if x.check_handler(method)]:
+            thr.abort_thread(killAfter)
+
+        self.threads = [x for x in self.threads if not x.check_handler(method)]
+
+    # Stop the thread immediately
+    def terminateThread(self, method):
+        """
+        Terminate a thread.
+
+        Args:
+            method: The method associated with the thread.
+        """
+        for thr in [x for x in self.threads if x.check_handler(method)]:
+            thr.terminate()
+        self.threads = [x for x in self.threads if not x.check_handler(method)]

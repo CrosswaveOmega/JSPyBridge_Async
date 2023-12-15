@@ -29,28 +29,91 @@ from .connection import ConnectionClass
 from .util import generate_snowflake
 from .asynciotasks import EventLoopMixin, TaskGroup
 
-from .threadtasks import ThreadGroup
+from .threadtasks import ThreadGroup, ThreadManagerMixin
 
 
 EVENT_EMITTER_CALLBACK_MAX_HOLDUP = 20
 
+event_lock = threading.Lock()  # Create a lock for SuperEvent access
+class EventObject():
+    '''Parent mixin for CrossThreadEvents, to return values 
+    back to a calling thread without the need for threading barriers.'''
+    output=None
+    timeout_happened=False
+    event_lock=threading.Lock()
+    
+    def set(self):
+        raise NotImplementedError()
+    
+    def set_data(self,data):
+        '''Set the data returned to the subscribed thread or coroutine.
+        '''
+        self.output=data
 
-class CrossThreadEvent(asyncio.Event):
+    def get_data(self):
+        '''called within the target thread or coroutine,
+        retrieve the data published to this Event.'''
+        with self.event_lock:
+            return self.output
+
+    def publish(self,data:Any):
+        '''Publish data back to the thread or coroutine 
+        which requested it.  Triggers the event_lock until
+        the data has been sucsesfully returned.'''
+        with self.event_lock:
+            self.set() #
+            self.set_data(data)
+
+    def timeout_flag(self):
+        print('a timeout happened')
+        with self.event_lock:
+            self.timeout_happened=True
+            return True
+
+    def was_timeout(self):
+        evt=False
+        with self.event_lock:
+            evt=self.timeout_happened
+        return evt
+
+class CrossThreadEvent(asyncio.Event,EventObject):
     """Initalize Asyncio Event and pass in a specific
     Asyncio event loop, and ensure that the event can be
     Set outside an asyncio event loop."""
 
     def __init__(self, _loop=None, *args, **kwargs):
-        self._loop = None
+        self._superloop = None
+
         super().__init__(*args, **kwargs)
-        if self._loop is None:
-            self._loop = _loop
+        if self._superloop is None:
+            self._superloop = _loop
+        self.output=None
+        self.timeout_happened=False
+        self.event_lock=threading.Lock()
+
+
 
     def set(self):
-        self._loop.call_soon_threadsafe(super().set)
+        self._superloop.call_soon_threadsafe(super().set)
 
     def clear(self):
-        self._loop.call_soon_threadsafe(super().clear)
+        self._superloop.call_soon_threadsafe(super().clear)
+
+    async def wait(self):
+        self._superloop=asyncio.get_event_loop()
+        await super().wait()
+
+
+
+class CrossThreadEventSync(threading.Event,EventObject):
+    def __init__(self,*args, **kwargs):
+        
+        super().__init__(*args, **kwargs)
+        self.timeout_happened=False
+        self.output=None
+        self.event_lock=threading.Lock()
+    
+
 
 
 class EventExecutorThread(threading.Thread):
@@ -99,7 +162,7 @@ class EventExecutorThread(threading.Thread):
 # The event loop here is shared across all threads. All of the IO between the
 # JS and Python happens through this event loop. Because of Python's "Global Interperter Lock"
 # only one thread can run Python at a time, so no race conditions to worry about.
-class EventLoop(EventLoopBase, EventLoopMixin):
+class EventLoop(EventLoopBase, EventLoopMixin,ThreadManagerMixin):
     """
     A shared syncronous event loop which manages all IO between Python and Node.JS.
 
@@ -173,80 +236,11 @@ class EventLoop(EventLoopBase, EventLoopMixin):
         """
         self.conn.stop()
 
-    # === THREADING ===
-    def newTaskThread(self, handler, *args):
-        """
-        Create a new task thread.
-
-        Args:
-            handler: The handler function for the thread.
-            *args: Additional arguments for the handler function.
-
-        Returns:
-            ThreadGroup: new threadgroup instance, which contains state, handler, and thread.
-        """
-        thr = ThreadGroup(handler, *args)
-        # state = ThreadState()
-        # t = threading.Thread(target=handler, args=(state, *args), daemon=True)
-        self.threads.append(thr)
-
-        return thr
-
-    def startThread(self, method):
-        """
-        Start a thread.
-
-        Args:
-            method: The method associated with the thread.
-        """
-
-        for thr in [x for x in self.threads if x.check_handler(method)]:
-            thr.start_thread()
-            return
-        t = self.newTaskThread(method)
-        t.start_thread()
-
-    # Signal to the thread that it should stop. No forcing.
-    def stopThread(self, method):
-        """
-        Stop a thread.
-
-        Args:
-            method: The method associated with the thread.
-        """
-        for thr in [x for x in self.threads if x.check_handler(method)]:
-            thr.stop_thread()
-
-    # Force the thread to stop -- if it doesn't kill after a set amount of time.
-    def abortThread(self, method, killAfter=0.5):
-        """
-        Abort a thread.
-
-        Args:
-            method: The method associated with the thread.
-            killAfter (float): Time in seconds to wait before forcefully killing the thread.
-        """
-        for thr in [x for x in self.threads if x.check_handler(method)]:
-            thr.abort_thread(killAfter)
-
-        self.threads = [x for x in self.threads if not x.check_handler(method)]
-
-    # Stop the thread immediately
-    def terminateThread(self, method):
-        """
-        Terminate a thread.
-
-        Args:
-            method: The method associated with the thread.
-        """
-        for thr in [x for x in self.threads if x.check_handler(method)]:
-            thr.terminate()
-        self.threads = [x for x in self.threads if not x.check_handler(method)]
 
     # == IO ==
 
     # `queue_request` pushes this event onto the Payload
-    def queue_request(self, request_id, payload, timeout=None, asyncmode=False, loop=None) -> threading.Event:
+    def queue_request(self, request_id, payload, timeout=None, asyncmode=False, loop=None) -> Union[CrossThreadEventSync,CrossThreadEvent]:
         """
         Queue a request to be sent with the payload
 
@@ -256,14 +250,14 @@ class EventLoop(EventLoopBase, EventLoopMixin):
             timeout (float): Timeout duration in seconds.
 
         Returns:
-            threading.Event: An event for waiting on the response.
+            Union[CrossThreadEventSync,CrossThreadEvent]: An event for waiting on the response.
         """
 
         self.outbound.put(payload)
         if asyncmode:
             lock = CrossThreadEvent(_loop=loop)
         else:
-            lock = threading.Event()
+            lock = CrossThreadEventSync()
         self.requests[request_id] = [lock, timeout]
         log_debug(
             "EventLoop: queue_request. rid %s. payload=%s,  lock=%s, timeout:%s",
@@ -274,10 +268,38 @@ class EventLoop(EventLoopBase, EventLoopMixin):
         )
         self.queue.put("send")
         return lock
+    # `queue_request` pushes this event onto the Payload
+    async def queue_request_a(self, request_id, payload, timeout=None, asyncmode=False) -> Union[CrossThreadEventSync,CrossThreadEvent]:
+        """
+        Queue a request to be sent with the payload
 
+        Args:
+            request_id: The ID of the request.
+            payload: The payload to be sent.
+            timeout (float): Timeout duration in seconds.
+
+        Returns:
+            Union[CrossThreadEventSync,CrossThreadEvent]: An event for waiting on the response.
+        """
+
+        self.outbound.put(payload)
+        if asyncmode:
+            lock = CrossThreadEvent(_loop=asyncio.get_event_loop())
+        else:
+            lock = CrossThreadEventSync()
+        self.requests[request_id] = [lock, timeout]
+        log_debug(
+            "EventLoop: queue_request. rid %s. payload=%s,  lock=%s, timeout:%s",
+            str(request_id),
+            str(payload),
+            str(lock),
+            timeout,
+        )
+        self.queue.put("send")
+        return lock
     def queue_payload(self, payload):
         """
-        Just send the payload to be sent.
+        Just send a payload.
 
         Args:
             payload: The payload to be sent.
@@ -286,9 +308,9 @@ class EventLoop(EventLoopBase, EventLoopMixin):
         log_debug("EventLoop: added %s to payload", str(payload))
         self.queue.put("send")
 
-    def await_response(self, request_id, timeout=None, asyncmode=False, loop=None) -> threading.Event:
+    def await_response(self, request_id, timeout=None, asyncmode=False, loop=None) -> Union[CrossThreadEventSync,CrossThreadEvent]:
         """
-        Await a response for a request.
+        Return a lock event for an expected responce given a request_id
 
         Args:
             request_id: The ID of the request.
@@ -300,7 +322,7 @@ class EventLoop(EventLoopBase, EventLoopMixin):
         if asyncmode:
             lock = CrossThreadEvent(_loop=loop)
         else:
-            lock = threading.Event()
+            lock = CrossThreadEventSync()
         self.requests[request_id] = [lock, timeout]
         log_debug("EventLoop: await_response. rid %s.  lock=%s, timeout:%s", str(request_id), str(lock), timeout)
         self.queue.put("send")
@@ -335,37 +357,28 @@ class EventLoop(EventLoopBase, EventLoopMixin):
         time.sleep(0.8)  # Allow final IO
         self.conn.stop()
 
-    def get_response_from_id(self, request_id: int) -> Tuple[Any, threading.Barrier]:
-        """Retrieve a response and associated barrier for a given request ID,
-         and then removes it from the internal responces dictionary.
+    # def get_response_from_id(self, request_id: int) -> Tuple[Any, threading.Barrier]:
+    #     """ DEPRECATED
+    #     Retrieve a response and associated barrier for a given request ID,
+    #      and then removes it from the internal responces dictionary.
 
-        Args:
-            request_id (int): The request ID for which the response and barrier are needed.
+    #     Args:
+    #         request_id (int): The request ID for which the response and barrier are needed.
 
-        Returns:
-            Tuple[Any, threading.Barrier]: A tuple containing the response and the
-            threading.Barrier associated with the request.
+    #     Returns:
+    #         Tuple[Any, threading.Barrier]: A tuple containing the response and the
+    #         threading.Barrier associated with the request.
 
-        Raises:
-            KeyError: If the specified request ID does not exist in the responses.
+    #     Raises:
+    #         KeyError: If the specified request ID does not exist in the responses.
 
-        """
-        if not request_id in self.responses:
-            raise KeyError(f"Response id {request_id} not in self.responses")
-        res, barrier = self.responses[request_id]
-        del self.responses[request_id]
-        return res, barrier
+    #     """
+    #     if not request_id in self.responses:
+    #         raise KeyError(f"Response id {request_id} not in self.responses")
+    #     res, barrier = self.responses[request_id]
+    #     del self.responses[request_id]
+    #     return res, barrier
 
-    def _publish_inbound(self, r, inbound):
-        lock, timeout = self.requests.pop(r)
-        barrier = threading.Barrier(2, timeout=5)
-
-        self.responses[r] = inbound, barrier
-        # why delete when you can just use .pop()?
-        # del self.requests[r]
-        # print(inbound,lock)
-        lock.set()  # release, allow calling thread to resume
-        barrier.wait()
 
     def _send_outbound(self):
         """
@@ -422,6 +435,21 @@ class EventLoop(EventLoopBase, EventLoopMixin):
         self.active = False
         self.conf.throw_error_state(errorst)
 
+    def _publish_inbound(self, r, inbound):
+        '''Publish inbound data to the relevant calling task.'''
+        event, timeout = self.requests.pop(r)
+        event:EventObject=event
+        # barrier = threading.Barrier(2, timeout=5)
+        # The data is only going one way, back to the thread/coroutine
+        # which made the request in the first place.
+        # There's no reason to use a barrier.
+
+        if not event.was_timeout():
+            event.publish(inbound)
+               
+        else:
+            log_warning("Request %d timed out: %s",r,timeout)
+
     def _recieve_inbound(self, oldr: int):
         """
         Read the inbound data from the connection, and route it
@@ -440,7 +468,7 @@ class EventLoop(EventLoopBase, EventLoopMixin):
         if self.conn.kill_error:
             log_critical("FATAL.")
             self._fatal_error()
-            return
+            return r
         for inbound in inbounds:
             log_debug("Loop: inbounds was %s", str(inbound))
             r = inbound["r"]
@@ -452,6 +480,7 @@ class EventLoop(EventLoopBase, EventLoopMixin):
                 # syncio.create_task(asyncio.to_thread(pyi.inbound,inbound))
                 self.callbackExecutor.add_job(r, cbid, mypyi.inbound, inbound)
             if r in self.requests:
+                #Call the publish inbound sub method.
                 self._publish_inbound(r, inbound)
 
         return r
