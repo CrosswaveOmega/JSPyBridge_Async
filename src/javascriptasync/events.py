@@ -7,21 +7,20 @@ Core module which contains the EventLoop class.
 from __future__ import annotations
 import asyncio
 import random
-import time, threading, json, sys
+import time, threading
 from typing import Any, Callable, Dict, List, Tuple, Union
 
-
-from . import config, errors
 from queue import Queue, Empty
 from weakref import WeakValueDictionary
-from .core.abc import ThreadTaskStateBase, EventLoopBase
+
+from .errorsjs import NodeTerminated
+from .core.abc import Request, EventLoopBase
 
 from .core.jslogging import (
     log_critical,
     log_debug,
     log_error,
     log_info,
-    log_print,
     log_warning,
 )
 
@@ -31,7 +30,7 @@ from .asynciotasks import EventLoopMixin, TaskGroup
 
 from .threadtasks import ThreadGroup, ThreadManagerMixin
 
-
+from . import configjs
 EVENT_EMITTER_CALLBACK_MAX_HOLDUP = 20
 
 event_lock = threading.Lock()  # Create a lock for SuperEvent access
@@ -54,7 +53,8 @@ class EventObject():
         '''called within the target thread or coroutine,
         retrieve the data published to this Event.'''
         with self.event_lock:
-            return self.output
+            req=Request(**self.output)
+            return req
 
     def publish(self,data:Any):
         '''Publish data back to the thread or coroutine 
@@ -177,16 +177,16 @@ class EventLoop(EventLoopBase, EventLoopMixin,ThreadManagerMixin):
         requests (dict): A dictionary of request IDs and locks.
         responses (dict): A dictionary of response data and barriers.
         conn(ConnectionClass): Instance of the connection class.
-        conf(JSConfig): The JSConfig instance this class belongs to.
+        conf(configjs.JSConfig): The configjs.JSConfig instance this class belongs to.
 
     """
 
-    def __init__(self, config_container: config.JSConfig):
+    def __init__(self, config_container: configjs.JSConfig):
         """
         Initialize the EventLoop.
 
         Args:
-            config_container (config.JSConfig): Reference to the active JSConfig object
+            config_container (config.configjs.JSConfig): Reference to the active configjs.JSConfig object
         """
         self.active: bool = True
         self.queue = Queue()
@@ -215,7 +215,7 @@ class EventLoop(EventLoopBase, EventLoopMixin,ThreadManagerMixin):
         self.responses: Dict[int, Tuple[Dict, threading.Barrier]] = {}
         # Map of requestID -> response payload
         self.conn: ConnectionClass = ConnectionClass(config_container)
-        self.conf: config.JSConfig = config_container
+        self.conf: configjs.JSConfig = config_container
         # if not amode:
 
     # async def add_loop(self):
@@ -401,7 +401,7 @@ class EventLoop(EventLoopBase, EventLoopMixin,ThreadManagerMixin):
                     log_warning("EventLoop, outbound Queue is empty.", exc_info=e)
                     still_full = False
             self.conn.writeAll(out)
-        except errors.NodeTerminated as e:
+        except NodeTerminated as e:
             log_critical("Attempted to write to a terminated process! %s", e)
 
     def _remove_finished_thread_tasks(self):

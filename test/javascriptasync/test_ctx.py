@@ -1,6 +1,4 @@
 import pytest
-import asyncio
-import pytest
 
 """
 
@@ -410,12 +408,10 @@ async def test_my_coroutine():
 
 
 def test_context():
-    import os
+    
     import time
-    import logging
     from javascriptasync import JSContext
     from javascriptasync.emitters import On, off, Once, once
-    from javascriptasync.logging import setup_logging, get_filehandler
     context=JSContext()
     context.init_js()
     console = context.get_console()  # TODO: Remove this in 1.0

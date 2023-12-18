@@ -114,9 +114,6 @@ class EventLoopMixin:
 
     tasks = []
 
-    def __init__(self):
-        self.tasks: List[TaskGroup]
-        # Tuple[TaskStateAsync,Coroutine,asyncio.Task]] = []
 
     # === ASYNCIO ===
     async def newTask(self, handler: Coroutine, *args):

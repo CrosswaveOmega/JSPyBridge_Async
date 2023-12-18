@@ -29,21 +29,26 @@ class Request(Dict[str, Any]):
         action: str = None,
         ffid: int = None,
         key: Any = None,
+        keys: Any = None,
         args: Any = None,
         val: Any = None,
         error: Any = None,
         sig: Any = None,
         c: str = None,
+        insp : str =None
     ):
         self.r = r
         self.action = action
         self.ffid = ffid
         self.key = key
+        self.keys=keys
         self.args = args
         self.val = val
         self.error = error
         self.sig = sig
         self.c = c
+        self.insp = insp
+
         super().__init__(
             {
                 k: v
@@ -52,11 +57,13 @@ class Request(Dict[str, Any]):
                     "action": action,
                     "ffid": ffid,
                     "key": key,
+                    "keys": self.keys,
                     "args": args,
                     "val": val,
                     "error": error,
                     "sig": sig,
                     "c": c,
+                    "insp":insp
                 }.items()
                 if v is not None
             }
@@ -73,15 +80,19 @@ class Request(Dict[str, Any]):
                     "action": self.action,
                     "ffid": self.ffid,
                     "key": self.key,
+                    "keys": self.keys,
                     "args": self.args,
                     "val": self.val,
                     "error": self.error,
                     "sig": self.sig,
                     "c": self.c,
+                    "insp":self.insp
                 }.items()
                 if v is not None
             }
-
+    def error_state(self):
+        return (self.error is not None)
+            
     @classmethod
     def create_by_action(cls, r: int, action: str, ffid: int, key: Any, args: Any=None) -> 'Request':
         """

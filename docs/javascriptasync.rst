@@ -12,10 +12,10 @@ javascriptasync.asynciotasks module
    :undoc-members:
    :show-inheritance:
 
-javascriptasync.config module
------------------------------
+javascriptasync.configjs module
+-------------------------------
 
-.. automodule:: javascriptasync.config
+.. automodule:: javascriptasync.configjs
    :members:
    :undoc-members:
    :show-inheritance:
@@ -60,13 +60,17 @@ javascriptasync.logging module
    :undoc-members:
    :show-inheritance:
 
-javascriptasync.proxy module
-----------------------------
+javascriptasync.executor module
+-------------------------------
 
-.. autoclass:: javascriptasync.proxy.Executor
+.. autoclass:: javascriptasync.executor.Executor
    :members:
    :undoc-members:
    :show-inheritance:
+
+javascriptasync.proxy module
+----------------------------
+
 
 .. autoclass:: javascriptasync.proxy.Proxy
    :members:

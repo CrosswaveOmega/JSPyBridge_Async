@@ -6,7 +6,7 @@ with the serialization of PCall requests.
 from json import JSONEncoder, JSONDecoder
 
 from javascriptasync.core.jslogging import log_warning
-from .errors import InvalidNodeOp
+from .errorsjs import InvalidNodeOp
 from typing import Any, Tuple
 
 

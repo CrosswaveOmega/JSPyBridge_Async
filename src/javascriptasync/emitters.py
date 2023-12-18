@@ -3,7 +3,7 @@ from __future__ import annotations
 # This file contains all the exposed modules
 import asyncio
 from typing import Any, Coroutine, Optional, Callable, Union
-from .config import Config
+from .configjs import Config
 from .core.jslogging import log_print, logs
 from .proxy import EventEmitterProxy
 

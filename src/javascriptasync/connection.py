@@ -8,14 +8,15 @@ import json
 import time
 
 # import signal
-import atexit
+
 import os
 import sys
 from typing import Any, Dict, List, TextIO, Union
-from . import config, events
+from . import configjs, events
+
 from .core.jslogging import log_print, log_debug, log_info, log_error, log_critical, log_warning
 from .util import haspackage
-from .errors import FatalJavaScriptError, InvalidNodeJS, JavaScriptError, NodeTerminated
+from .errorsjs import FatalJavaScriptError, InvalidNodeJS,  NodeTerminated
 from .json_patch import JSONRequestDecoder
 
 ISCLEAR = False
@@ -46,8 +47,8 @@ class ConnectionClass:
     This class initalizes a node.js instance, sends information from Python to JavaScript, and recieves input from JavaScript back to Python.
 
     Attributes:
-        config (config.JSConfig): Reference to the active JSConfig object.
-        event_loop(config.JSConfig): Reference to the event_loop
+        config (configjs.JSConfig): Reference to the active configjs.JSConfig object.
+        event_loop(configjs.JSConfig): Reference to the event_loop
         endself(bool): if the thread is ending, send nothing else.
         stdout (TextIO): The standard output.
         modified_stdout (bool): True if stdout has been altered in some way, False otherwise.
@@ -74,12 +75,12 @@ class ConnectionClass:
         """
         return ISNOTEBOOK
 
-    def __init__(self, configval: config.JSConfig):
+    def __init__(self, configval: configjs.JSConfig):
         """
         Initialize the ConnectionClass.
 
         Args:
-            config (config.JSConfig): Reference to the active JSConfig object.
+            config (configjs.JSConfig): Reference to the active configjs.JSConfig object.
         """
 
         self.stdout: TextIO = sys.stdout
@@ -95,8 +96,8 @@ class ConnectionClass:
         #self.stderr_lines: List[str] = []
         self.stderr_lines: Queue[str] = Queue()
         self.sendQ: list = []
-        self.config: config.JSConfig = configval
-        self.event_loop: events.EventLoop = None
+        self.config: configjs.JSConfig = configval
+        self.event_loop:events.EventLoop = None
         # Modified stdout
         self.endself = False
         self.modified_stdout = (sys.stdout != sys.__stdout__) or (getattr(sys, "ps1", sys.flags.interactive) == ">>> ")
@@ -191,6 +192,7 @@ class ConnectionClass:
             except FatalJavaScriptError as v_e:
                 #print(v_e, "[JSE]", line)
                 log_error("FATAL ERROR.  TERMINATING.")
+                log_error(v_e)
                 return ret
                 #log_error()
         return ret

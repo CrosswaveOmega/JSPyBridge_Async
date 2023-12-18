@@ -1,18 +1,14 @@
 from __future__ import annotations
 
-import time, threading, json, sys
-from typing import Any, Callable, Dict, List, Tuple
+import time, threading, sys
+from typing import Callable
 
-from . import pyi, config
-from queue import Queue
-from weakref import WeakValueDictionary
 from typing import Callable
 from .core.abc import (
     ThreadTaskStateBase,
 )
 from .core.jslogging import (
     log_debug,
-    log_print,
 )
 
 

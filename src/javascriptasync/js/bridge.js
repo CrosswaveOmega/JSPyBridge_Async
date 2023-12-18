@@ -21,6 +21,7 @@ try {
       'jspybridge',
   ) ? (...args) => console.debug(`[${args}]`) : () => { };
   const supportsColors = false;
+  const autoInspect = true;
   /**
  * Determines the "type" of the provided object
  * according to a custom series of checks.
@@ -79,6 +80,9 @@ try {
    * Bridge class constructor. Initializes the ffid, lastadd,
    * reference map m, ipc, pyBridge and eventMap.
    *
+   * Each operation that can be preformed by the python side
+   * of the bridge will have a relevant function within this class.
+   *
    * @param {IPCClass} ipc - Inter Process Communication
    */
     constructor(ipc) {
@@ -118,6 +122,7 @@ try {
       };
       this.ipc = ipc;
       this.pyi = new PyBridge(this.ipc, this);
+      // Is eventMap used... anywhere?
       this.eventMap = {};
 
     // ipc.on('message', this.onMessage)
@@ -203,30 +208,17 @@ try {
             var type = v.ffid ? 'py' : getType(v);
             var attObj=this.switchType(r, v, type);
             attObj['attr']=attribute;
+            if (autoInspect) {
+              attObj['insp']=util.inspect(v, {});
+            }
             to_return.push(attObj);
           }
         }
-        this.ipc.send({r, key: 'deepobj', val: to_return});
+        return this.ipc.send({r, key: 'deepobj', val: to_return});
       } catch (e) {
         return this.ipc.send({r, key: 'void', val: this.ffid});
       }
-      return this.switchType(r, v, type);
-      switch (type) {
-        case 'string': return this.ipc.send({r, key: 'string', val: v});
-        case 'big': return this.ipc.send({r, key: 'big', val: Number(v)});
-        case 'num': return this.ipc.send({r, key: 'num', val: v});
-        case 'py': return this.ipc.send({r, key: 'py', val: v.ffid});
-        case 'class':
-          this.m[this.ffidinc()] = v;
-          return this.ipc.send({r, key: 'class', val: this.ffid});
-        case 'fn':
-          this.m[this.ffidinc()] = v;
-          return this.ipc.send({r, key: 'fn', val: this.ffid});
-        case 'obj':
-          this.m[this.ffidinc()] = v;
-          return this.ipc.send({r, key: 'obj', val: this.ffid});
-        default: return this.ipc.send({r, key: 'void', val: this.ffid});
-      }
+      // return this.switchType(r, v, type);
     }
     /**
    * Asynchronously retrieves the value of a specific attribute for
@@ -247,23 +239,12 @@ try {
       } catch (e) {
         return this.ipc.send({r, key: 'void', val: this.ffid});
       }
-      return this.ipc.send(this.switchType(r, v, type));
-      switch (type) {
-        case 'string': return this.ipc.send({r, key: 'string', val: v});
-        case 'big': return this.ipc.send({r, key: 'big', val: Number(v)});
-        case 'num': return this.ipc.send({r, key: 'num', val: v});
-        case 'py': return this.ipc.send({r, key: 'py', val: v.ffid});
-        case 'class':
-          this.m[this.ffidinc()] = v;
-          return this.ipc.send({r, key: 'class', val: this.ffid});
-        case 'fn':
-          this.m[this.ffidinc()] = v;
-          return this.ipc.send({r, key: 'fn', val: this.ffid});
-        case 'obj':
-          this.m[this.ffidinc()] = v;
-          return this.ipc.send({r, key: 'obj', val: this.ffid});
-        default: return this.ipc.send({r, key: 'void', val: this.ffid});
+      const attObj=this.switchType(r, v, type);
+      if (autoInspect) {
+        attObj['insp']=util.inspect(v, {});
       }
+
+      return this.ipc.send(attObj);
     }
 
     /**
@@ -303,11 +284,16 @@ try {
      new this.m[ffid][attr](...args):
      new this.m[ffid](...args);
       // console.log('init', r, ffid, attr, args, this.ffid,  this.m[this.ffid])
+      let attrObj={};
       if (this.m[this.ffid] instanceof EventEmitter) {
-        this.ipc.send({r, key: 'inste', val: this.ffid});
+        attrObj={r, key: 'inste', val: this.ffid};
       } else {
-        this.ipc.send({r, key: 'inst', val: this.ffid});
+        attrObj={r, key: 'inst', val: this.ffid};
       }
+      if (autoInspect) {
+        attrObj['insp']=util.inspect(this.m[this.ffid], {});
+      }
+      this.ipc.send(attrObj);
     }
     /**
    * This function handles the synchronous or asynchronous
@@ -336,25 +322,11 @@ try {
       }
       const type = getType(v);
       // console.log('GetType', type, v);
-      return this.ipc.send(this.switchType(r, v, type));
-      switch (type) {
-        case 'string': return this.ipc.send({r, key: 'string', val: v});
-        case 'big': return this.ipc.send({r, key: 'big', val: Number(v)});
-        case 'num': return this.ipc.send({r, key: 'num', val: v});
-        case 'py': return this.ipc.send({r, key: 'py', val: v.ffid});
-        case 'class':
-          this.m[this.ffidinc()] = v;
-          return this.ipc.send({r, key: 'class', val: this.ffid});
-        case 'fn':
-        // Fix for functions that return functions, use .call() wrapper
-        // this.m[++this.ffid] = { call: v }
-          this.m[this.ffidinc()] = v;
-          return this.ipc.send({r, key: 'fn', val: this.ffid});
-        case 'obj':
-          this.m[this.ffidinc()] = v;
-          return this.ipc.send({r, key: 'obj', val: this.ffid});
-        default: return this.ipc.send({r, key: 'void', val: this.ffid});
+      const attrObj=this.switchType(r, v, type);
+      if (autoInspect) {
+        attrObj['insp']=util.inspect(v, {});
       }
+      return this.ipc.send(attrObj);
     }
 
     /**

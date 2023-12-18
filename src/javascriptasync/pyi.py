@@ -3,16 +3,20 @@ import asyncio
 
 # THe Python Interface for JavaScript
 
-import inspect, importlib, traceback
+import inspect
+import importlib
+import traceback
 import threading
-import os, sys, json, types
-import socket
+from weakref import WeakValueDictionary
+import types
 from typing import Any, Dict, List, Tuple
 
-from .util import generate_snowflake, SnowflakeMode
-from . import proxy, events, config
-from .errors import JavaScriptError, getErrorMessage, NoAsyncLoop, NoPyiAction
-from weakref import WeakValueDictionary
+from .util import generate_snowflake
+
+
+from . import proxy, events, executor, configjs
+from .errorsjs import NoAsyncLoop, NoPyiAction
+
 from .core.jslogging import log_info, log_print, log_debug, log_warning
 
 
@@ -111,19 +115,19 @@ class PyInterface:
         m (Dict[int, Any]): A dictionary of objects with FFID (foreign object reference id) as keys.
         weakmap (WeakValueDictionary): A weak reference dictionary for managing objects.
         cur_ffid (int): The current FFID value.
-        config (config.JSConfig): Reference to the active JSConfig object.
-        ipc(EventLoop): The EventLoop used to broker communication to NodeJS.
+        config (config.configjs.JSConfig): Reference to the active configjs.JSConfig object.
+        ipc(events.EventLoop): The events.EventLoop used to broker communication to NodeJS.
         send_inspect (bool): Whether to send inspect data for console logging.
         current_async_loop: The current asyncio event loop.
 
 
     """
 
-    def __init__(self, config_obj: config.JSConfig):
+    def __init__(self, config_obj: configjs.JSConfig):
         """Initalize a new PYInterface.
 
         Args:
-            config_obj (config.JSConfig): Reference to the active JSConfig object.
+            config_obj (configjs.JSConfig): Reference to the active configjs.JSConfig object.
 
         """
         self.m = {0: {"python": python, "fileImport": fileImport, "Iterate": Iterate}}
@@ -139,7 +143,7 @@ class PyInterface:
         self.send_inspect = True
         self.current_async_loop = None
         self.my_actions={}
-        self.executor: proxy.Executor = None
+        self.executor: Any = None
         self.define_actions()
 
     def define_actions(self):
@@ -164,17 +168,17 @@ class PyInterface:
         res = str(self.m)
         return res
 
-    def set_executor(self, exe: proxy.Executor):
+    def set_executor(self, exe: Any):
         """Set the current executor object.
 
         Args:
-            exe (proxy.Executor): The new executor object to be set.
+            exe (Any): The new executor object to be set.
         """
         self.executor = exe
 
     # @property
     # def executor(self):
-    #     """Get the executor object currently initalized in JSConfig."""
+    #     """Get the executor object currently initalized in configjs.JSConfig."""
     #     return self.config.executor
 
     # @executor.setter

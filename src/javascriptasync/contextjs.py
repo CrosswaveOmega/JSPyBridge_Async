@@ -5,10 +5,10 @@ import inspect
 
 from typing import Any, Optional
 
-from .config import JSConfig
+from .configjs import JSConfig
 from .core.jslogging import log_print
 from .proxy import Proxy
-from .errors import NoAsyncLoop
+from .errorsjs import NoAsyncLoop
 
 
 class JSContext:

@@ -4,21 +4,21 @@ The core config class.
 from __future__ import annotations
 import asyncio
 import os
+import threading, inspect, time, atexit, sys
 from typing import List
-from .proxy import Proxy, Executor
+from .proxy import Proxy
+from .executor import Executor
 from .events import EventLoop
 from .pyi import PyInterface
 from .core.jslogging import log_print, logs, print_path ,log_warning
-from .errors import FatalJavaScriptError, NoConfigInitalized
-import threading, inspect, time, atexit, sys
-
+from .errorsjs import FatalJavaScriptError, NoConfigInitalized
 
 class Null:
     def __getattr__(self, *args, **kwargs):
         raise Exception("The JavaScript process has crashed. Please restart the runtime to access JS APIs.")
 
 
-class JSConfig():
+class JSConfig:
     """The configuration class for the JavaScript Bridge.
 
     This class is used to configure, manage, and facilitatie communication to an EventLoop, which filters data in/out to an active node subprocess.

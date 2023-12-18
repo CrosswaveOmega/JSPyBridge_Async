@@ -1,13 +1,8 @@
 import time
-from javascriptasync import require, require_a, eval_js, eval_js_a, init_js, init_js_a
+from javascriptasync import require, eval_js, init_js
 from javascriptasync.emitters import On, Once, off, once
-from javascriptasync import AsyncTaskA, AsyncTaskUtils
-from javascriptasync.errors import BridgeTimeout
-from javascriptasync.logging import set_log_level
-from javascriptasync.config import Config
-import logging
+from javascriptasync.errorsjs import BridgeTimeout
 import pytest
-import asyncio
 
 class TestJavaScriptLibrary:
     @pytest.fixture(autouse=True)
