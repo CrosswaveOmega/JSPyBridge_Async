@@ -1,18 +1,20 @@
 from __future__ import annotations
 import asyncio
-import time, traceback
-from typing import Any, Callable, Coroutine, Dict, Literal, Tuple, Union
+import time
+from typing import Any, Dict, Tuple
 
 from .json_patch import CustomJSONCountEncoder
 
-from . import configjs,pyi,events
-from .errorsjs import AsyncReminder, BridgeTimeoutAsync, InvalidNodeOp, JavaScriptError, BridgeTimeout
+from .core.abc import EventObject
+from . import configjs
+from .errorsjs import BridgeTimeoutAsync, JavaScriptError, BridgeTimeout
 
 
 # from .config import configjs.JSConfig
 from .util import generate_snowflake, SnowflakeMode
-from .core.jslogging import log_warning, log_debug, log_info, log_error
+from .core.jslogging import log_debug, log_info
 from .core.abc import Request
+
 
 class Executor:
     """
@@ -21,31 +23,26 @@ class Executor:
 
     Attributes:
         config (configjs.JSConfig): Reference to the active configjs.JSConfig object.
-        loop (events.EventLoop): The event loop for handling JavaScript events.
         i (int): A unique id for generating request ids.
-        bridge(PyInterface): shortcut to Config.pyi
+
     """
 
-    def __init__(self, config_obj: configjs.JSConfig, loop: events.EventLoop):
+    def __init__(self, config_obj: configjs.JSConfig):
         """
         Initializer for the executor.
 
         Args:
             config_obj (configjs.JSConfig): configjs.JSConfig object reference.
-            loop (events.EventLoop): events.EventLoop object reference.
 
         Attributes:
             config (configjs.JSConfig): The active configjs.JSConfig object.
-            loop (events.EventLoop): The event loop for handling JavaScript events.
             i (int): A unique id for generating request ids.
-            bridge (PyInterface): PyInterface object retrieved from the config object.
         """
         self.config: configjs.JSConfig = config_obj
-        self.loop: events.EventLoop = loop
-        self.i = 0
-        self.bridge:pyi.PyInterface = config_obj.get_pyi()
 
-    def ipc(self, action: str, ffid: int, attr: Any, args=None)->Request:
+        self.i = 0
+
+    def ipc(self, action: str, ffid: int, attr: Any, args=None) -> Request:
         """
         Interacts with JavaScript context based on specified actions.
 
@@ -64,20 +61,19 @@ class Executor:
         r = generate_snowflake(self.i, SnowflakeMode.pyrid)  # unique request ts, acts as ID for response
         l = None  # the lock
         req: Request = Request.create_by_action(r, action, ffid, attr, args)
-        l = self.loop.queue_request(r, req)
+        l = self.config.event_loop.queue_request(r, req)
 
         if not l.wait(10):
             l.timeout_flag()
             raise BridgeTimeout(f"Timed out accessing '{attr}'", action, ffid, attr)
-        res=l.get_data()
+        res = l.get_data()
 
-        #res, barrier = self.loop.get_response_from_id(r)
-        #barrier.wait()
+
         if res.error_state():
             raise JavaScriptError(attr, res["error"])
         return res
 
-    async def ipc_async(self, action:str, ffid:int, attr:Any, args=None)->Request:
+    async def ipc_async(self, action: str, ffid: int, attr: Any, args=None) -> Request:
         """
         Async Variant of ipc.  Interacts with JavaScript context based on specified actions.
 
@@ -98,20 +94,20 @@ class Executor:
         amode = True
         aloop = asyncio.get_event_loop()
         req: Request = Request.create_by_action(r, action, ffid, attr, args)
-        l = self.loop.queue_request(r, req, asyncmode=amode, loop=aloop)
+        l = self.config.event_loop.queue_request(r, req, asyncmode=amode, loop=aloop)
         try:
             await asyncio.wait_for(l.wait(), timeout)
         except asyncio.TimeoutError as time_exc:
             l.timeout_flag()
             raise asyncio.TimeoutError(f"{ffid},{action}:Timed out accessing '{attr}'") from time_exc
-        res=l.get_data()
-        #res, barrier = self.loop.get_response_from_id(r)
-        #barrier.wait()
+        res = l.get_data()
+
         if res.error_state():
             raise JavaScriptError(attr, res["error"])
         return res
 
-    def _prepare_pcall_request( self, request: Request, forceRefs: bool = False
+    def _prepare_pcall_request(
+        self, request: Request, forceRefs: bool = False
     ) -> Tuple[Dict[str, Any], str, Dict[int, Any], int]:
         """
         Prepare the preliminary request for the pcall function.
@@ -154,20 +150,17 @@ class Executor:
 
         return request, payload, wanted, ffid_resp_id
 
-    def _process_expected_reply(self, packet:Request, wanted: Dict[str, Any], lock, ffid_resp_id: int):
+    def _process_expected_reply(self, packet: Request, wanted: Dict[str, Any], lock:EventObject, ffid_resp_id: int):
         """ """
-        #pre, barrier = self.loop.get_response_from_id(ffid_resp_id)
-        pre=lock.get_data()
-        log_info(
-            "ProxyExec got response: call_resp_id:%s ffid_resp_id:%s, %s", str(packet.r), str(ffid_resp_id), pre
-        )
+        pre = lock.get_data()
+        log_info("ProxyExec got response: call_resp_id:%s ffid_resp_id:%s, %s", str(packet.r), str(ffid_resp_id), pre)
 
         if pre.error_state():
             raise JavaScriptError(packet.key, pre["error"])
 
-        self.bridge.process_and_assign_reply_values(pre, wanted)
+        self.config.pyi.process_and_assign_reply_values(pre, wanted)
 
-        #barrier.wait()
+        # barrier.wait()
 
     # forceRefs=True means that the non-primitives in the second parameter will not be recursively
     # parsed for references. It's specifcally for eval_js.
@@ -205,14 +198,14 @@ class Executor:
 
         # call_resp_id = packet["r"]
 
-        l = await self.loop.queue_request_a(packet.r, payload, asyncmode=True)
+        l = await self.config.event_loop.queue_request_a(packet.r, payload, asyncmode=True)
 
         if wanted["exp_reply"]:
             # If any non-primitives were sent, then
             # we need to wait for a FFID assignment response if
             # otherwise skip
 
-            l2 = self.loop.await_response(ffid_resp_id, asyncmode=True, loop=asyncio.get_event_loop())
+            l2 = self.config.event_loop.await_response(ffid_resp_id, asyncmode=True, loop=asyncio.get_event_loop())
             try:
                 await asyncio.wait_for(l2.wait(), timeout)
             except asyncio.TimeoutError as e:
@@ -228,12 +221,12 @@ class Executor:
         now = time.time()
 
         try:
-            #print(timeout)
+            # print(timeout)
             await asyncio.wait_for(l.wait(), timeout)
         except asyncio.TimeoutError as time_exc:
             l.timeout_flag()
-            
-            print('elapsed is',time.time() - now)
+
+            print("elapsed is", time.time() - now)
             raise BridgeTimeoutAsync(
                 f"Call to '{request.key}' timed out.",
                 action=request.action,
@@ -249,12 +242,8 @@ class Executor:
             timeout,
             time.time() - now,
         )
-        #res, barrier = self.loop.get_response_from_id(packet.r)
-        # res, barrier = self.loop.responses[call_resp_id]
-        # del self.loop.responses[call_resp_id]
 
-        #barrier.wait()
-        res=l.get_data()
+        res = l.get_data()
 
         if res.error_state():
             raise JavaScriptError(request.key, res["error"])
@@ -294,19 +283,18 @@ class Executor:
         packet, payload, wanted, ffid_resp_id = self._prepare_pcall_request(request, forceRefs)
 
         # call_resp_id = packet["r"]
-        l = self.loop.queue_request(packet.r, payload)
+        l = self.config.event_loop.queue_request(packet.r, payload)
         # We only have to wait for a FFID assignment response if
         # we actually sent any non-primitives, otherwise skip
         if wanted["exp_reply"]:
-            l2 = self.loop.await_response(ffid_resp_id)
-            
+            l2 = self.config.event_loop.await_response(ffid_resp_id)
+
             if not l2.wait(timeout):
                 l2.timeout_flag()
                 raise BridgeTimeout(
                     f"Call to '{request.key}' timed out.", action=request.action, ffid=request.ffid, attr=request.key
                 )
-            # pre, barrier = self.loop.responses[ffid_resp_id]
-            #self._process_expected_reply(l2.get_data(), wanted, packet.r, ffid_resp_id)
+
             self._process_expected_reply(packet, wanted, l2, ffid_resp_id)
 
         now = time.time()
@@ -320,7 +308,7 @@ class Executor:
         )
         if not l.wait(timeout):
             l.timeout_flag()
-            print('elapsed is',time.time() - now)
+            print("elapsed is", time.time() - now)
             raise BridgeTimeout(
                 f"Call to '{request.key}' timed out.", action=request.action, ffid=request.ffid, attr=request.key
             )
@@ -333,11 +321,9 @@ class Executor:
             timeout,
             elapsed,
         )
-        res=l.get_data()
+        res = l.get_data()
 
-        #res, barrier = self.loop.get_response_from_id(packet.r)
 
-        #barrier.wait()
 
         if res.error_state():
             raise JavaScriptError(request.key, res["error"])
@@ -507,7 +493,7 @@ class Executor:
         Args:
             ffid (int): Foreign Object Reference ID.
         """
-        self.loop.freeable.append(ffid)
+        self.config.event_loop.free_ffid(ffid)
 
     def get(self, ffid):
         """
@@ -519,4 +505,4 @@ class Executor:
         Returns:
             Any: The JavaScript object.
         """
-        return self.bridge.m[ffid]
+        return self.config.pyi.get_pyobj_from_ffid(ffid)

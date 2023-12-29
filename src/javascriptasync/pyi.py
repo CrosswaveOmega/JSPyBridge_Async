@@ -14,7 +14,7 @@ from typing import Any, Dict, List, Tuple
 from .util import generate_snowflake
 
 
-from . import proxy, events, executor, configjs
+from . import events, configjs
 from .errorsjs import NoAsyncLoop, NoPyiAction
 
 from .core.jslogging import log_info, log_print, log_debug, log_warning
@@ -115,7 +115,7 @@ class PyInterface:
         m (Dict[int, Any]): A dictionary of objects with FFID (foreign object reference id) as keys.
         weakmap (WeakValueDictionary): A weak reference dictionary for managing objects.
         cur_ffid (int): The current FFID value.
-        config (config.configjs.JSConfig): Reference to the active configjs.JSConfig object.
+        config (configjs.JSConfig): Reference to the active configjs.JSConfig object.
         ipc(events.EventLoop): The events.EventLoop used to broker communication to NodeJS.
         send_inspect (bool): Whether to send inspect data for console logging.
         current_async_loop: The current asyncio event loop.
@@ -136,17 +136,16 @@ class PyInterface:
         self.cur_ffid = 10000
         self.ffid_param = 10000
         self.config = config_obj
-        self.ipc: events.EventLoop = self.config.get_event_loop()
         # This toggles if we want to send inspect data for console logging. It's auto
         # disabled when a for loop is active; use `repr` to request logging instead.
         self.m[0]["sendInspect"] = lambda x: setattr(self, "send_inspect", x)
         self.send_inspect = True
         self.current_async_loop = None
         self.my_actions={}
-        self.executor: Any = None
-        self.define_actions()
+        #self.executor: Any = None
+        self._define_actions()
 
-    def define_actions(self):
+    def _define_actions(self):
         for name, method in inspect.getmembers(self, predicate=inspect.ismethod):
             if name!='action_selector':
                 signature = inspect.signature(method)
@@ -160,21 +159,23 @@ class PyInterface:
                     self.my_actions[name] = method
         
 
-    def queue_push(self, r, key, val, sig=""):
-        self.ipc.queue_payload({"c": "pyi", "r": r, "key": key, "val": val, "sig": sig})
+    def _queue_push(self, r, key, val, sig=""):
+        self.config.event_loop.queue_payload(
+            {"c": "pyi", "r": r, "key": key, "val": val, "sig": sig}
+        )
 
     def __str__(self):
         """Return a string representation of the PyInterface object."""
         res = str(self.m)
         return res
 
-    def set_executor(self, exe: Any):
-        """Set the current executor object.
+    # def set_executor(self, exe: Any):
+    #     """Set the current executor object.
 
-        Args:
-            exe (Any): The new executor object to be set.
-        """
-        self.executor = exe
+    #     Args:
+    #         exe (Any): The new executor object to be set.
+    #     """
+    #     self.executor = exe
 
     # @property
     # def executor(self):
@@ -252,7 +253,7 @@ class PyInterface:
             else:
                 raise LookupError(f"Property '{fix_key(key)}' does not exist on {repr(v)}")
         l = len(v)
-        self.queue_push(r, "num", l)
+        self._queue_push(r, "num", l)
 
     def init(self, r: int, ffid: int, key: str, args: Tuple):
         """Initialize an object on the Python side, assign an FFID to it, and
@@ -267,7 +268,7 @@ class PyInterface:
         """
         v = self.m[ffid](*args)
         ffid = self.assign_ffid(v)
-        self.queue_push(r, "inst", ffid)
+        self._queue_push(r, "inst", ffid)
 
     def call(self, r: int, ffid: int, keys: List, args: Tuple, kwargs: Dict, invoke=True):
         """Call a method or access a property of an object on the python side,
@@ -337,28 +338,28 @@ class PyInterface:
                 v = v(*args, **kwargs)
         typ = type(v)
         if typ is str:
-            self.queue_push(r, "string", v)
+            self._queue_push(r, "string", v)
             return
         if typ is int or typ is float or (v is None) or (v is True) or (v is False):
-            self.queue_push(r, "int", v)
+            self._queue_push(r, "int", v)
             return
         if inspect.isclass(v) or isinstance(v, type):
             # generate a new ffid.
-            self.queue_push(r, "class", self.assign_ffid(v), self.make_signature(v))
+            self._queue_push(r, "class", self.assign_ffid(v), self.make_signature(v))
             return
         if callable(v):  # anything with __call__
-            self.queue_push(r, "fn", self.assign_ffid(v), self.make_signature(v))
+            self._queue_push(r, "fn", self.assign_ffid(v), self.make_signature(v))
             return
         if (typ is dict) or (inspect.ismodule(v)) or was_class:  # "object" in JS speak
-            self.queue_push(r, "obj", self.assign_ffid(v), self.make_signature(v))
+            self._queue_push(r, "obj", self.assign_ffid(v), self.make_signature(v))
             return
         if typ is list:
-            self.queue_push(r, "list", self.assign_ffid(v), self.make_signature(v))
+            self._queue_push(r, "list", self.assign_ffid(v), self.make_signature(v))
             return
         if hasattr(v, "__class__"):  # numpy generator can't be picked up without this
-            self.queue_push(r, "class", self.assign_ffid(v), self.make_signature(v))
+            self._queue_push(r, "class", self.assign_ffid(v), self.make_signature(v))
             return
-        self.queue_push(r, "void", self.cur_ffid)
+        self._queue_push(r, "void", self.cur_ffid)
 
     # Same as call just without invoking anything, and args
     # would be null
@@ -393,7 +394,7 @@ class PyInterface:
         for key in keys:
             v = getattr(v, key, None) or v[key]
         s = repr(v)
-        self.queue_push(r, "", s)
+        self._queue_push(r, "", s)
 
     # no ACK needed
     def free(self, r: int, ffid: int, key: str, args: List):
@@ -466,7 +467,7 @@ class PyInterface:
             v[on] = val
         else:
             setattr(v, on, val)
-        self.queue_push(r, "void", self.cur_ffid)
+        self._queue_push(r, "void", self.cur_ffid)
 
     def json_to_python(self, json_input, lookup_key):
         """Convert special JSON objects to Python methods"""
@@ -480,7 +481,7 @@ class PyInterface:
         for k, v in iterator:
             if isinstance(v, dict) and (lookup_key in v):
                 ffid = v[lookup_key]
-                json_input[k] = proxy.Proxy(self.executor, ffid)
+                json_input[k] = self.config.new_proxy(ffid)
             else:
                 self.json_to_python(v, lookup_key)
 
@@ -541,7 +542,7 @@ class PyInterface:
             else:
                 v = t
 
-        self.queue_push(r, "ser", v)
+        self._queue_push(r, "ser", v)
 
     def process_and_assign_reply_values(self,jsresponse:Dict[str,Any],wanted:Dict[str,Any]):
         '''Assign FFIDs to any non-primitive objects within the wanted dictionary.'''
@@ -577,7 +578,7 @@ class PyInterface:
             return self.action_selector(action,r,ffid,key,args)
             #return getattr(self, action)(r, ffid, key, args)
         except Exception:
-            self.queue_push(r, "error", "", traceback.format_exc())
+            self._queue_push(r, "error", "", traceback.format_exc())
             pass
 
     def inbound(self, j: Dict[str, Any]):
@@ -593,6 +594,18 @@ class PyInterface:
         thread_id = threading.current_thread().ident
         # print('threadid',thread_id,"INBOUND PYI: ",j)
         return self.onMessage(j["r"], j["action"], j["ffid"], j["key"], j["val"])
+    
+    def get_pyobj_from_ffid(self, ffid:int)->Any:
+        """Get a python object stored the 'm' dictionary with ffid.
+        
+        Args:
+            ffid(int): FFID of python object to get.
+
+        Returns:
+            Any - A (complex) Python Object of any type.
+        
+        """
+        return self.m[ffid]
     
     async def inbound_a(self, j:Dict[str,Any]):
         """Extract the message arguments from J, and call onMessage.  asyncronous.

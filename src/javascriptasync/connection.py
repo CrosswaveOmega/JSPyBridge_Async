@@ -12,8 +12,7 @@ import time
 import os
 import sys
 from typing import Any, Dict, List, TextIO, Union
-from . import configjs, events
-
+from . import configjs
 from .core.jslogging import log_print, log_debug, log_info, log_error, log_critical, log_warning
 from .util import haspackage
 from .errorsjs import FatalJavaScriptError, InvalidNodeJS,  NodeTerminated
@@ -48,7 +47,6 @@ class ConnectionClass:
 
     Attributes:
         config (configjs.JSConfig): Reference to the active configjs.JSConfig object.
-        event_loop(configjs.JSConfig): Reference to the event_loop
         endself(bool): if the thread is ending, send nothing else.
         stdout (TextIO): The standard output.
         modified_stdout (bool): True if stdout has been altered in some way, False otherwise.
@@ -97,7 +95,7 @@ class ConnectionClass:
         self.stderr_lines: Queue[str] = Queue()
         self.sendQ: list = []
         self.config: configjs.JSConfig = configval
-        self.event_loop:events.EventLoop = None
+
         # Modified stdout
         self.endself = False
         self.modified_stdout = (sys.stdout != sys.__stdout__) or (getattr(sys, "ps1", sys.flags.interactive) == ">>> ")
@@ -303,7 +301,7 @@ class ConnectionClass:
         readline = line_read
         if readline:
             self.stderr_lines.put(readline)
-            self.event_loop.queue.put("stdin")
+            self.config.push_job("stdin")
 
 
     def com_io(self):
@@ -366,7 +364,7 @@ class ConnectionClass:
         Start the communication thread.
         """
         log_info("ConnectionClass.com_thread opened")
-        self.event_loop=self.config.get_event_loop()
+        # self.event_loop=self.config.get_event_loop()
         self.com_thread = threading.Thread(target=self.com_io, args=(), daemon=True)
         self.com_thread.start()
 

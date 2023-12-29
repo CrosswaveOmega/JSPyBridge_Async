@@ -21,20 +21,38 @@ class Null:
 class JSConfig:
     """The configuration class for the JavaScript Bridge.
 
-    This class is used to configure, manage, and facilitatie communication to an EventLoop, which filters data in/out to an active node subprocess.
-    It also stores the
-    python->
+    This class is used to configure, manage, and facilitatie communication to an EventLoop, 
+    which filters data in/out to an active node subprocess.
+    It also stores all objects necessary for execution of the runtime.
 
     Attributes:
-        event_loop (EventLoop): The event loop to facilitate io between Python and a node.js connection.
+        event_loop (EventLoop): The event loop to manage io between Python and node.js.
         event_thread (Thread): The thread running the `event_loop.loop` method.
         executor (Executor): The executor for JavaScript code execution.
         global_jsi (Proxy): The root interface to JavaScript with FFID 0.
         fast_mode (bool): Whether to enable fast mode for JavaScript execution.
         node_emitter_patches (bool): Whether patches are needed for legacy node versions.
         dead (str): message for when the node.js process crashes.
+        state (int): current state of the runtime.  
+            0 is awaiting startup.  
+            1 is starting up.  
+            2 is active.  
+            3 is error state.
+        manual_terminate (bool): should be true if the runtime should only be terminated explicitly.
     """
-
+    slots=[
+        'dead'
+        ,'event_loop'
+        ,'event_thread'
+        ,'pyi'
+        ,'executor'
+        ,'global_jsi'
+        ,'fast_mode'
+        ,'node_emitter_patches'
+        ,'error_stack'
+        ,'state'
+        ,'manual_terminate'
+    ]
     def __init__(self,manual_terminate=False):
         """
         Initializes a new instance of JSConfig.
@@ -44,27 +62,24 @@ class JSConfig:
         self.dead = "\n** The Node process has crashed. Please restart the runtime to use JS APIs. **\n"
         self.event_loop: EventLoop = None
         self.event_thread: threading.Thread = None
-        self.profiler = None
         self.pyi: PyInterface = None
         self.executor: Executor = None
         self.global_jsi: Proxy = None
         self.fast_mode: bool = False
         self.node_emitter_patches: bool = False
-        self.error_state=False
         self.error_stack=None
         self.state:int=0
         self.manual_terminate=manual_terminate
 
 
     def _startup_internal(self):
-            self.error_state=False
             self.error_stack=None
 
             self.event_loop: EventLoop = EventLoop(self)
             self.pyi: PyInterface = PyInterface(self)
-            self.executor: Executor = Executor(self, self.event_loop)
+            self.executor: Executor = Executor(self)
 
-            self.pyi.set_executor(self.executor)
+            #self.pyi.set_executor(self.executor)
             self.event_loop.start_connection()
             self.event_thread: threading.Thread = threading.Thread(target=self.event_loop.loop, args=(), daemon=True)
             self.event_thread.start()
@@ -107,14 +122,46 @@ class JSConfig:
         self.event_loop.on_exit()
 
     def throw_error_state(self, errorst:List[str]):
-        self.error_state=True
+        self.state=3
         self.error_stack=errorst
         self.terminate()
 
-    def get_event_loop(self):
+    def new_proxy(self,ffid:int)->Proxy:
+        '''Create a new Proxy object with only the passed in ffid.
+        
+        Args:
+            ffid(int): FFID of the newly initalized Proxy object.
+
+        Returns:
+            Proxy- a new Proxy object with the current executor and the target ffid.
+        '''
+        proxy=Proxy(self.executor, ffid)
+        return proxy
+
+    def get_event_loop(self)->EventLoop:
+        '''Return a reference to the active EventLoop used to 
+        interact with this particular JavaScript runtime. 
+        
+        Return:
+            EventLoop- reference to the initalized EventLoop.
+        '''
         return self.event_loop
 
-    def get_pyi(self):
+
+    def push_job(self,job:str):
+        '''
+        Push a job to the active EventLoop's queue. 
+
+        Args:
+            job(str): String representing the job to push.
+        
+        '''
+        if not self.event_loop:
+            raise NoConfigInitalized("event_loop of JSConfig was never set!")
+        self.event_loop.queue.put(job)
+
+    def get_pyi(self)->PyInterface:
+        '''Get the PyInterface instance in use by this config.'''
         return self.pyi
 
     def set_asyncio_loop(self, loop: asyncio.AbstractEventLoop):
@@ -127,6 +174,7 @@ class JSConfig:
         """
         if self.global_jsi.needsNodePatches():
             self.node_emitter_patches = True
+    
 
     def reset_self(self):
         """
@@ -153,6 +201,7 @@ class JSConfig:
 
 
 class Config:
+
     """
 
     This class is a singleton container for managing a JSConfig instance. It ensures that only one instance
@@ -242,7 +291,7 @@ class Config:
             )
         elif Config._initalizing:
             raise NoConfigInitalized("Still initalizing JSConfig, please wait!")
-        if Config._instance.error_state:
+        if Config._instance.state==3:
             raise FatalJavaScriptError('FatalError',Config._instance.error_stack)
         return Config._instance
 

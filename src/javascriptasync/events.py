@@ -14,7 +14,7 @@ from queue import Queue, Empty
 from weakref import WeakValueDictionary
 
 from .errorsjs import NodeTerminated
-from .core.abc import Request, EventLoopBase
+from .core.abc import Request, EventObject
 
 from .core.jslogging import (
     log_critical,
@@ -31,67 +31,28 @@ from .asynciotasks import EventLoopMixin, TaskGroup
 from .threadtasks import ThreadGroup, ThreadManagerMixin
 
 from . import configjs
+
 EVENT_EMITTER_CALLBACK_MAX_HOLDUP = 20
 
-event_lock = threading.Lock()  # Create a lock for SuperEvent access
-class EventObject():
-    '''Parent mixin for CrossThreadEvents, to return values 
-    back to a calling thread without the need for threading barriers.'''
-    output=None
-    timeout_happened=False
-    event_lock=threading.Lock()
-    
-    def set(self):
-        raise NotImplementedError()
-    
-    def set_data(self,data):
-        '''Set the data returned to the subscribed thread or coroutine.
-        '''
-        self.output=data
-
-    def get_data(self):
-        '''called within the target thread or coroutine,
-        retrieve the data published to this Event.'''
-        with self.event_lock:
-            req=Request(**self.output)
-            return req
-
-    def publish(self,data:Any):
-        '''Publish data back to the thread or coroutine 
-        which requested it.  Triggers the event_lock until
-        the data has been sucsesfully returned.'''
-        with self.event_lock:
-            self.set() #
-            self.set_data(data)
-
-    def timeout_flag(self):
-        print('a timeout happened')
-        with self.event_lock:
-            self.timeout_happened=True
-            return True
-
-    def was_timeout(self):
-        evt=False
-        with self.event_lock:
-            evt=self.timeout_happened
-        return evt
-
-class CrossThreadEvent(asyncio.Event,EventObject):
+class CrossThreadEvent(asyncio.Event, EventObject):
     """Initalize Asyncio Event and pass in a specific
     Asyncio event loop, and ensure that the event can be
     Set outside an asyncio event loop."""
-
+    __slots__=[
+        '_superloop'
+        ,'output'
+        ,'timeout_happened'
+        ,'event_lock'
+    ]
     def __init__(self, _loop=None, *args, **kwargs):
         self._superloop = None
 
         super().__init__(*args, **kwargs)
         if self._superloop is None:
             self._superloop = _loop
-        self.output=None
-        self.timeout_happened=False
-        self.event_lock=threading.Lock()
-
-
+        self.output = None
+        self.timeout_happened = False
+        self.event_lock = threading.Lock()
 
     def set(self):
         self._superloop.call_soon_threadsafe(super().set)
@@ -100,20 +61,22 @@ class CrossThreadEvent(asyncio.Event,EventObject):
         self._superloop.call_soon_threadsafe(super().clear)
 
     async def wait(self):
-        self._superloop=asyncio.get_event_loop()
+        self._superloop = asyncio.get_event_loop()
         await super().wait()
 
 
-
-class CrossThreadEventSync(threading.Event,EventObject):
-    def __init__(self,*args, **kwargs):
-        
-        super().__init__(*args, **kwargs)
-        self.timeout_happened=False
-        self.output=None
-        self.event_lock=threading.Lock()
+class CrossThreadEventSync(threading.Event, EventObject):
+    __slots__=[
+        'output'
+        ,'timeout_happened'
+        ,'event_lock'
+    ]
     
-
+    def __init__(self, *args, **kwargs):
+        super().__init__(*args, **kwargs)
+        self.timeout_happened = False
+        self.output = None
+        self.event_lock = threading.Lock()
 
 
 class EventExecutorThread(threading.Thread):
@@ -162,7 +125,7 @@ class EventExecutorThread(threading.Thread):
 # The event loop here is shared across all threads. All of the IO between the
 # JS and Python happens through this event loop. Because of Python's "Global Interperter Lock"
 # only one thread can run Python at a time, so no race conditions to worry about.
-class EventLoop(EventLoopBase, EventLoopMixin,ThreadManagerMixin):
+class EventLoop(EventLoopMixin, ThreadManagerMixin):
     """
     A shared syncronous event loop which manages all IO between Python and Node.JS.
 
@@ -177,16 +140,31 @@ class EventLoop(EventLoopBase, EventLoopMixin,ThreadManagerMixin):
         requests (dict): A dictionary of request IDs and locks.
         responses (dict): A dictionary of response data and barriers.
         conn(ConnectionClass): Instance of the connection class.
-        conf(configjs.JSConfig): The configjs.JSConfig instance this class belongs to.
+        config(configjs.JSConfig): The configjs.JSConfig instance this class belongs to.
 
     """
+    __slots__=[
+        'active'
+        ,'queue'
+        ,'freeable'
+        ,'upper_batch_limit'
+        ,'callbackExecutor'
+        ,'callbacks'
+        ,'threads'
+        ,'tasks'
+        ,'outbound'
+        ,'requests'
+        ,'responses'
+        ,'config'
+        ,'conn'
+    ]
 
     def __init__(self, config_container: configjs.JSConfig):
         """
         Initialize the EventLoop.
 
         Args:
-            config_container (config.configjs.JSConfig): Reference to the active configjs.JSConfig object
+            config_container (configjs.JSConfig): Reference to the active configjs.JSConfig object
         """
         self.active: bool = True
         self.queue = Queue()
@@ -210,12 +188,12 @@ class EventLoop(EventLoopBase, EventLoopMixin,ThreadManagerMixin):
         # After a socket request is made, it's ID is pushed to self.requests. Then, after a response
         # is recieved it's removed from requests and put into responses, where it should be deleted
         # by the consumer.
-        self.requests: Dict[int, Union[CrossThreadEvent, threading.Lock]] = {}
+        self.requests: Dict[int, EventObject] = {}
         # Map of requestID -> threading.Lock
         self.responses: Dict[int, Tuple[Dict, threading.Barrier]] = {}
         # Map of requestID -> response payload
         self.conn: ConnectionClass = ConnectionClass(config_container)
-        self.conf: configjs.JSConfig = config_container
+        self.config: configjs.JSConfig = config_container
         # if not amode:
 
     # async def add_loop(self):
@@ -236,11 +214,12 @@ class EventLoop(EventLoopBase, EventLoopMixin,ThreadManagerMixin):
         """
         self.conn.stop()
 
-
     # == IO ==
 
     # `queue_request` pushes this event onto the Payload
-    def queue_request(self, request_id, payload, timeout=None, asyncmode=False, loop=None) -> Union[CrossThreadEventSync,CrossThreadEvent]:
+    def queue_request(
+        self, request_id, payload, timeout=None, asyncmode=False, loop=None
+    ) -> Union[CrossThreadEventSync, CrossThreadEvent]:
         """
         Queue a request to be sent with the payload
 
@@ -268,8 +247,11 @@ class EventLoop(EventLoopBase, EventLoopMixin,ThreadManagerMixin):
         )
         self.queue.put("send")
         return lock
+
     # `queue_request` pushes this event onto the Payload
-    async def queue_request_a(self, request_id, payload, timeout=None, asyncmode=False) -> Union[CrossThreadEventSync,CrossThreadEvent]:
+    async def queue_request_a(
+        self, request_id, payload, timeout=None, asyncmode=False
+    ) -> Union[CrossThreadEventSync, CrossThreadEvent]:
         """
         Queue a request to be sent with the payload
 
@@ -297,6 +279,7 @@ class EventLoop(EventLoopBase, EventLoopMixin,ThreadManagerMixin):
         )
         self.queue.put("send")
         return lock
+
     def queue_payload(self, payload):
         """
         Just send a payload.
@@ -308,7 +291,19 @@ class EventLoop(EventLoopBase, EventLoopMixin,ThreadManagerMixin):
         log_debug("EventLoop: added %s to payload", str(payload))
         self.queue.put("send")
 
-    def await_response(self, request_id, timeout=None, asyncmode=False, loop=None) -> Union[CrossThreadEventSync,CrossThreadEvent]:
+    def free_ffid(self, ffid: int):
+        """
+        Schedule a free operation for a JavaScript object on the other
+        side of the bridge.
+
+        Args:
+            ffid (int): Foreign Object Reference ID of the object to be freed.
+        """
+        self.freeable.append(ffid)
+
+    def await_response(
+        self, request_id, timeout=None, asyncmode=False, loop=None
+    ) -> Union[CrossThreadEventSync, CrossThreadEvent]:
         """
         Return a lock event for an expected responce given a request_id
 
@@ -379,7 +374,6 @@ class EventLoop(EventLoopBase, EventLoopMixin,ThreadManagerMixin):
     #     del self.responses[request_id]
     #     return res, barrier
 
-
     def _send_outbound(self):
         """
         Gather all jobs in the outbound Queue, and send to the active
@@ -433,12 +427,12 @@ class EventLoop(EventLoopBase, EventLoopMixin,ThreadManagerMixin):
             inbound = {"r": r, "key": "error", "error": errorst}
             self._publish_inbound(r, inbound)
         self.active = False
-        self.conf.throw_error_state(errorst)
+        self.config.throw_error_state(errorst)
 
     def _publish_inbound(self, r, inbound):
-        '''Publish inbound data to the relevant calling task.'''
+        """Publish inbound data to the relevant calling task."""
         event, timeout = self.requests.pop(r)
-        event:EventObject=event
+        event: EventObject = event
         # barrier = threading.Barrier(2, timeout=5)
         # The data is only going one way, back to the thread/coroutine
         # which made the request in the first place.
@@ -446,9 +440,9 @@ class EventLoop(EventLoopBase, EventLoopMixin,ThreadManagerMixin):
 
         if not event.was_timeout():
             event.publish(inbound)
-               
+
         else:
-            log_warning("Request %d timed out: %s",r,timeout)
+            log_warning("Request %d timed out: %s", r, timeout)
 
     def _recieve_inbound(self, oldr: int):
         """
@@ -476,11 +470,11 @@ class EventLoop(EventLoopBase, EventLoopMixin,ThreadManagerMixin):
             if "c" in inbound and inbound["c"] == "pyi":
                 log_debug("Loop, inbound C request was %s", str(inbound))
 
-                mypyi = self.conf.get_pyi()
+                mypyi = self.config.get_pyi()
                 # syncio.create_task(asyncio.to_thread(pyi.inbound,inbound))
                 self.callbackExecutor.add_job(r, cbid, mypyi.inbound, inbound)
             if r in self.requests:
-                #Call the publish inbound sub method.
+                # Call the publish inbound sub method.
                 self._publish_inbound(r, inbound)
 
         return r
@@ -547,5 +541,3 @@ class EventLoop(EventLoopBase, EventLoopMixin,ThreadManagerMixin):
                 self.active = False
                 break
             r = self.process_job(job, r)
-
-

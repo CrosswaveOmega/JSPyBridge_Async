@@ -108,7 +108,7 @@ class Proxy(object):
 
     def _loop(self) -> EventLoop:
         """Access the EventLoop reference within the executor."""
-        return self._exe.loop
+        return self._exe.config.event_loop
 
     def toggle_async_chain(self, value: bool):
         """Alias for toggle_async_stack.

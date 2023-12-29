@@ -1,5 +1,6 @@
 from typing import Any, Dict
 
+import threading
 
 class ThreadTaskStateBase:
     """Base class for the "ThreadState" and "TaskStateAsync" """
@@ -17,9 +18,46 @@ class BaseError(Exception):
     """Base error class."""
 
 
-class EventLoopBase:
-    """Base Class for the Event Loop"""
+class EventObject:
+    """Parent mixin for CrossThreadEvents, to return values
+    back to a calling thread or coroutine without the need for threading barriers."""
+            
+    output = None
+    timeout_happened = False
+    event_lock = threading.Lock()
+    def set(self):
+        raise NotImplementedError()
 
+    def set_data(self, data):
+        """Set the data returned to the subscribed thread or coroutine."""
+        self.output = data
+
+    def get_data(self):
+        """called within the target thread or coroutine,
+        retrieve the data published to this Event."""
+        with self.event_lock:
+            req = Request(**self.output)
+            return req
+
+    def publish(self, data: Any):
+        """Publish data back to the thread or coroutine
+        which requested it.  Triggers the event_lock until
+        the data has been sucsesfully returned."""
+        with self.event_lock:
+            self.set()  #
+            self.set_data(data)
+
+    def timeout_flag(self):
+        print("a timeout happened")
+        with self.event_lock:
+            self.timeout_happened = True
+            return True
+
+    def was_timeout(self):
+        evt = False
+        with self.event_lock:
+            evt = self.timeout_happened
+        return evt
 
 # {"c": "pyi", "r": r, "key": key, "val": val, "sig": sig}
 class Request(Dict[str, Any]):
@@ -121,7 +159,7 @@ class Request(Dict[str, Any]):
 
         Parameters:
         ffid (int): The ID of the function.
-        action (str): The action to be taken ("serialize", "keys", "get", "inspect", "set", "init").
+        action (str): The action to be taken ("serialize", "keys", "get", "inspect", "set", "call", "init").
         
         key (Any): The key for the request, used in "get", "inspect", "set", "init" actions.
         args (Any): The arguments for the request, used in "set", "init" actions.
