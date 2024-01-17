@@ -30,7 +30,10 @@ def setup_logging(level: int, handler: logging.Handler = None):
 
 
 def get_filehandler(
-    filename: str = "asyncjs.log", max_bytes: int = 8000000, file_count: int = 1, log_level: int = None
+    filename: str = "asyncjs.log",
+    max_bytes: int = 8000000,
+    file_count: int = 1,
+    log_level: int = None,
 ):
     """
     This function creates a file handler for logging with the specified filename, maximum number

@@ -34,11 +34,15 @@ def main():
     update_parser = subparsers.add_parser("update", help="Update the package store")
     update_parser.set_defaults(func=update)
 
-    install_parser = subparsers.add_parser("install", help="Install package(s) to the package store")
+    install_parser = subparsers.add_parser(
+        "install", help="Install package(s) to the package store"
+    )
     install_parser.add_argument("packages", nargs="+")
     install_parser.set_defaults(func=install)
 
-    uninstall_parser = subparsers.add_parser("uninstall", help="uninstall package(s) from the package store")
+    uninstall_parser = subparsers.add_parser(
+        "uninstall", help="uninstall package(s) from the package store"
+    )
     uninstall_parser.add_argument("packages", nargs="+")
     uninstall_parser.set_defaults(func=uninstall)
 

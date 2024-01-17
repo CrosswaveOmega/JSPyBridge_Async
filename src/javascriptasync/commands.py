@@ -5,9 +5,7 @@ import shutil
 
 import subprocess
 
-PACKAGEJSON = (
-    '{\n\t"name": "js-modules",\n\t"description": "This folder holds the installed JS deps",\n\t"dependencies": {}\n}'
-)
+PACKAGEJSON = '{\n\t"name": "js-modules",\n\t"description": "This folder holds the installed JS deps",\n\t"dependencies": {}\n}'
 
 
 def clean():

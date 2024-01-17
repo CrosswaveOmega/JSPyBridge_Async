@@ -15,7 +15,7 @@ class TaskStateAsync(ThreadTaskStateBase):
 
     def __init__(self):
         self.stopping = False
-        #self.sleep = self.wait
+        # self.sleep = self.wait
 
     async def wait(self, sec):
         """
@@ -31,7 +31,7 @@ class TaskStateAsync(ThreadTaskStateBase):
             pass
             # print('STOP IN WAIT!')
             # sys.exit(1)
-            
+
     async def sleep(self, sec):
         return await self.wait(sec)
 
@@ -56,7 +56,12 @@ class TaskGroup:
         """
         self.state: TaskStateAsync = TaskStateAsync()
         self.handler: Coroutine = handler
-        logs.debug("EventLoop: adding Task. state=%s. handler=%s, args=%s", str(self.state), str(handler), args)
+        logs.debug(
+            "EventLoop: adding Task. state=%s. handler=%s, args=%s",
+            str(self.state),
+            str(handler),
+            args,
+        )
 
         self.task: asyncio.Task = asyncio.create_task(handler(self.state, *args))
 
@@ -89,7 +94,11 @@ class TaskGroup:
         """
         await self.stop_task()
         killTime = time.time() + kill_after
-        logs.debug("EventLoop: aborting task with handler %s, kill time %f", str(self.handler), (kill_after))
+        logs.debug(
+            "EventLoop: aborting task with handler %s, kill time %f",
+            str(self.handler),
+            (kill_after),
+        )
         while not self.task.done():
             await asyncio.sleep(0.2)
             if time.time() > killTime:
@@ -113,7 +122,6 @@ class EventLoopMixin:
     """
 
     tasks = []
-
 
     # === ASYNCIO ===
     async def newTask(self, handler: Coroutine, *args):

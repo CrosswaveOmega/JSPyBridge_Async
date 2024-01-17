@@ -1,4 +1,6 @@
+# pylint: disable=unused-argument
 from __future__ import annotations
+from typing import TYPE_CHECKING
 import asyncio
 
 # THe Python Interface for JavaScript
@@ -6,15 +8,15 @@ import asyncio
 import inspect
 import importlib
 import traceback
-import threading
+
 from weakref import WeakValueDictionary
 import types
 from typing import Any, Dict, List, Tuple
 
 from .util import generate_snowflake
 
-
-from . import events, configjs
+if TYPE_CHECKING:
+    from .configjs import JSConfig
 from .errorsjs import NoAsyncLoop, NoPyiAction
 
 from .core.jslogging import log_info, log_print, log_debug, log_warning
@@ -33,24 +35,26 @@ def python(method: str) -> types.ModuleType:
     return importlib.import_module(method, package=None)
 
 
-def fileImport(moduleName: str, absolutePath: str, folderPath: str) -> types.ModuleType:
-    """Import a Python module from a file using its absolute path from javascript.
+# It's not used by the JS files.
+# def file_import(moduleName: str, absolutePath: str, folderPath: str) -> types.ModuleType:
+#     """Import a Python module from a file using its absolute path from javascript.
 
-    Args:
-        moduleName (str): The name of the module.
-        absolutePath (str): The absolute path to the Python module file.
-        folderPath (str): The folder path to add to sys.path for importing.
+#     Args:
+#         moduleName (str): The name of the module.
+#         absolutePath (str): The absolute path to the Python module file.
+#         folderPath (str): The folder path to add to sys.path for importing.
 
-    Returns:
-        module: The imported Python module.
+#     Returns:
+#         module: The imported Python module.
 
-    """
-    #ABSOLUTELY NOT.
-    #if folderPath not in sys.path:    sys.path.append(folderPath)
-    spec = importlib.util.spec_from_file_location(moduleName, absolutePath)
-    foo = importlib.util.module_from_spec(spec)
-    spec.loader.exec_module(foo)
-    return foo
+#     """
+#     # ABSOLUTELY NOT.
+#     # if folderPath not in sys.path:    sys.path.append(folderPath)
+
+#     spec = importlib.util.spec_from_file_location(moduleName, absolutePath)
+#     module_from_spec = importlib.util.module_from_spec(spec)
+#     spec.loader.exec_module(module_from_spec)
+#     return module_from_spec
 
 
 class Iterate:
@@ -83,7 +87,7 @@ class Iterate:
         def next_iter():
             try:
                 return next(it)
-            except Exception:
+            except Exception:  # pylint: disable=broad-except
                 return "$$STOPITER"
 
         self.Next = next_iter
@@ -97,40 +101,44 @@ class Iterate:
         yield self.what()
 
 
-fix_key = lambda key: key.replace("~~", "") if type(key) is str else key
-
+fix_key = lambda key: key.replace("~~", "") if isinstance(key, str) else key
 
 
 class PyInterfaceActions:
     """Mixin which defines actions for PyInterface"""
 
+
 class PyInterface:
     """
     Python Interface for JavaScript.
 
-    This is the class through which Node.JS uses to interact with the python side of the bridge.
+    This is the class through which Node.JS uses to interact with the
+    python side of the bridge.
 
 
     Attributes:
         m (Dict[int, Any]): A dictionary of objects with FFID (foreign object reference id) as keys.
         weakmap (WeakValueDictionary): A weak reference dictionary for managing objects.
         cur_ffid (int): The current FFID value.
-        config (configjs.JSConfig): Reference to the active configjs.JSConfig object.
-        ipc(events.EventLoop): The events.EventLoop used to broker communication to NodeJS.
+        ffid_param (int): Parameter used to generate the next FFID.
+        config (JSConfig): Reference to the active JSConfig object.
         send_inspect (bool): Whether to send inspect data for console logging.
         current_async_loop: The current asyncio event loop.
+        my_actions (Dict[str,MethodType]): All possible methods JavaScript may use through PYI
+
 
 
     """
 
-    def __init__(self, config_obj: configjs.JSConfig):
+    def __init__(self, config_obj: JSConfig):
         """Initalize a new PYInterface.
 
         Args:
-            config_obj (configjs.JSConfig): Reference to the active configjs.JSConfig object.
+            config_obj (JSConfig): Reference to the active JSConfig object.
 
         """
-        self.m = {0: {"python": python, "fileImport": fileImport, "Iterate": Iterate}}
+        # "fileImport": file_import,
+        self.m = {0: {"python": python, "Iterate": Iterate}}
         # Things added to this dict are auto GC'ed
         self.weakmap = WeakValueDictionary()
         self.cur_ffid = 10000
@@ -141,23 +149,22 @@ class PyInterface:
         self.m[0]["sendInspect"] = lambda x: setattr(self, "send_inspect", x)
         self.send_inspect = True
         self.current_async_loop = None
-        self.my_actions={}
-        #self.executor: Any = None
+        self.my_actions = {}
+        # self.executor: Any = None
         self._define_actions()
 
     def _define_actions(self):
         for name, method in inspect.getmembers(self, predicate=inspect.ismethod):
-            if name!='action_selector':
+            if name != "action_selector":
                 signature = inspect.signature(method)
                 parameters = [k for k in signature.parameters.keys()]
-                #log_debug(name,signature,parameters)
+                # log_debug(name,signature,parameters)
                 if set(["r", "ffid", "key", "args"]).issubset(parameters):
-                    #log_debug("is_subset")
+                    # log_debug("is_subset")
                     self.my_actions[name] = method
                 if set(["r", "ffid", "keys", "args"]).issubset(parameters):
-                    #log_debug("is_subset2")
+                    # log_debug("is_subset2")
                     self.my_actions[name] = method
-        
 
     def _queue_push(self, r, key, val, sig=""):
         self.config.event_loop.queue_payload(
@@ -179,7 +186,7 @@ class PyInterface:
 
     # @property
     # def executor(self):
-    #     """Get the executor object currently initalized in configjs.JSConfig."""
+    #     """Get the executor object currently initalized in JSConfig."""
     #     return self.config.executor
 
     # @executor.setter
@@ -202,12 +209,11 @@ class PyInterface:
         Raises:
             NoPyiAction: If the given action is not defined in the my_actions dictionary.
         """
-        print(action,r,ffid,key,args)
+        print(action, r, ffid, key, args)
         if action in self.my_actions:
-            print('found',action,r,ffid,key,args)
+            print("found", action, r, ffid, key, args)
             return self.my_actions[action](r, ffid, key, args)
         raise NoPyiAction(f"There's no method in PYI for action {action}. {r},{ffid},{key},{args}.")
-        
 
     def assign_ffid(self, what: Any):
         """Assign a new FFID (foreign object reference id) for an object.
@@ -248,8 +254,10 @@ class PyInterface:
             elif hasattr(v, "__getitem__"):
                 try:
                     v = v[key]
-                except:
-                    raise LookupError(f"Property '{fix_key(key)}' does not exist on {repr(v)}")
+                except LookupError as le:
+                    raise LookupError(
+                        f"Property '{fix_key(key)}' does not exist on {repr(v)}"
+                    ) from le
             else:
                 raise LookupError(f"Property '{fix_key(key)}' does not exist on {repr(v)}")
         l = len(v)
@@ -302,8 +310,10 @@ class PyInterface:
                 elif hasattr(v, "__getitem__"):
                     try:
                         v = v[key]
-                    except:
-                        raise LookupError(f"Property '{fix_key(key)}' does not exist on {repr(v)}")
+                    except LookupError as le:
+                        raise LookupError(
+                            f"Property '{fix_key(key)}' does not exist on {repr(v)}"
+                        ) from le
                 else:
                     raise LookupError(f"Property '{fix_key(key)}' does not exist on {repr(v)}")
         else:
@@ -315,8 +325,10 @@ class PyInterface:
                 elif hasattr(v, "__getitem__"):
                     try:
                         v = v[key]
-                    except:
-                        raise LookupError(f"Property '{fix_key(key)}' does not exist on {repr(v)}")
+                    except LookupError as le:
+                        raise LookupError(
+                            f"Property '{fix_key(key)}' does not exist on {repr(v)}"
+                        ) from le
                 else:
                     raise LookupError(f"Property '{fix_key(key)}' does not exist on {repr(v)}")
 
@@ -329,7 +341,9 @@ class PyInterface:
                     raise NoAsyncLoop(
                         "Tried to call a coroutine callback without setting the asyncio loop!  Use 'await set_async_loop()' somewhere in your code!"
                     )
-                future = asyncio.run_coroutine_threadsafe(v(*args, **kwargs), self.current_async_loop)
+                future = asyncio.run_coroutine_threadsafe(
+                    v(*args, **kwargs), self.current_async_loop
+                )
                 v = future.result()
             else:
                 if inspect.isclass(v):
@@ -461,8 +475,10 @@ class PyInterface:
             else:
                 try:
                     v = v[key]
-                except:
-                    raise LookupError(f"Property '{fix_key(key)}' does not exist on {repr(v)}")
+                except LookupError as e:
+                    raise LookupError(
+                        f"Property '{fix_key(key)}' does not exist on {repr(v)}"
+                    ) from e
         if type(v) in (dict, tuple, list, set):
             v[on] = val
         else:
@@ -538,14 +554,14 @@ class PyInterface:
         for key in keys:
             t = getattr(v, str(key), None)
             if t is None:
-                v = v[key]  # 🚨 If you get an error here, you called an undefined property
+                v = v[key]  # If you get an error here, you called an undefined property
             else:
                 v = t
 
         self._queue_push(r, "ser", v)
 
-    def process_and_assign_reply_values(self,jsresponse:Dict[str,Any],wanted:Dict[str,Any]):
-        '''Assign FFIDs to any non-primitive objects within the wanted dictionary.'''
+    def process_and_assign_reply_values(self, jsresponse: Dict[str, Any], wanted: Dict[str, Any]):
+        """Assign FFIDs to any non-primitive objects within the wanted dictionary."""
         for request_id in jsresponse["val"]:
             ffid = jsresponse["val"][request_id]
             self.m[ffid] = wanted["wanted"][int(request_id)]
@@ -556,9 +572,8 @@ class PyInterface:
                         log_info("this is a method")
                     else:
                         setattr(self.m[ffid], "iffid", ffid)
-            except Exception as e:
-                log_warning("There was an issue with , %s", e)
-                
+            except Exception as e:  # pylint: disable=broad-except
+                log_warning("There was an issue with , %s", e)  # pylint: disable=broad-except
 
     def onMessage(self, r: int, action: str, ffid: int, key: str, args: List):
         """Determine which action to preform based on the
@@ -575,11 +590,10 @@ class PyInterface:
         # current valid acts:
         # length, get, setval,pcall, inspect, value, free
         try:
-            return self.action_selector(action,r,ffid,key,args)
-            #return getattr(self, action)(r, ffid, key, args)
-        except Exception:
+            return self.action_selector(action, r, ffid, key, args)
+            # return getattr(self, action)(r, ffid, key, args)
+        except Exception:  # pylint: disable=broad-except
             self._queue_push(r, "error", "", traceback.format_exc())
-            pass
 
     def inbound(self, j: Dict[str, Any]):
         """Extract the message arguments from J, and call onMessage.
@@ -589,31 +603,29 @@ class PyInterface:
 
         """
         log_info("PYI, %s", j)
-        
+
         # print(j)
-        thread_id = threading.current_thread().ident
+        # thread_id = threading.current_thread().ident
         # print('threadid',thread_id,"INBOUND PYI: ",j)
         return self.onMessage(j["r"], j["action"], j["ffid"], j["key"], j["val"])
-    
-    def get_pyobj_from_ffid(self, ffid:int)->Any:
+
+    def get_pyobj_from_ffid(self, ffid: int) -> Any:
         """Get a python object stored the 'm' dictionary with ffid.
-        
+
         Args:
             ffid(int): FFID of python object to get.
 
         Returns:
             Any - A (complex) Python Object of any type.
-        
+
         """
         return self.m[ffid]
-    
-    async def inbound_a(self, j:Dict[str,Any]):
+
+    async def inbound_a(self, j: Dict[str, Any]):
         """Extract the message arguments from J, and call onMessage.  asyncronous.
 
         Args:
             j (Dict[str, Any]): The incoming data as a dictionary.
 
         """
-        await asyncio.to_thread(self.inbound,j)
-    
-
+        await asyncio.to_thread(self.inbound, j)

@@ -1,4 +1,4 @@
-'''Simple code profiler to generate plantuml sequence diagrams for a single specific Thread.'''
+"""Simple code profiler to generate plantuml sequence diagrams for a single specific Thread."""
 
 from types import NoneType
 import pytest
@@ -17,7 +17,8 @@ to_ignore = [
     "enum",
     "dumps",
     "loads",
-    "json.decoder", "ntpath",
+    "json.decoder",
+    "ntpath",
     "json",
     "json.encoder",
     "subprocess",
@@ -34,23 +35,22 @@ to_ignore = [
 
 
 # to_ignore=[]
-def prettyprint(arg,maxlen):
-    
+def prettyprint(arg, maxlen):
     out = str(arg)
-    
+
     if isinstance(arg, list):
         out = ""
-        out = "[" + "],\\n[".join(prettyprint(a,maxlen) for a in arg) + "]"
+        out = "[" + "],\\n[".join(prettyprint(a, maxlen) for a in arg) + "]"
     elif isinstance(arg, dict):
         out = ""
         for key in arg.keys():
             out += f"{key},"
-    elif len(out)>maxlen:
-        out=f"{out[0:8]}... [{len(out)-16}] ...{out[-8:]}"
+    elif len(out) > maxlen:
+        out = f"{out[0:8]}... [{len(out)-16}] ...{out[-8:]}"
     return out
 
 
-def primitive_check(thisval,maxlen):
+def primitive_check(thisval, maxlen):
     primitive_types = (int, bool, float, str, NoneType)
     if isinstance(thisval, primitive_types):
         if isinstance(thisval, str):
@@ -58,29 +58,29 @@ def primitive_check(thisval,maxlen):
                 return "str"
         return thisval
     else:
-        return prettyprint(thisval,maxlen)
+        return prettyprint(thisval, maxlen)
 
 
 class CodeProfiler:
-    def __init__(self, filename="profilered",ignore_private=True):
+    def __init__(self, filename="profilered", ignore_private=True):
         self.function_calls = []
         self.call_stack = []
         self.all_names = set()
-        self.maxlen=64
+        self.maxlen = 64
         self.output_file = f"{filename}.puml"
-        self.ignore_private=ignore_private
+        self.ignore_private = ignore_private
         self.ignore_classes = ["Queue", "Event", "Thread", None, "JSONDecoder"]
         self.write_to_file("@startuml\nautoactivate on\n", mode="w+")
 
     def filter_valid_ascii(self, input_string):
         # Filter out characters that are not valid ASCII
         valid_ascii_chars = [char for char in input_string if ord(char) < 128]
-        return ''.join(valid_ascii_chars)
+        return "".join(valid_ascii_chars)
 
     def write_to_file(self, value, mode="a+"):
         with open(self.output_file, mode, encoding="utf8") as file:
-            #print('writing',value)
-            
+            # print('writing',value)
+
             file.write(self.filter_valid_ascii(value))
 
     def trace_calls(self, frame, event, arg):
@@ -106,7 +106,7 @@ class CodeProfiler:
                 class_nm = frame.f_locals["self"].__class__.__name__
                 class_name = f"{thread_id}{class_nm}"
             if "cls" in frame.f_locals:
-                #print("FRE",frame.f_locals["cls"])
+                # print("FRE",frame.f_locals["cls"])
                 if frame.f_locals["cls"] is not None:
                     class_nm = frame.f_locals["cls"].__name__
                     class_name = f"{thread_id}{class_nm}"
@@ -116,7 +116,7 @@ class CodeProfiler:
                 or function_name == "<listcomp>"
                 or frame.f_globals.get("__name__") in to_ignore
                 or (class_name in self.ignore_classes)
-                or (self.ignore_private==True and function_name.startswith("_"))
+                or (self.ignore_private == True and function_name.startswith("_"))
             ):
                 self.call_stack.append((caller_name, class_name, function_name, "call", False))
                 return self.trace_calls
@@ -126,12 +126,12 @@ class CodeProfiler:
             frame_locals_items = frame.f_locals.items()
             allitems = []
             for key, value in frame_locals_items:
-                if key not in ["self","cls"]:
+                if key not in ["self", "cls"]:
                     if value is not None:
                         thisval = primitive_check(value, self.maxlen)
                         allitems.append((key, thisval))
 
-            arg =prettyprint(allitems,self.maxlen)
+            arg = prettyprint(allitems, self.maxlen)
             if caller_name is not None:
                 self.function_calls.append((caller_name, (class_name, function_name, "call", arg)))
                 arg = arg[:256]
@@ -147,8 +147,10 @@ class CodeProfiler:
                     caller_name = frame.f_code.co_name
 
                     if caller_name is not None:
-                        self.function_calls.append((caller_name, (f"{classname}", function_name, "return", arg)))
-                        #self.write_to_file(f"return from {function_name}: with {out}\n")
+                        self.function_calls.append(
+                            (caller_name, (f"{classname}", function_name, "return", arg))
+                        )
+                        # self.write_to_file(f"return from {function_name}: with {out}\n")
 
         return self.trace_calls
 
@@ -172,6 +174,6 @@ class CodeProfiler:
                 else:
                     self.write_to_file(f"{caller_name} -> {function_name}:{arg}\n")
             elif event_type == "return":
-                out = prettyprint(arg,self.maxlen)
-                out=out.replace("\n","\\n")
+                out = prettyprint(arg, self.maxlen)
+                out = out.replace("\n", "\\n")
                 self.write_to_file(f"return from {function_name}: with {str(out)}\n")

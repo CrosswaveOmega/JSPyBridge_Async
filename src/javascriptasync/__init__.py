@@ -11,6 +11,7 @@ from .errorsjs import NoAsyncLoop
 
 from .configjs import Config
 
+
 def init_js():
     """Initalize a new bridge to node.js if it does not already exist."""
 
@@ -43,6 +44,31 @@ def kill_js():
     print("killed js")
 
 
+def get_calling_dir(name):
+    """Get the caller's file path for relative imports
+
+    Args:
+        name (str): name of relative import package.
+
+    Returns:
+        str: calling directory
+    """
+    calling_dir = None
+    if name.startswith("."):
+        # Some code to extract the caller's file path, needed for relative imports
+        try:
+            frame = inspect.stack()[2][0]  # Going two steps up.
+            namespace = frame.f_globals
+            cwd = os.getcwd()
+            rel_path = namespace["__file__"]
+            abs_path = os.path.join(cwd, rel_path)
+            calling_dir = os.path.dirname(abs_path)
+        except Exception:  # pylint: disable=broad-except
+            # On Notebooks, the frame info above does not exist, so assume the CWD as caller
+            calling_dir = os.getcwd()
+    return calling_dir
+
+
 def require(name: str, version: Optional[str] = None) -> Proxy:
     """
     Import an npm package, and return it as a Proxy.
@@ -66,19 +92,9 @@ def require(name: str, version: Optional[str] = None) -> Proxy:
     """
     calling_dir = None
     conf = Config.get_inst()
-    if name.startswith("."):
-        # Some code to extract the caller's file path, needed for relative imports
-        try:
-            namespace = sys._getframe(1).f_globals
-            cwd = os.getcwd()
-            rel_path = namespace["__file__"]
-            abs_path = os.path.join(cwd, rel_path)
-            calling_dir = os.path.dirname(abs_path)
-        except Exception:
-            # On Notebooks, the frame info above does not exist, so assume the CWD as caller
-            calling_dir = os.getcwd()
-    require=conf.global_jsi.get('require')
-    return require(name, version, calling_dir, timeout=900)
+    calling_dir = get_calling_dir(name)
+    require_mod = conf.global_jsi.get("require")
+    return require_mod(name, version, calling_dir, timeout=900)
 
 
 async def require_a(name: str, version: Optional[str] = None, amode: bool = False) -> Proxy:
@@ -106,22 +122,12 @@ async def require_a(name: str, version: Optional[str] = None, amode: bool = Fals
     """
     calling_dir = None
     conf = Config.get_inst()
-    if name.startswith("."):
-        # Some code to extract the caller's file path, needed for relative imports
-        try:
-            namespace = sys._getframe(1).f_globals
-            cwd = os.getcwd()
-            rel_path = namespace["__file__"]
-            abs_path = os.path.join(cwd, rel_path)
-            calling_dir = os.path.dirname(abs_path)
-        except Exception:
-            # On Notebooks, the frame info above does not exist, so assume the CWD as caller
-            calling_dir = os.getcwd()
+    calling_dir = get_calling_dir(name)
     coro = conf.global_jsi.get("require").call_a(name, version, calling_dir, timeout=900)
     # req=conf.global_jsi.require
     module = await coro
     if amode:
-        module._asyncmode = True
+        module.toggle_async_chain(True)
         await module.getdeep()
     return module
 
@@ -200,9 +206,10 @@ def eval_js(js: str, timeout: int = 10) -> Any:
     rv = None
     try:
         local_vars = {}
-        for local in frame.f_back.f_locals:
+        locals_dict = frame.f_back.f_locals
+        for local in locals_dict:
             if not local.startswith("__"):
-                local_vars[local] = frame.f_back.f_locals[local]
+                local_vars[local] = locals_dict[local]
         context = conf.global_jsi.get_s("evaluateWithContext")
 
         rv = context.call_s(js, local_vars, timeout=timeout, forceRefs=True)
@@ -234,17 +241,18 @@ async def eval_js_a(js: str, timeout: int = 10, as_thread: bool = False) -> Any:
     rv = None
     try:
         local_vars = {}
-        locals = frame.f_back.f_locals
-
-        for local in frame.f_back.f_locals:
+        locals_dict = frame.f_back.f_locals
+        for local in locals_dict:
             if not local.startswith("__"):
-                local_vars[local] = frame.f_back.f_locals[local]
+                local_vars[local] = locals_dict[local]
         if not as_thread:
             context = conf.global_jsi.get_s("evaluateWithContext")
 
             rv = context.call_s(js, local_vars, timeout=timeout, forceRefs=True, coroutine=True)
         else:
-            rv = asyncio.to_thread(conf.global_jsi.evaluateWithContext, js, local_vars, timeout=timeout, forceRefs=True)
+            rv = asyncio.to_thread(
+                conf.global_jsi.evaluateWithContext, js, local_vars, timeout=timeout, forceRefs=True
+            )
     finally:
         del frame
     return await rv
@@ -288,7 +296,7 @@ def AsyncTaskA():
     """
 
     def decor(fn):
-        conf = Config.get_inst()
+        # conf = Config.get_inst()
         fn.is_async_task = True
         return fn
         # t = conf.event_loop.newTask(fn)
@@ -401,5 +409,3 @@ class ThreadUtils:
         """
         conf = Config.get_inst()
         conf.event_loop.abortThread(method, kill_after)
-
-

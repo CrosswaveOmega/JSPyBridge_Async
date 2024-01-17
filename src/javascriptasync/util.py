@@ -37,7 +37,9 @@ class SnowflakeMode(enum.Enum):
     pyffid = 3
 
 
-def generate_snowflake(parameter: int, mode: Union[int, SnowflakeMode] = SnowflakeMode.pyrid) -> int:
+def generate_snowflake(
+    parameter: int, mode: Union[int, SnowflakeMode] = SnowflakeMode.pyrid
+) -> int:
     """
     Generates a unique snowflake value based on the current timestamp
     and a passed in 'mode' parameter.

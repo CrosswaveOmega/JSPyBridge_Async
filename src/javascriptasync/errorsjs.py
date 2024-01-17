@@ -1,4 +1,5 @@
 from __future__ import annotations
+
 import re
 import traceback
 import asyncio
@@ -7,6 +8,7 @@ from .core.abc import BaseError
 
 
 INTERNAL_FILES = ["bridge.js", "pyi.js", "errors.js", "deps.js", "test.js"]
+
 
 class JavaScriptError(Exception):
     """
@@ -21,35 +23,31 @@ class JavaScriptError(Exception):
             call (str): The failed JavaScript call.
             jsStackTrace (List[str]): JavaScript stack trace.
         """
-        
+
         super().__init__(*args, **kwargs)  # Assuming BaseError is the base class of JavaScriptError
         self.call = call
         self.js = jsStackTrace
-        self.failedCall=None
-        self.jsErrorline=None
-        self.jsStackTrace=None
-        self.jsErrorMessage=None
-        self.pyErrorline=None
-        self.pyStackTrace=None
-
+        self.failedCall = None
+        self.jsErrorline = None
+        self.jsStackTrace = None
+        self.jsErrorMessage = None
+        self.pyErrorline = None
+        self.pyStackTrace = None
 
     def get_error_message(self):
-        return self.getErrorMessage(self.call, self.js, traceback.format_tb( self.__traceback__))
-    
+        return self.getErrorMessage(self.call, self.js, traceback.format_tb(self.__traceback__))
+
     def __str__(self):
         return self.get_error_message()
-    
+
     def __repr__(self):
         return str(self)
-    
-    
+
     def print_error(self) -> List[str]:
         lines = []
         log = lambda *s: lines.append(" ".join(s))
-        if self.failedCall == 'FatalError':
-            log(
-                "NODEJS RAISED A FATAL ERROR."
-            )
+        if self.failedCall == "FatalError":
+            log("NODEJS RAISED A FATAL ERROR.")
         else:
             log(
                 "NodeJS",
@@ -105,15 +103,11 @@ class JavaScriptError(Exception):
 
         return error_line, lines
 
-
-
-
     def isInternal(self, file):
         for f in INTERNAL_FILES:
             if f in file:
                 return True
         return False
-
 
     def processJsStacktrace(self, stack, allowInternal=False):
         lines = []
@@ -122,7 +116,7 @@ class JavaScriptError(Exception):
         found_main_line = False
         # print("Allow internal", allowInternal)
         if stack is None:
-            stack=["No js stacktracce?"]
+            stack = ["No js stacktracce?"]
         stacks = stack if (type(stack) is list) else stack.split("\n")
         for line in stacks:
             if not message_line:
@@ -135,10 +129,10 @@ class JavaScriptError(Exception):
                 base_path = re.search(r"at (.*):(\d+):(\d+)$", line)
                 if abs_path or file_path or base_path:
                     path = abs_path or file_path or base_path
-                    fpath, errorline, char = path.groups()
+                    fpath, errorline, _ = path.groups()
                     if fpath.startswith("node:"):
                         continue
-                    with open(fpath, "r",encoding='utf8') as f:
+                    with open(fpath, "r", encoding="utf8") as f:
                         flines = f.readlines()
                         error_line = flines[int(errorline) - 1].strip()
                     lines.append(line.strip())
@@ -152,7 +146,6 @@ class JavaScriptError(Exception):
             return (error_line, message_line, lines)
         return None
 
-
     def getErrorMessage(self, failed_call, jsStackTrace, pyStacktrace):
         try:
             tuple_a = self.processJsStacktrace(jsStackTrace)
@@ -160,39 +153,41 @@ class JavaScriptError(Exception):
                 tuple_a = self.processJsStacktrace(jsStackTrace, True)
             (jse, jsm, jss) = tuple_a
             pye, pys = self.processPyStacktrace(pyStacktrace)
-            self.failedCall=failed_call
-            self.jsErrorline=jse
-            self.jsStackTrace=jss
-            self.jsErrorMessage=jsm
-            self.pyErrorline=pye
-            self.pyStackTrace=pys
+            self.failedCall = failed_call
+            self.jsErrorline = jse
+            self.jsStackTrace = jss
+            self.jsErrorMessage = jsm
+            self.pyErrorline = pye
+            self.pyStackTrace = pys
             lines = self.print_error()
             return "\n".join(lines)
-        except Exception as e:
+        except Exception as e:  # pylint: disable=broad-except
             print("Error in exception handler")
 
             print(e)
             pys = "\n".join(pyStacktrace)
             print(f"** JavaScript Stacktrace **\n{jsStackTrace}\n** Python Stacktrace **\n{pys}")
             return jsStackTrace
-    
+
+
 class FatalJavaScriptError(JavaScriptError):
-    """ 
+    """
     Raised when something caused the Javascript runtime to crash.
     """
+
 
 class NoAsyncLoop(BaseError):
     """
     Raised when calling @On when the passed in handler is an async function
     And no event loop was passed into the args
     """
-    
+
+
 class NoPyiAction(BaseError):
     """
     Raised when PYI does not have a given set action in PYI.
-    
-    """
 
+    """
 
 
 class NoConfigInitalized(BaseError):
@@ -207,21 +202,27 @@ class InvalidNodeJS(BaseError):
 
     """
 
+
 class InvalidNodeOp(BaseError):
     """
     Raised if a NodeOp is invalid
 
     """
+
+
 class AsyncReminder(BaseError):
     """
     Raised if an syncrounous magic method was called in amode
 
     """
+
+
 class NodeTerminated(BaseError):
     """
-    Raised if the Node process terminated during a write.
+    Raised if the Node process terminated for any reason.
 
     """
+
 
 class BridgeTimeout(TimeoutError):
     """
@@ -234,6 +235,7 @@ class BridgeTimeout(TimeoutError):
         self.ffid = ffid
         self.attr = attr
 
+
 class BridgeTimeoutAsync(asyncio.TimeoutError):
     """
     Raised if a request times out in async mode
@@ -244,7 +246,6 @@ class BridgeTimeoutAsync(asyncio.TimeoutError):
         self.action = action
         self.ffid = ffid
         self.attr = attr
-
 
 
 def format_line(line: str) -> str:
@@ -370,5 +371,5 @@ chalk = Chalk()
 #     orig_excepthook(error_type, error, error_traceback)
 
 
-#sys.excepthook = error_catcher
+# sys.excepthook = error_catcher
 # ====

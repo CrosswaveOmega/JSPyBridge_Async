@@ -12,36 +12,35 @@ from .errorsjs import NoAsyncLoop
 
 
 class JSContext:
-    '''
+    """
     experimental mode
-    '''
-    __slots__=['config','_imported','_known_packages']
+    """
+
+    __slots__ = ["config", "_imported", "_known_packages"]
+
     def __init__(self):
         """Initialize the JSContext and retrieve the Config instance."""
-        #Config("NoStartup")
+        # Config("NoStartup")
         self.config: JSConfig = JSConfig(manual_terminate=True)
-        self._imported ={}
-        self._known_packages={}
+        self._imported = {}
+        self._known_packages = {}
 
     def __getattr__(self, __name: str) -> Any:
         if __name in self._imported:
             return self._imported[__name]
         raise AttributeError(f"No known package {__name}")
 
-
     def __getitem__(self, __name: str) -> Any:
         if __name in self._imported:
             return self._imported[__name]
         raise AttributeError(f"No known package {__name}")
-    
+
     def __del__(self):
-        
-        keys=list(self._imported.keys())
+        keys = list(self._imported.keys())
         for k in keys:
-            log_print('purging key ',k)
+            log_print("purging key ", k)
             del self._imported[k]
         self.kill_js()
-
 
     def init_js(self):
         """Initialize a new bridge to node.js if it does not already exist."""
@@ -68,7 +67,7 @@ class JSContext:
         self.config.set_asyncio_loop(asyncio.get_event_loop())
 
     def kill_js(self):
-        '''Shut down the active NodeJS context.'''
+        """Shut down the active NodeJS context."""
         if self.config.state != 2:
             return
 
@@ -76,7 +75,9 @@ class JSContext:
         self.config.reset_self()
         print("killed js")
 
-    def require(self, name: str, version: Optional[str] = None,store_as:Optional[str]=None) -> Proxy:
+    def require(
+        self, name: str, version: Optional[str] = None, store_as: Optional[str] = None
+    ) -> Proxy:
         """
         Import an npm package, and return it as a Proxy.
         If the required package isn't found, then
@@ -97,7 +98,7 @@ class JSContext:
 
         """
         if name in self._known_packages:
-            proxyname=self._known_packages[name]
+            proxyname = self._known_packages[name]
             return self._imported[proxyname]
         calling_dir = None
         if name.startswith("."):
@@ -112,13 +113,19 @@ class JSContext:
                 # On Notebooks, the frame info above does not exist, so assume the CWD as caller
                 calling_dir = os.getcwd()
         require = self.config.global_jsi.get("require")
-        proxy=require(name, version, calling_dir, timeout=900)
+        proxy = require(name, version, calling_dir, timeout=900)
         if store_as:
-            self._imported[store_as]=proxy
-            self._known_packages[name]=store_as
+            self._imported[store_as] = proxy
+            self._known_packages[name] = store_as
         return proxy
 
-    async def require_a(self, name: str, version: Optional[str] = None, amode: bool = False,store_as:Optional[str]=None) -> Proxy:
+    async def require_a(
+        self,
+        name: str,
+        version: Optional[str] = None,
+        amode: bool = False,
+        store_as: Optional[str] = None,
+    ) -> Proxy:
         """
         Asynchronously import an npm package and return it as a Proxy.
         If the required package isn't found, then
@@ -142,7 +149,7 @@ class JSContext:
 
         """
         if name in self._known_packages:
-            proxyname=self._known_packages[name]
+            proxyname = self._known_packages[name]
             return self._imported[proxyname]
         calling_dir = None
         if name.startswith("."):
@@ -162,10 +169,9 @@ class JSContext:
             module.toggle_async_chain(True)
             await module.getdeep()
         if store_as:
-            self._imported[store_as]=module
-            self._known_packages[name]=store_as
+            self._imported[store_as] = module
+            self._known_packages[name] = store_as
         return module
-
 
     def get_console(self) -> Proxy:
         """

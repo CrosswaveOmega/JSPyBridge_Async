@@ -1,4 +1,5 @@
 from __future__ import annotations
+from typing import TYPE_CHECKING
 
 # This file contains all the exposed modules
 import asyncio
@@ -6,8 +7,6 @@ from typing import Any, Coroutine, Optional, Callable, Union
 from .configjs import Config
 from .core.jslogging import log_print, logs
 from .proxy import EventEmitterProxy
-
-
 
 
 def On(emitter: EventEmitterProxy, event: str) -> Callable:
@@ -103,7 +102,7 @@ def once(emitter: EventEmitterProxy, event: str) -> Any:
     Returns:
         Any: The value emitted when the event occurs.
 
-        
+
     Example:
         .. code-block:: python
             wait() {
@@ -155,12 +154,12 @@ async def once_a(emitter: EventEmitterProxy, event: str) -> Any:
     Returns:
         Any: The value emitted when the event occurs.
 
-        
+
     Example:
         .. code-block:: python
 
             #defined on nodejs side:
-            #wait() {setTimeout(() => {this.emit('done');}, 400);}            
+            #wait() {setTimeout(() => {this.emit('done');}, 400);}
             val= once(myEmitter, "done")
     """
     conf = Config.get_inst()
