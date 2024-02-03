@@ -10,6 +10,7 @@ from .core.jslogging import log_print
 from .proxy import Proxy
 from .errorsjs import NoAsyncLoop
 
+
 class JSContext:
     """
     Represents a context for interfacing with JavaScript through Python, eliminating the
@@ -18,9 +19,9 @@ class JSContext:
     by the usecwd flag.
     """
 
-    __slots__ = ["config", "temp_mode", "usecwd","_imported", "_known_packages"]
+    __slots__ = ["config", "temp_mode", "usecwd", "_imported", "_known_packages"]
 
-    def __init__(self,config:Optional[JSConfig]=None,usecwd:bool=False):
+    def __init__(self, config: Optional[JSConfig] = None, usecwd: bool = False):
         """
         Initializes a new JSContext instance with optional configuration and working directory settings.
 
@@ -31,14 +32,15 @@ class JSContext:
             If False, uses the directory of the file that called require(). Defaults to False.
         """
         if config is not None:
-            self.config=config
-            self.temp_mode=True
+            self.config = config
+            self.temp_mode = True
         else:
             self.config: JSConfig = JSConfig(manual_terminate=True)
-            self.temp_mode=False
-        self.usecwd=usecwd
+            self.temp_mode = False
+        self.usecwd = usecwd
         self._imported = {}
         self._known_packages = {}
+
     def __getattr__(self, __name: str) -> Any:
         if __name in self._imported:
             return self._imported[__name]
@@ -91,7 +93,7 @@ class JSContext:
         self.config.reset_self()
         print("killed js")
 
-    def get_calling_dir(self,name):
+    def get_calling_dir(self, name):
         """Get the caller's file path for relative imports
 
         Args:
@@ -104,7 +106,7 @@ class JSContext:
         if name.startswith("."):
             # Some code to extract the caller's file path, needed for relative imports
             try:
-                steps=3 if self.temp_mode else 2
+                steps = 3 if self.temp_mode else 2
                 frame = inspect.stack()[steps][0]  # Going two steps up.
                 namespace = frame.f_globals
                 cwd = os.getcwd()
@@ -116,6 +118,7 @@ class JSContext:
                 calling_dir = os.getcwd()
         print(calling_dir)
         return calling_dir
+
     def require(
         self, name: str, version: Optional[str] = None, store_as: Optional[str] = None
     ) -> Proxy:
@@ -142,7 +145,7 @@ class JSContext:
             proxyname = self._known_packages[name]
             return self._imported[proxyname]
         calling_dir = None
-        calling_dir=self.get_calling_dir(name)
+        calling_dir = self.get_calling_dir(name)
 
         require = self.config.global_jsi.get("require")
         proxy = require(name, version, calling_dir, timeout=900)
@@ -184,8 +187,8 @@ class JSContext:
             proxyname = self._known_packages[name]
             return self._imported[proxyname]
         calling_dir = None
-        
-        calling_dir=self.get_calling_dir(name)
+
+        calling_dir = self.get_calling_dir(name)
 
         coro = self.config.global_jsi.get("require").call_a(name, version, calling_dir, timeout=900)
         module = await coro

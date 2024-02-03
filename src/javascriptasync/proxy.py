@@ -160,7 +160,7 @@ class Proxy:
             result_val = Proxy(self._exe, val, es6=True, amode=self._asyncmode)
         elif method_type in ["obj", "inst"]:
             result_val = Proxy(self._exe, val, amode=self._asyncmode)
-        elif method_type in ["obje","inste"]:
+        elif method_type in ["obje", "inste"]:
             result_val = EventEmitterProxy(self._exe, val, amode=self._asyncmode)
         elif method_type == "void":
             result_val = None
@@ -409,7 +409,6 @@ class Proxy:
         """
         return self.contains_key(key)
 
-    
     def valueOf(self):
         """
         Serialize the linked JavaScript object.
@@ -679,7 +678,6 @@ class Proxy:
         """
         return self.get_dict()
 
-
     def get_dict(self) -> dict:
         """
         Serialize the linked JavaScript object into a python dictionary.
@@ -704,7 +702,7 @@ class Proxy:
         ser = await self._exe.ipc_async("serialize", self.ffid, "")
         log_debug("proxy.get_value_of, %s", ser)
         return ser["val"]
-    
+
     def get_blob(self) -> bytes:
         """
         Fetch the blob data associated with the current proxy object,
@@ -715,7 +713,7 @@ class Proxy:
         """
         ser = self._exe.ipc("blob", self.ffid, "")
         log_debug("proxy.get_blob, %s", ser)
-        b64blob=ser["blob"]
+        b64blob = ser["blob"]
         buffer_data = base64.b64decode(b64blob)
 
         return buffer_data
@@ -730,11 +728,11 @@ class Proxy:
         """
         ser = await self._exe.ipc_async("blob", self.ffid, "")
         log_debug("proxy.get_blob, %s", ser)
-        b64blob=ser["blob"]
+        b64blob = ser["blob"]
         buffer_data = base64.b64decode(b64blob)
 
         return buffer_data
-    
+
     def get_str(self):
         """
         Get a string representation of the linked JavaScript object via an inspect call.

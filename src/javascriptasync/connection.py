@@ -33,8 +33,8 @@ try:
         if "COLAB_GPU" in os.environ:
             ISCLEAR = True
         else:
-            ipythonname=get_ipython().__class__.__name__
-            if ipythonname in ["ZMQInteractiveShell","TerminalInteractiveShell"]:
+            ipythonname = get_ipython().__class__.__name__
+            if ipythonname in ["ZMQInteractiveShell", "TerminalInteractiveShell"]:
                 print("Notebook?")
                 ISNOTEBOOK = True
     else:

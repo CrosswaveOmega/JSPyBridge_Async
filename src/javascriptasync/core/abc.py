@@ -120,7 +120,7 @@ class Request(Dict[str, Any]):
                     "c": c,
                     "insp": insp,
                     "len": len,
-                    "blob": blob
+                    "blob": blob,
                 }.items()
                 if v is not None
             }

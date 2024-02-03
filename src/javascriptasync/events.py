@@ -170,7 +170,7 @@ class EventLoop(EventLoopMixin, ThreadManagerMixin):
         """
         Initialize the EventLoop.
 
-        This EventLoop coordinates all communication between the Python side of the bridge and the 
+        This EventLoop coordinates all communication between the Python side of the bridge and the
         NodeJS side of the bridge.
 
         Args:
@@ -405,7 +405,7 @@ class EventLoop(EventLoopMixin, ThreadManagerMixin):
         try:
             while self.outbound.qsize() > 0 and still_full:
                 try:
-                    #Batch 
+                    # Batch
                     toadd = self.outbound.get_nowait()
                     out.append(toadd)
                     current_iter += 1
