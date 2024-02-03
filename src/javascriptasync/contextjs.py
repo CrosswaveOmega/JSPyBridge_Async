@@ -10,21 +10,35 @@ from .core.jslogging import log_print
 from .proxy import Proxy
 from .errorsjs import NoAsyncLoop
 
-
 class JSContext:
     """
-    experimental mode
+    Represents a context for interfacing with JavaScript through Python, eliminating the
+    need for initializing a global systemwide nodejs process. This context can be configured to either use the
+    current working directory or the directory of the file that called require(), determined
+    by the usecwd flag.
     """
 
-    __slots__ = ["config", "_imported", "_known_packages"]
+    __slots__ = ["config", "temp_mode", "usecwd","_imported", "_known_packages"]
 
-    def __init__(self):
-        """Initialize the JSContext and retrieve the Config instance."""
-        # Config("NoStartup")
-        self.config: JSConfig = JSConfig(manual_terminate=True)
+    def __init__(self,config:Optional[JSConfig]=None,usecwd:bool=False):
+        """
+        Initializes a new JSContext instance with optional configuration and working directory settings.
+
+        Args:
+            config (Optional[JSConfig], optional): Configuration settings for the JS context. Defaults to None,
+            which will initialize a default JSConfig with manual_terminate set to True.
+            usecwd (bool, optional): If True, uses the current working directory for operations like require.
+            If False, uses the directory of the file that called require(). Defaults to False.
+        """
+        if config is not None:
+            self.config=config
+            self.temp_mode=True
+        else:
+            self.config: JSConfig = JSConfig(manual_terminate=True)
+            self.temp_mode=False
+        self.usecwd=usecwd
         self._imported = {}
         self._known_packages = {}
-
     def __getattr__(self, __name: str) -> Any:
         if __name in self._imported:
             return self._imported[__name]
@@ -36,6 +50,8 @@ class JSContext:
         raise AttributeError(f"No known package {__name}")
 
     def __del__(self):
+        if self.temp_mode:
+            return
         keys = list(self._imported.keys())
         for k in keys:
             log_print("purging key ", k)
@@ -75,6 +91,31 @@ class JSContext:
         self.config.reset_self()
         print("killed js")
 
+    def get_calling_dir(self,name):
+        """Get the caller's file path for relative imports
+
+        Args:
+            name (str): name of relative import package.
+
+        Returns:
+            str: calling directory
+        """
+        calling_dir = None
+        if name.startswith("."):
+            # Some code to extract the caller's file path, needed for relative imports
+            try:
+                steps=3 if self.temp_mode else 2
+                frame = inspect.stack()[steps][0]  # Going two steps up.
+                namespace = frame.f_globals
+                cwd = os.getcwd()
+                rel_path = namespace["__file__"]
+                abs_path = os.path.join(cwd, rel_path)
+                calling_dir = os.path.dirname(abs_path)
+            except Exception as e:  # pylint: disable=broad-except
+                # On Notebooks, the frame info above does not exist, so assume the CWD as caller
+                calling_dir = os.getcwd()
+        print(calling_dir)
+        return calling_dir
     def require(
         self, name: str, version: Optional[str] = None, store_as: Optional[str] = None
     ) -> Proxy:
@@ -97,21 +138,12 @@ class JSContext:
             NoConfigInitialized: If `init_js` or `init_js_a` was not called prior,  or if the bridge is still being initialization is in progress.
 
         """
-        if name in self._known_packages:
+        if name in self._known_packages and not self.temp_mode:
             proxyname = self._known_packages[name]
             return self._imported[proxyname]
         calling_dir = None
-        if name.startswith("."):
-            # Some code to extract the caller's file path, needed for relative imports
-            try:
-                namespace = sys._getframe(1).f_globals
-                cwd = os.getcwd()
-                rel_path = namespace["__file__"]
-                abs_path = os.path.join(cwd, rel_path)
-                calling_dir = os.path.dirname(abs_path)
-            except Exception:
-                # On Notebooks, the frame info above does not exist, so assume the CWD as caller
-                calling_dir = os.getcwd()
+        calling_dir=self.get_calling_dir(name)
+
         require = self.config.global_jsi.get("require")
         proxy = require(name, version, calling_dir, timeout=900)
         if store_as:
@@ -152,17 +184,9 @@ class JSContext:
             proxyname = self._known_packages[name]
             return self._imported[proxyname]
         calling_dir = None
-        if name.startswith("."):
-            # Some code to extract the caller's file path, needed for relative imports
-            try:
-                namespace = sys._getframe(1).f_globals
-                cwd = os.getcwd()
-                rel_path = namespace["__file__"]
-                abs_path = os.path.join(cwd, rel_path)
-                calling_dir = os.path.dirname(abs_path)
-            except Exception:
-                # On Notebooks, the frame info above does not exist, so assume the CWD as caller
-                calling_dir = os.getcwd()
+        
+        calling_dir=self.get_calling_dir(name)
+
         coro = self.config.global_jsi.get("require").call_a(name, version, calling_dir, timeout=900)
         module = await coro
         if amode:

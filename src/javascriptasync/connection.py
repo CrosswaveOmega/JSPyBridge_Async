@@ -33,7 +33,8 @@ try:
         if "COLAB_GPU" in os.environ:
             ISCLEAR = True
         else:
-            if (get_ipython().__class__.__name__) == "ZMQInteractiveShell":
+            ipythonname=get_ipython().__class__.__name__
+            if ipythonname in ["ZMQInteractiveShell","TerminalInteractiveShell"]:
                 print("Notebook?")
                 ISNOTEBOOK = True
     else:
@@ -179,7 +180,7 @@ class ConnectionClass:
         for line in inp.split("\n"):
             if not len(line):
                 continue
-            # this line worries me.
+
             decoder = JSONRequestDecoder()
             try:
                 d, decodeok = decoder.decode(line)

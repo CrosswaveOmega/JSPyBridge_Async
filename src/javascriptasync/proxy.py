@@ -9,7 +9,7 @@ from typing import (
     Literal,
     Union,
 )
-
+import base64
 
 from .errorsjs import (
     AsyncReminder,
@@ -160,7 +160,7 @@ class Proxy:
             result_val = Proxy(self._exe, val, es6=True, amode=self._asyncmode)
         elif method_type in ["obj", "inst"]:
             result_val = Proxy(self._exe, val, amode=self._asyncmode)
-        elif method_type == "inste":
+        elif method_type in ["obje","inste"]:
             result_val = EventEmitterProxy(self._exe, val, amode=self._asyncmode)
         elif method_type == "void":
             result_val = None
@@ -409,6 +409,7 @@ class Proxy:
         """
         return self.contains_key(key)
 
+    
     def valueOf(self):
         """
         Serialize the linked JavaScript object.
@@ -669,21 +670,23 @@ class Proxy:
 
     def get_value_of(self):
         """
-        Serialize the linked JavaScript object.
+        Alias for get_dict.
+          Serialize the linked JavaScript object into a python dictionary.
 
         Returns:
-            Any: The "valueOf" value.
+            Any: The Dictionary value that represents the Proxy on
+             the Node.JS side.
         """
-        ser = self._exe.ipc("serialize", self.ffid, "")
-        log_debug("proxy.get_value_of, %s", ser)
-        return ser["val"]
+        return self.get_dict()
+
 
     def get_dict(self) -> dict:
         """
-        Serialize a linked JavaScript object into a python dictionary.
+        Serialize the linked JavaScript object into a python dictionary.
 
         Returns:
-            Any: The "valueOf" value.
+            Any: The Dictionary value that represents the Proxy on
+             the Node.JS side.
         """
         ser = self._exe.ipc("serialize", self.ffid, "")
         log_debug("proxy.get_value_of, %s", ser)
@@ -691,15 +694,47 @@ class Proxy:
 
     async def get_dict_a(self) -> dict:
         """
-        Serialize a linked JavaScript object into a python dictionary.
+        Asyncronous version of get_dict.
+        Serialize the linked JavaScript object into a python dictionary.
 
         Returns:
-            Any: The "valueOf" value.
+            Any: The Dictionary value that represents the Proxy on
+             the Node.JS side.
         """
         ser = await self._exe.ipc_async("serialize", self.ffid, "")
         log_debug("proxy.get_value_of, %s", ser)
         return ser["val"]
+    
+    def get_blob(self) -> bytes:
+        """
+        Fetch the blob data associated with the current proxy object,
+        decodes it from Base64,  and returns it as a `bytes` object.
 
+        Returns:
+            bytes: The decoded blob data.
+        """
+        ser = self._exe.ipc("blob", self.ffid, "")
+        log_debug("proxy.get_blob, %s", ser)
+        b64blob=ser["blob"]
+        buffer_data = base64.b64decode(b64blob)
+
+        return buffer_data
+
+    async def get_blob_a(self) -> bytes:
+        """
+        Asynchronously fetches the blob data associated with the current proxy object,
+          decodes it from Base64, and returns it as a `bytes` object.
+
+        Returns:
+            bytes: The decoded blob data.
+        """
+        ser = await self._exe.ipc_async("blob", self.ffid, "")
+        log_debug("proxy.get_blob, %s", ser)
+        b64blob=ser["blob"]
+        buffer_data = base64.b64decode(b64blob)
+
+        return buffer_data
+    
     def get_str(self):
         """
         Get a string representation of the linked JavaScript object via an inspect call.
@@ -746,8 +781,8 @@ class EventEmitterProxy(Proxy):
 
     """A unique type of Proxy made whenever an EventEmitter is returned,
     containing special wrapped on, off, and once functions that ensure the
-    python side of the bridge knows that it's functions have been set as
-    listeners."""
+    python side of the bridge knows that this particular proxy is for NodeJS
+    events."""
 
     def on(self, event: str, listener: Union[Callable, Coroutine]):
         """

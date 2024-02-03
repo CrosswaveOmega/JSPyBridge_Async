@@ -100,7 +100,7 @@ class JSConfig:
         self,
     ):
         """
-        Starts the JavaScript runtime environment.
+        Starts a new JavaScript runtime environment.
 
         This method initializes the event loop, executor, and global_jsi for JavaScript execution.
         """

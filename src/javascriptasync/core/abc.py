@@ -88,6 +88,8 @@ class Request(Dict[str, Any]):
         sig: Any = None,
         c: str = None,
         insp: str = None,
+        len: int = None,
+        blob: str = None,
     ):
         self.r = r
         self.action = action
@@ -100,7 +102,8 @@ class Request(Dict[str, Any]):
         self.sig = sig
         self.c = c
         self.insp = insp
-
+        self.len = len
+        self.blob = blob
         super().__init__(
             {
                 k: v
@@ -116,6 +119,8 @@ class Request(Dict[str, Any]):
                     "sig": sig,
                     "c": c,
                     "insp": insp,
+                    "len": len,
+                    "blob": blob
                 }.items()
                 if v is not None
             }
@@ -164,7 +169,7 @@ class Request(Dict[str, Any]):
         Returns:
         Request: The Request object created using the parameters.
         """
-        if action in ["serialize", "keys", "getdeep"]:
+        if action in ["serialize", "keys", "getdeep", "blob"]:
             return Request(r=r, action=action, ffid=ffid)
         elif action in ["get", "inspect"]:
             return Request(r=r, action=action, ffid=ffid, key=key)

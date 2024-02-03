@@ -92,6 +92,8 @@ def require(name: str, version: Optional[str] = None) -> Proxy:
     """
     calling_dir = None
     conf = Config.get_inst()
+    ctx=JSContext(conf)
+    return ctx.require(name,version)
     calling_dir = get_calling_dir(name)
     require_mod = conf.global_jsi.get("require")
     return require_mod(name, version, calling_dir, timeout=900)
@@ -120,6 +122,10 @@ async def require_a(name: str, version: Optional[str] = None, amode: bool = Fals
         NoConfigInitalized: If `init_js` or `init_js_a` was not called prior,  or if the bridge is still being initialization is in progress.
 
     """
+    conf = Config.get_inst()
+    ctx=JSContext(conf)
+    out= await ctx.require_a(name,version,amode)
+    return out
     calling_dir = None
     conf = Config.get_inst()
     calling_dir = get_calling_dir(name)

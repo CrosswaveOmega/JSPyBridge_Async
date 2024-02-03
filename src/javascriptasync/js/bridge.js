@@ -13,6 +13,7 @@ if (
 try {
   const util = require('util');
   const EventEmitter = require('events');
+  // const fs = require('fs');
   const {PyBridge, SnowflakeMode, generateSnowflake} = require('./pyi');
   const {$require} = require('./deps');
   const {once} = require('events');
@@ -182,7 +183,11 @@ try {
           return {r, key: 'fn', val: this.ffid};
         case 'obj':
           this.m[this.ffidinc()] = v;
-          return {r, key: 'obj', val: this.ffid};
+          let thiskey='obj';
+          if (v instanceof EventEmitter) {
+            thiskey='obje';
+          }
+          return {r, key: thiskey, val: this.ffid};
         default: return {r, key: 'void', val: this.ffid};
       }
     }
@@ -357,6 +362,33 @@ try {
     async serialize(r, ffid) {
       const v = await this.m[ffid];
       this.ipc.send({r, val: v.valueOf()});
+    }
+    /**
+   * This asynchronous function gthe provided
+   * object to json string and sends it over IPC.
+   *
+   * @async
+   * @param {int} r -  Request identifier.
+   * @param {int} ffid - Identifier of the object on the FFID map.
+   * @return {void} nothing.
+   */
+    async blob(r, ffid) {
+      const v = await this.m[ffid];
+
+      // The result property contains the data URL
+      const blobContent = v;
+
+      // Step 2: Convert Blob to Buffer (if necessary)
+      // eslint-disable-next-line max-len
+      const bufferData = Buffer.isBuffer(blobContent) ? blobContent : Buffer.from(blobContent);
+
+      // Step 3: Encode Buffer to Base64
+      const base64Data = bufferData.toString('base64');
+      this.ipc.send({r, len: v.length, blob: base64Data});
+      // Convert the JSON object to a string
+
+
+      // Create a FileReader object
     }
 
     /**

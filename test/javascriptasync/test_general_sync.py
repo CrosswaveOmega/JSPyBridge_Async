@@ -1,3 +1,4 @@
+from pathlib import Path
 import time
 from javascriptasync import require, eval_js, init_js
 from javascriptasync.emitters import On, Once, off, once
@@ -90,6 +91,8 @@ class TestJavaScriptLibrary:
     def test_once(self):
         self.demo.wait()
         once(self.demo, "done")
+
+
 
     def test_assignment(self):
         self.demo.x = 3
