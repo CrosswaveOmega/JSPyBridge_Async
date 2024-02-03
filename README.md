@@ -9,8 +9,6 @@ Interoperate Node.js from Python, with built in asyncio compatibility.
 
 This is a fork of [JSPyBridge](https://github.com/extremeheat/JSPyBridge) by extremeheat, created to properly integrate `asyncio` events and coroutines into the python side of the bridge.
 
-However, 
-
 As the purpose of this fork was only to alter the `javascript` package, it's specifically for running Node.js from Python.  No changes are made to `pythonia` or are planned to be made to `pythonia`.
 ### current stable installation
 ```
