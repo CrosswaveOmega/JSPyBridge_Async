@@ -9,6 +9,7 @@ Interoperate Node.js from Python, with built in asyncio compatibility.
 
 This is a fork of [JSPyBridge](https://github.com/extremeheat/JSPyBridge) by extremeheat, created to properly integrate `asyncio` events and coroutines into the python side of the bridge.
 
+However, 
 
 As the purpose of this fork was only to alter the `javascript` package, it's specifically for running Node.js from Python.  No changes are made to `pythonia` or are planned to be made to `pythonia`.
 ### current stable installation
@@ -32,6 +33,8 @@ Requires Node.js 14 and Python 3.8 or newer.
 * Object inspection allows you to easily `console.log` or `print()` any foreign objects
 
 * (Bridge to call JS from Python) Specialized object oriented support for event-emitter functions.
+* retrieve blob objects from the Javascript side of the bridge.
+* enhanced support for concurrent operations.
 
 ### New Javascript from Python usage:
 ```py
@@ -49,8 +52,7 @@ asyncio.run(main)
 ```
 ## TO DO:
  * better documentation and examples
- * bug fixing/optimization.
- * callback an asyncio coroutine from JavaScript
+ * bug fixing/optimization
  * Code cleanup.
 
 
@@ -58,6 +60,7 @@ asyncio.run(main)
 * `javascript` is now `javascriptasync`
 * `config.py` has been encapsulated into the `JSConfig` class, all objects that need to access variables within `JSConfig` have been passed an object reference to a single unique `JSConfig` instance.
  * `__init__.py` utilizes a singleton to ensure that only one instance of an JSConfig class is created at any one time.  You need to call `init()` to start up the bridge!
+ * The `JSContext` object can be utilized to make use of the library's operations in a more object oriented manner.
 * debug output now uses the logging module.
 * `connection.py` has been encapsulated into the `ConnectionClass`, accessable through the `events.EventLoop` class, as `events.EventLoop` is the only place the connection was ever utilized.
 * It's possible to set a custom timeout value when using eval_js.
