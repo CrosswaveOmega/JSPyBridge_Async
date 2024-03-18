@@ -587,6 +587,11 @@ try {
         }
         if (j.c === 'pyi') {
           handlers[j.r]?.(j);
+          
+          if (handlers.hasOwnProperty(j.r)) {
+            delete handlers[j.r];
+          }
+          
         } else {
           bridge.onMessage(j);
         }
