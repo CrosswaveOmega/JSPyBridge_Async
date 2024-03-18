@@ -80,7 +80,7 @@ def hybridize_dir():
                 toinstall.append(line)
             size = len(toinstall)
             print(f"Installing {size} packages from {file.name}...")
-            for e, line in toinstall:
+            for e, line in enumerate(toinstall):
                 print(f"installing npm package {e}/{size}: {line}")
                 os.system(f"npm install {line.strip()}")
     else:

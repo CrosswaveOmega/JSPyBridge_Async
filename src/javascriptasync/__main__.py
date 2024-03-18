@@ -46,19 +46,21 @@ def main():
     uninstall_parser.add_argument("packages", nargs="+")
     uninstall_parser.set_defaults(func=uninstall)
 
-    hybridize_parser = subparsers.add_parser("hybridize")
+    hybridize_parser = subparsers.add_parser("hybridize", help="install a node_modules folder using the packages within a nodemodules.txt")
     hybridize_parser.add_argument("action", choices=["reset", "install", "add", "update"])
 
-    if "add" in hybridize_parser.parse_args().action:
+    if "add" in sys.argv[1:]:
         hybridize_parser.add_argument("files", nargs="+")
 
-    hybridize_parser.set_defaults(func=hybridize)
-    args = parser.parse_args()
+    args = parser.parse_args(sys.argv[1:])
 
-    if hasattr(args, "func"):
+    if args.command == "hybridize":
+        hybridize(args)
+    elif hasattr(args, "func"):
         args.func(args)
     else:
         parser.print_help(sys.stderr)
+
 
 
 if __name__ == "__main__":
