@@ -526,7 +526,7 @@ try {
    */
     constructor(tgprocess) {
       this.process = tgprocess;
-      this.message='';
+      // this.message='';
       this.queue=new AsyncQueue();
     }
 
