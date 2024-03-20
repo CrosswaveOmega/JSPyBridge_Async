@@ -65,14 +65,52 @@ class EventObject:
         return evt
 
 
-# {"c": "pyi", "r": r, "key": key, "val": val, "sig": sig}
 class Request(Dict[str, Any]):
     """
-    Extended class of Dictionary to provide some common
-    functionality.
+    A specialized class extending the Dictionary class for
+    initializing JSON objects sent between Python and Node.js.
 
-    Args:
-        Dict (_type_): _description_
+    This class streamlines the process of creating formatted JSON objects
+    by providing a convenient interface for initializing dictionaries
+    with specific key-value pairs. It is designed to reduce boilerplate code
+    and enhance code readability, making communication between
+    Python and Node.js instances more efficient.
+
+    Some key attributes in the Request dictionary  are used
+    exclusively for sending data to Node.js, while others are
+    for receiving data from Node.js.  If a value is set to None,
+    it is omitted from the underlying dictionary.
+
+    Attributes:
+    - r (int): Unique request ID for the specific request.
+    - action (str): The name of the action Python or Node.js should perform.
+    - ffid (int): Unique Foreign Object Reference ID identifying an object on either the Python or Node.js side of the bridge.
+    - key (Any): A key attribute used on both sides of the bridge for different purposes.
+    - keys (Any): A list of keys returned from Node.js.
+    - args (Any): Additional parameters used for init, set, and call actions.
+    - val (Any): A value returned by Node.js or Python as part of a request.
+    - error (Any): If present, filled with error traceback information.
+    - sig (Any): Unique key for the signature of Python objects sent to Node.js, used only if requested by Node.js.
+    - c (str): Unique key for when Node.js needs to request data from Python. If present, it is always set to "pyi".
+    - insp (str): If the autoInspect constant is enabled on the Node.js side, this key is added with the util.inspect values for Node.js objects.
+    - len (int): Only used for blob requests, contains the original byte length for a blob value.
+    - blob (str): Only used for blob requests, contains a Base64 encoded string for the blob.
+
+    Example Usage:
+    ```
+    # Before using the class
+    {"r": r, "action": "get", "ffid": ffid, "key": key}
+
+    # With the class
+    Request.create_by_action(r, 'get', ffid, key)
+    ```
+
+    Methods:
+    - create_by_action(cls, r: int, action: str, ffid: int, key: Any, args: Any = None) -> "Request":
+      Creates a Request object based on the given parameters.
+
+    - create_for_pcall(cls, ffid: int, action: str, key: Any, args: Any = None) -> "Request":
+      Creates a Request object for use with the 'pcall' methods in Executor.
     """
 
     def __init__(
@@ -88,21 +126,21 @@ class Request(Dict[str, Any]):
         sig: Any = None,
         c: str = None,
         insp: str = None,
-        len: int = None,
+        length: int = None,
         blob: str = None,
     ):
         self.r = r
         self.action = action
         self.ffid = ffid
         self.key = key
-        self.keys = keys
+        self.keyvalues = keys
         self.args = args
         self.val = val
         self.error = error
         self.sig = sig
         self.c = c
         self.insp = insp
-        self.len = len
+        self.length = length
         self.blob = blob
         super().__init__(
             {
@@ -112,14 +150,14 @@ class Request(Dict[str, Any]):
                     "action": action,
                     "ffid": ffid,
                     "key": key,
-                    "keys": self.keys,
+                    "keys": self.keyvalues,
                     "args": args,
                     "val": val,
                     "error": error,
                     "sig": sig,
                     "c": c,
                     "insp": insp,
-                    "len": len,
+                    "length": length,
                     "blob": blob,
                 }.items()
                 if v is not None
@@ -138,18 +176,26 @@ class Request(Dict[str, Any]):
                 "action": self.action,
                 "ffid": self.ffid,
                 "key": self.key,
-                "keys": self.keys,
+                "keys": self.keyvalues,
                 "args": self.args,
                 "val": self.val,
                 "error": self.error,
                 "sig": self.sig,
                 "c": self.c,
                 "insp": self.insp,
+                "length": self.length,
+                "blob": self.blob,
             }.items()
             if v is not None
         }
 
     def error_state(self):
+        """
+        Determines if an error has occurred and been recorded in the request.
+
+        Returns:
+            bool: True if an error is present, False otherwise.
+        """
         return self.error is not None
 
     @classmethod
@@ -179,7 +225,8 @@ class Request(Dict[str, Any]):
     @classmethod
     def create_for_pcall(cls, ffid: int, action: str, key: Any, args: Any = None) -> "Request":
         """
-        Class method that creates a Request object based on the given parameters.
+        Class method that creates a Request object for use with the 'pcall' methods
+        in Executor.
 
         Parameters:
         ffid (int): The ID of the function.

@@ -214,7 +214,60 @@ async function $require(name, version, relativeTo) {
   const mod = await import(newpath);
   return mod.default ?? mod;
 }
-module.exports = {$require};
+
+/**
+ * A simple Async Queue
+ */
+class AsyncQueue {
+  /**
+   * Constructs a new AsyncQueue instance.
+   */
+  constructor() {
+    /** @private */
+    this.queue = [];
+  }
+
+  /**
+   * Enqueues an item into the queue.
+   * @param {*} item The item to enqueue.
+   */
+  enqueue(item) {
+    this.queue.push(item);
+  }
+
+  /**
+   * Dequeues an item from the queue asynchronously.
+   * @return {*} item the dequeued item,
+   * or undefined if the queue is empty.
+   */
+  dequeue() {
+    if (this.queue.length === 0) {
+      return; // If the queue is empty, return nothing
+    }
+    return this.queue.shift();
+  }
+  /**
+   * Peek the first element in the queue.
+   * @return {*} the first item,
+   * or undefined if the queue is empty.
+   */
+  peek() {
+    if (this.queue.length === 0) {
+      return; // If the queue is empty, return nothing
+    }
+    return this.queue[0];
+  }
+
+  /**
+   * Checks if the queue has elements.
+   * @return {boolean} True if the queue has elements, false otherwise.
+   */
+  hasElements() {
+    return this.queue.length > 0;
+  }
+}
+
+module.exports = {$require, AsyncQueue};
 
 // async function test () {
 //   console.log(await $require('prismarine-block'))

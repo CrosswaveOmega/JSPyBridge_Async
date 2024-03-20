@@ -1,6 +1,5 @@
 import asyncio
 import os
-import sys
 import inspect
 
 from typing import Any, Optional
@@ -8,7 +7,6 @@ from typing import Any, Optional
 from .configjs import JSConfig
 from .core.jslogging import log_print
 from .proxy import Proxy
-from .errorsjs import NoAsyncLoop
 
 
 class JSContext:
@@ -79,7 +77,8 @@ class JSContext:
         """Set the callback event loop to the current asyncio loop.
 
         Raises:
-            NoConfigInitialized: If `init_js` or `init_js_a` was not called prior,  or if the bridge is still being initialization is in progress.
+            NoConfigInitialized: If `init_js` or `init_js_a` was not called prior,
+            or if the bridge is still being initialization is in progress.
         """
 
         self.config.set_asyncio_loop(asyncio.get_event_loop())
@@ -103,6 +102,9 @@ class JSContext:
             str: calling directory
         """
         calling_dir = None
+
+        if self.usecwd:
+            return os.getcwd()
         if name.startswith("."):
             # Some code to extract the caller's file path, needed for relative imports
             try:
@@ -113,7 +115,7 @@ class JSContext:
                 rel_path = namespace["__file__"]
                 abs_path = os.path.join(cwd, rel_path)
                 calling_dir = os.path.dirname(abs_path)
-            except Exception as e:  # pylint: disable=broad-except
+            except Exception:  # pylint: disable=broad-except
                 # On Notebooks, the frame info above does not exist, so assume the CWD as caller
                 calling_dir = os.getcwd()
         print(calling_dir)
@@ -308,7 +310,7 @@ class JSContext:
         rv = None
         try:
             local_vars = {}
-            locals = frame.f_back.f_locals
+            # locals = frame.f_back.f_locals
 
             for local in frame.f_back.f_locals:
                 if not local.startswith("__"):

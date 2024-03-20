@@ -142,7 +142,7 @@ class EventLoop(EventLoopMixin, ThreadManagerMixin):
         callbackExecutor (EventExecutorThread): An event executor thread for handling callbacks.
         callbacks (WeakValueDictionary): A dictionary of active callbacks that are being tracked.
         threads (list): A list of threads managed by the event loop.
-        outbound (list): A list of outbound payloads.
+        outbound (Queue): A list of outbound payloads.
         requests (dict): A dictionary of request IDs and locks.
         responses (dict): A dictionary of response data and barriers.
         conn(ConnectionClass): Instance of the connection class.
@@ -288,8 +288,7 @@ class EventLoop(EventLoopMixin, ThreadManagerMixin):
 
     def queue_payload(self, payload: PayloadType):
         """
-        Just send a payload.
-
+        Add a payload to the outbound queue.
         Args:
             payload: The payload to be sent.
         """
@@ -405,7 +404,6 @@ class EventLoop(EventLoopMixin, ThreadManagerMixin):
         try:
             while self.outbound.qsize() > 0 and still_full:
                 try:
-                    # Batch
                     toadd = self.outbound.get_nowait()
                     out.append(toadd)
                     current_iter += 1
@@ -428,7 +426,9 @@ class EventLoop(EventLoopMixin, ThreadManagerMixin):
         self.tasks = [x for x in self.tasks if x.is_task_done() is False]
 
     def _free_if_above_limit(self, ra: int = 20, lim: int = 40):
-        """Send a free request across the bridge if limit was exceeded
+        """
+        Send a free request across the bridge if size of the
+        freeable list was exceeded.
 
         Args:
             ra (int): Request ID to be assigned to request.

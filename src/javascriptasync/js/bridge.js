@@ -15,7 +15,7 @@ try {
   const EventEmitter = require('events');
   // const fs = require('fs');
   const {PyBridge, SnowflakeMode, generateSnowflake} = require('./pyi');
-  const {$require} = require('./deps');
+  const {$require, AsyncQueue} = require('./deps');
   const {once} = require('events');
 
   const debug = process.env.DEBUG?.includes(
@@ -384,7 +384,7 @@ try {
 
       // Step 3: Encode Buffer to Base64
       const base64Data = bufferData.toString('base64');
-      this.ipc.send({r, len: v.length, blob: base64Data});
+      this.ipc.send({r, length: v.length, blob: base64Data});
       // Convert the JSON object to a string
 
 
@@ -527,6 +527,7 @@ try {
     constructor(tgprocess) {
       this.process = tgprocess;
       this.message='';
+      this.queue=new AsyncQueue();
     }
 
     /**
@@ -579,21 +580,23 @@ try {
    * @param {Bridge} bridge - An instance of the Bridge class
    */
     handle_message =(bridge)=>{
-      for (const line of this.message.split('\n')) {
-        try {
-          var j = JSON.parse(line);
-        } catch (e) {
-          continue;
-        }
-        if (j.c === 'pyi') {
-          handlers[j.r]?.(j);
-          
-          if (handlers.hasOwnProperty(j.r)) {
-            delete handlers[j.r];
+      while (this.queue.hasElements()) {
+        const message=this.queue.dequeue();
+        for (const line of message.split('\n')) {
+          try {
+            var j = JSON.parse(line);
+          } catch (e) {
+            continue;
           }
-          
-        } else {
-          bridge.onMessage(j);
+          if (j.c === 'pyi') {
+            handlers[j.r]?.(j);
+
+            if (handlers.hasOwnProperty(j.r)) {
+              delete handlers[j.r];
+            }
+          } else {
+            bridge.onMessage(j);
+          }
         }
       }
     };
@@ -605,15 +608,18 @@ try {
    */
     read = (data, bridge) => {
       const d = String(data);
+      let message='';
       for (let i = 0; i < d.length; i++) {
         if (d[i] === '\n') {
-          debug('py -> js', this.message);
+          debug('py -> js', message);
+          this.queue.enqueue(message);
           this.handle_message(bridge);
-          this.message = '';
+          message = '';
         } else {
-          this.message += d[i];
+          message += d[i];
         }
       }
+      this.queue.enqueue(message);
     };
     /**
    * Handles the end of data stream operations.
@@ -623,8 +629,8 @@ try {
    * @param {Bridge} bridge - An instance of the Bridge class.
    */
     end = (bridge)=>{
-      if (this.message.length > 0) {
-        debug('py -> js', this.message);
+      if (this.queue.hasElements()) {
+        debug('py -> js', this.queue.peek());
         this.handle_message(bridge);
       }
     };

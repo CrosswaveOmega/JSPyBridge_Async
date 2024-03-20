@@ -64,7 +64,7 @@ class ConnectionClass:
         com_thread (threading.Thread): The thread for handling communication with JavaScript.
         stdout_thread (threading.Thread): The thread for reading standard output.
 
-        sendQ (list): Queue for outgoing messages to JavaScript.
+        sendQ (list): List for outgoing messages to JavaScript before the process fully starts.
         stderr_lines (list): Lines piped from JavaScript Process
     """
 
