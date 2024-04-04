@@ -37,9 +37,9 @@ INTERNAL_VARS = [
     "_es6",
     "_asyncmode",
     "_resolved",
-    "_ops",
+    "_ops", #currently unused
     "_keys",
-    "_inspected",
+    "_inspected", #currently unused
 ]
 
 
@@ -58,12 +58,15 @@ class Proxy:
 
     Attributes:
         ffid (int): Foreign Object Reference ID.
+        node_op (bool): For the node_op class
         _exe (Executor): The executor for communication with JavaScript.
         _ix (int): Index.
         _pffid (int): Property foreign Object Reference ID.
+        _children (dict): All immediate cached children on the python side.
         _pname (str): Property name.
         _es6 (bool): ES6 class flag.
-        _asyncmode (bool): asyncronous stacking mode: Operations are assembled into a stack of NodeOp  objects.
+        _asyncmode (bool): asyncronous stacking mode: 
+            Operations are assembled into a stack of NodeOp  objects.
         _resolved (dict): Resolved values.
         _keys (list): List of keys.
     """
@@ -92,6 +95,7 @@ class Proxy:
             prop_ffid (int, optional): Property foreign Object Reference ID. Defaults to None.
             prop_name (str, optional): Property name. Defaults to "".
             es6 (bool, optional): ES6 class flag. Defaults to False.
+            amode (bool, optional): Whether or not to enable async chaining mode.
 
         """
         log_info("new Proxy: %s, %s,%s,%s,%s", exe, ffid, prop_ffid, prop_name, es6)
@@ -105,7 +109,7 @@ class Proxy:
         self._resolved = {}
         self._ops = []
         self._children = {}
-        self.node_op = False
+        self.node_op= False
         self._keys = None
         self._inspected = None
         self._asyncmode = amode
@@ -1065,9 +1069,8 @@ class NodeOp:
         if self._op == "get":
             return await proxy.get_a(**self._kwargs)
         if self._op == "call":
-            args = self._kwargs["args"]
-            self._kwargs.pop("args")
-            return await proxy.call_a(*args, **self._kwargs)
+            a=self._get_args()
+            return await proxy.call_a(*a[0],**a[1])
         if self._op == "getitem":
             return await proxy.get_item_a(**self._kwargs)
         if self._op == "setitem":
@@ -1075,6 +1078,11 @@ class NodeOp:
         if self._op == "serialize":
             return await proxy.get_dict_a(**self._kwargs)
         raise InvalidNodeOp(f"Invalid Operation {self._op}!")
+
+    def _get_args(self):
+        args = self._kwargs["args"]
+        self._kwargs.pop("args")
+        return args, self._kwargs
 
     def process_sync(self):
         """
@@ -1090,9 +1098,8 @@ class NodeOp:
         if self._op == "get":
             return proxy.get_s(**self._kwargs)
         if self._op == "call":
-            args = self._kwargs["args"]
-            self._kwargs.pop("args")
-            return proxy.call_s(*args, **self._kwargs)
+            a=self._get_args()
+            return proxy.call_s(*a[0],**a[1])
         if self._op == "getitem":
             return proxy.get_item(**self._kwargs)
         if self._op == "setitem":

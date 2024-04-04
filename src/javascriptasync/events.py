@@ -95,7 +95,7 @@ class EventExecutorThread(threading.Thread):
     def __init__(self):
         self.doing: List[Any] = []
         self.running: bool = True
-        self.jobs: Queue[Tuple(str, str, Callable, Tuple[Any, ...])] = Queue()
+        self.jobs: Queue[Tuple[str, str, Callable, Tuple[Any, ...]]] = Queue()
         super().__init__(daemon=True)
         # self.daemon=True
 

@@ -27,7 +27,8 @@ from typing import Any, Tuple
 
 
 class JSONRequestDecoder(JSONDecoder):
-    def decode(self, s: str):
+    # pylint: disable=arguments-differ
+    def decode(self, s: str): #type:ignore
         """Return the Python representation of ``s`` (a ``str`` instance
         containing a JSON document).
 

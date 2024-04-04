@@ -143,7 +143,8 @@ class PackageManager {
       process.stderr.write('\n\n');
       process.stdout.write('\n');
       log('OK.');
-      return this.resolve(internalName);
+      return internalName;
+      // return this.resolve(internalName);
     } else {
       // The package is already installed.
       return internalName;

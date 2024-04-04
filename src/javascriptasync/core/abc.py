@@ -29,6 +29,7 @@ class EventObject:
 
     def set(self):
         """shared 'set' function for both threading.Event and asyncio.Event"""
+        #It's implemented in threading.Event
         raise NotImplementedError()
 
     def set_data(self, data):
@@ -37,7 +38,9 @@ class EventObject:
 
     def get_data(self):
         """called within the target thread or coroutine,
-        retrieve the data published to this Event."""
+        retrieve the data published to this Event.  
+        
+        Using a threading.Lock to sync."""
         with self.event_lock:
             req = Request(**self.output)
             return req
