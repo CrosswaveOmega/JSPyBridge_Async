@@ -121,7 +121,7 @@ class PyObject {
         };
       }
 
-      log('Get symbol', next.callstack, prop);
+      //log('Get symbol', next.callstack, prop);
       return;
     }
 
