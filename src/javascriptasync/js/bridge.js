@@ -589,9 +589,9 @@ try {
             continue;
           }
           if (j.c === 'pyi') {
-            handlers[j.r]?.(j);
-
-            if (handlers.hasOwnProperty(j.r)) {
+            const handler=handlers[j.r];
+            if (handler){
+              handler(j);
               delete handlers[j.r];
             }
           } else {
